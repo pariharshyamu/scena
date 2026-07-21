@@ -23,7 +23,20 @@
     "dev": "vite examples/forest",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pariharshyamu/scena.git"
+  },
+  "homepage": "https://github.com/pariharshyamu/scena#readme",
+  "bugs": {
+    "url": "https://github.com/pariharshyamu/scena/issues"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "threejs",
