@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — a world from one JSON manifest</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; color: #eef2f7;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — buildScene(manifest)</strong><br />
+      Terrain, lake, road, village, forests and day cycle — every world
+      decision above is one JSON object.<br />
+      The fort is an ASCII <code>assembleKit</code> map; distant trees are
+      LOD cones (<code>scatter</code> tiles). Append <code>?t=0.85</code>
+      for night.
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

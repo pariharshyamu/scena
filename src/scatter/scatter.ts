@@ -13,6 +13,12 @@ import type { Obstacle, Prop } from '../core/types';
 export interface ScatterItem {
   /** Prop factory, called once per visual variant with a seeded Rng. */
   create(rng: Rng): Prop;
+  /**
+   * Simplified far-distance factory for LOD (e.g. a single cone for a
+   * tree). Only used when `ScatterOptions.lod` is set; items without one
+   * stay full-detail at every distance.
+   */
+  createFar?(rng: Rng): Prop;
   /** Relative frequency among items. Default 1. */
   weight?: number;
   /** Distinct variants generated per item (visual variety). Default 4. */
@@ -40,6 +46,18 @@ export interface ScatterOptions {
   keepOut?: Obstacle[] | { center: { x: number; z: number }; radius: number }[];
   /** Density-noise feature size in world units. Default 18. */
   clumpScale?: number;
+  /**
+   * Tile-based LOD: placements are bucketed into square tiles; tiles
+   * beyond `distance` from the camera swap full-detail instances for the
+   * items' `createFar` variants (with 10% hysteresis so tiles don't
+   * flicker at the boundary). Call `result.update(camera)` each frame.
+   */
+  lod?: {
+    /** Camera distance at which tiles switch to far variants. */
+    distance: number;
+    /** Tile side in world units. Default 16. */
+    tileSize?: number;
+  };
 }
 
 export interface Placement {
@@ -49,6 +67,12 @@ export interface Placement {
   itemIndex: number;
 }
 
+export interface ScatterTile {
+  center: { x: number; z: number };
+  near: Group;
+  far: Group;
+}
+
 export interface ScatterResult {
   /** One InstancedMesh per template part — a handful of draw calls total. */
   group: Group;
@@ -56,6 +80,10 @@ export interface ScatterResult {
   /** World-space steering obstacles for everything with a footprint. */
   obstacles: Obstacle[];
   count: number;
+  /** LOD tiles (present when `lod` was requested). */
+  tiles?: ScatterTile[];
+  /** Re-evaluate tile LOD against the camera (present when `lod` was requested). */
+  update?(camera: { position: Vector3 }): void;
 }
 
 /**
@@ -167,10 +195,54 @@ export function scatter(options: ScatterOptions): ScatterResult {
   const up = new Vector3(0, 1, 0);
   const scaleVector = new Vector3();
 
+  const emit = (variant: Prop, list: Placement[], parent: Group): void => {
+    variant.object.updateMatrixWorld(true);
+    variant.object.traverse((child) => {
+      if (!(child instanceof Mesh)) return;
+      const instanced = new InstancedMesh(child.geometry, child.material, list.length);
+      instanced.instanceMatrix.setUsage(DynamicDrawUsage);
+      list.forEach((placement, index) => {
+        quaternion.setFromAxisAngle(up, placement.rotationY);
+        scaleVector.setScalar(placement.scale);
+        placementMatrix.compose(placement.position, quaternion, scaleVector);
+        composed.multiplyMatrices(placementMatrix, child.matrixWorld);
+        instanced.setMatrixAt(index, composed);
+      });
+      instanced.instanceMatrix.needsUpdate = true;
+      parent.add(instanced);
+    });
+  };
+
+  // LOD tiles: near/far group pairs, lazily created per occupied tile.
+  const tileSize = options.lod?.tileSize ?? 16;
+  const tileMap = new Map<string, ScatterTile>();
+  const tileFor = (x: number, z: number): ScatterTile => {
+    const tx = Math.floor(x / tileSize);
+    const tz = Math.floor(z / tileSize);
+    const key = `${tx},${tz}`;
+    let tile = tileMap.get(key);
+    if (!tile) {
+      tile = {
+        center: { x: (tx + 0.5) * tileSize, z: (tz + 0.5) * tileSize },
+        near: new Group(),
+        far: new Group(),
+      };
+      tile.far.visible = false;
+      group.add(tile.near, tile.far);
+      tileMap.set(key, tile);
+    }
+    return tile;
+  };
+
   options.items.forEach((item, itemIndex) => {
     const variantCount = item.variants ?? 4;
     const variants: Prop[] = [];
     for (let v = 0; v < variantCount; v++) variants.push(item.create(rng.fork()));
+    const useLod = options.lod !== undefined && item.createFar !== undefined;
+    const farVariants: Prop[] = [];
+    if (useLod) {
+      for (let v = 0; v < variantCount; v++) farVariants.push(item.createFar!(rng.fork()));
+    }
 
     const byVariant: Placement[][] = variants.map(() => []);
     for (const placement of placements) {
@@ -183,21 +255,22 @@ export function scatter(options: ScatterOptions): ScatterResult {
     variants.forEach((variant, v) => {
       const list = byVariant[v];
       if (list.length === 0) return;
-      variant.object.updateMatrixWorld(true);
-      variant.object.traverse((child) => {
-        if (!(child instanceof Mesh)) return;
-        const instanced = new InstancedMesh(child.geometry, child.material, list.length);
-        instanced.instanceMatrix.setUsage(DynamicDrawUsage);
-        list.forEach((placement, index) => {
-          quaternion.setFromAxisAngle(up, placement.rotationY);
-          scaleVector.setScalar(placement.scale);
-          placementMatrix.compose(placement.position, quaternion, scaleVector);
-          composed.multiplyMatrices(placementMatrix, child.matrixWorld);
-          instanced.setMatrixAt(index, composed);
-        });
-        instanced.instanceMatrix.needsUpdate = true;
-        group.add(instanced);
-      });
+      if (useLod) {
+        // Split this variant's placements per tile, emit near + far pairs.
+        const byTile = new Map<ScatterTile, Placement[]>();
+        for (const placement of list) {
+          const tile = tileFor(placement.position.x, placement.position.z);
+          let bucket = byTile.get(tile);
+          if (!bucket) byTile.set(tile, (bucket = []));
+          bucket.push(placement);
+        }
+        for (const [tile, bucket] of byTile) {
+          emit(variant, bucket, tile.near);
+          emit(farVariants[v], bucket, tile.far);
+        }
+      } else {
+        emit(variant, list, group);
+      }
       if (variant.obstacleRadius > 0) {
         for (const placement of list) {
           obstacles.push({
@@ -209,5 +282,26 @@ export function scatter(options: ScatterOptions): ScatterResult {
     });
   });
 
-  return { group, placements, obstacles, count: placements.length };
+  const result: ScatterResult = { group, placements, obstacles, count: placements.length };
+  if (options.lod) {
+    const tiles = [...tileMap.values()];
+    const swapOut = options.lod.distance * 1.1; // hysteresis: no flicker
+    const swapIn = options.lod.distance * 0.9;
+    result.tiles = tiles;
+    result.update = (camera) => {
+      for (const tile of tiles) {
+        const dx = camera.position.x - tile.center.x;
+        const dz = camera.position.z - tile.center.z;
+        const distance = Math.hypot(dx, dz);
+        if (tile.near.visible && distance > swapOut) {
+          tile.near.visible = false;
+          tile.far.visible = true;
+        } else if (!tile.near.visible && distance < swapIn) {
+          tile.near.visible = true;
+          tile.far.visible = false;
+        }
+      }
+    };
+  }
+  return result;
 }

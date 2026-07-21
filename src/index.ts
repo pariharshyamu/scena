@@ -44,11 +44,26 @@ export { createPath, type WorldPath, type PathOptions } from './environment/path
 // Generators
 export { createVillage, type Village, type VillageOptions } from './generators/village';
 
+// Kits
+export { KIT_UNIT, assembleKit, type Kit, type KitOptions } from './kits/kit';
+
+// Scene assembly
+export {
+  buildScene,
+  type SceneManifest,
+  type BuiltScene,
+  type ManifestScatter,
+  type ManifestScatterItem,
+  type ScatterPropType,
+} from './scene/manifest';
+export { extractMarkers, type Markers } from './scene/markers';
+
 // Scattering
 export {
   scatter,
   type ScatterOptions,
   type ScatterItem,
   type ScatterResult,
+  type ScatterTile,
   type Placement,
 } from './scatter/scatter';

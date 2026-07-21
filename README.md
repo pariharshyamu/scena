@@ -56,6 +56,27 @@ game.onUpdate(() => {                                                  // ← SC
 
 Neither library imports the other — the obstacle shape (`{ center, radius }`) is structural. Run the full demo (`npm run dev` — gama3d comes from npm): a day-night cycle over terrain, lakes, a windblown forest, a seeded hamlet whose windows ignite at dusk, and a dirt road whose single authored curve is at once the visual ribbon, the scatter keep-out, and the wardens' patrol route. Append `?t=0.85` to freeze the time of day.
 
+## A world as JSON
+
+Everything above can also be declared instead of coded — a `SceneManifest` is plain data (store it, diff it, send it over the network), and `buildScene` applies all the cross-feature wiring automatically: scatters stay ashore, off roads and out of the village; the village avoids water and paths; its lamps and windows feed the day cycle.
+
+```ts
+const world = buildScene({
+  seed: 18,
+  palette: 'autumn',
+  terrain: { size: 90, amplitude: 5 },
+  water: { level: 0.25 },
+  dayCycle: { dayLength: 120 },
+  paths: [{ points: roadPoints, loop: true }],
+  village: { radius: 9, houses: 5 },
+  scatters: [{ density: 0.05, items: [{ type: 'tree', weight: 4 }, { type: 'rock' }],
+               lod: { distance: 34 } }],   // far tiles collapse to cones
+}, scene);
+game.onUpdate((t) => world.update(t.delta));
+```
+
+Run it: `npm run dev:manifest`. For handcrafted interiors there are kits — `assembleKit(['####', '#.S#', '#..D', '####'])` turns an ASCII map into snapped walls, floors, doorways, torches, spawn points and obstacles. And for levels authored in Blender/glTF, `extractMarkers(gltf.scene)` reads `spawn_*` / `route_*_0` / `obstacle_*` / `keepout_*` empties into spawns, ordered patrol routes and steering/scatter metadata.
+
 ## API
 
 | Area | Exports |
@@ -64,9 +85,11 @@ Neither library imports the other — the obstacle shape (`{ center, radius }`) 
 | Environment | `createTerrain` (with `heightAt(x, z)` and `waterLevel` sand bands), `createSky`, `createLightingRig(...)`, `applyFog(...)`, `createWater` + `aboveWater` mask, `createDayCycle` (one `timeOfDay` drives sun/sky/fog/lamps), `applyWind` (vegetation sway), `createPath` (ribbon + patrol route + keep-out from one curve) |
 | Scattering | `scatter({ seed, area, surface, density \| count, items, mask, minSpacing, keepOut })` → `{ group, placements, obstacles, count }` |
 | Generators | `createVillage({ seed, center, radius, houses, surface, mask })` → `{ group, props, obstacles, lamps, keepOut }` — a hamlet whose windows and lamps hand straight to `createDayCycle`, buildings to `ObstacleAvoidance`, clearing to `scatter` |
+| Kits | `KIT_UNIT`, `assembleKit(asciiRows)` → `{ group, obstacles, spawns, torches, floorAt }` — grid-snapped walls/floors/doorways as two InstancedMeshes |
+| Scene assembly | `buildScene(manifest, scene?)` → a whole wired world from plain JSON; `extractMarkers(root)` → `{ spawns, routes, obstacles, keepOut }` from naming conventions |
 | Core | `Rng` (seeded), `valueNoise2`/`fractalNoise2`, `PALETTES`, `collectObstacles` |
 
-Scatter placement uses density noise for natural clumping and clearings, a spatial hash for minimum spacing, and per-item visual variants; rendering merges everything into `InstancedMesh`es (one draw call per prop part).
+Scatter placement uses density noise for natural clumping and clearings, a spatial hash for minimum spacing, and per-item visual variants; rendering merges everything into `InstancedMesh`es (one draw call per prop part). Opt into `lod: { distance, tileSize }` and placements bucket into tiles that swap to each item's `createFar` variant beyond the distance (10% hysteresis; call `result.update(camera)` each frame).
 
 ## Roadmap
 
@@ -80,9 +103,9 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Paths: one curve = visual ribbon + scatter keep-out + GAMA patrol route
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
-- [ ] Kits: dungeon/village pieces with shared snap dimensions
-- [ ] Declarative scene manifests (JSON → scene), Blender marker conventions (`spawn_*`, `route_*`, `nav_*`)
-- [ ] LOD tiers for scatter
+- [x] Kits: ASCII maps → grid-snapped dungeon/compound pieces (`assembleKit`)
+- [x] Declarative scene manifests (JSON → scene) and Blender marker conventions (`spawn_*`, `route_*`, `obstacle_*`, `keepout_*`)
+- [x] LOD tiles for scatter (`createFar` variants, hysteresis)
 - [ ] CC0 asset-pack adapters (Kenney/Quaternius) and a KTX2/Draco pipeline
 - [ ] Docs site with live playground (reusing GAMA's runner)
 
@@ -90,10 +113,11 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 
 ```bash
 npm install
-npm test          # 49 vitest unit tests (determinism, metadata, scatter rules, snapshots)
+npm test          # 62 vitest unit tests (determinism, metadata, scatter rules, snapshots)
 npm run typecheck
 npm run build     # tsup → dist (ESM + CJS + d.ts)
 npm run dev       # the SCENA × GAMA living-forest demo
+npm run dev:manifest  # the same kind of world, built from one JSON manifest
 ```
 
 ## License
