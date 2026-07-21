@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA playground runner</title>
+    <style>html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }</style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.js",
+          "scena3d": "./vendor/scena.js",
+          "gama3d": "./vendor/gama/index.js",
+          "gama3d/templates": "./vendor/gama/templates.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module" src="./src/runner.ts"></script>
+  </body>
+</html>

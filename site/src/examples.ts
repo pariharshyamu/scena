@@ -1,0 +1,433 @@
+export interface Example {
+  id: string;
+  title: string;
+  group: string;
+  code: string;
+}
+
+// Shared orbit-camera prelude, inlined into each example so every one is
+// fully self-contained and copy-pasteable.
+const orbit = (radius = 30, height = 16, speed = 0.05) =>
+  `game.onUpdate((t) => {
+  const a = t.elapsed * ${speed};
+  game.camera.position.set(Math.cos(a) * ${radius}, ${height}, Math.sin(a) * ${radius});
+  game.camera.lookAt(0, 2, 0);
+});`;
+
+export const EXAMPLES: Example[] = [
+  {
+    id: 'world',
+    title: 'Terrain, sky & light',
+    group: 'Worldbuilding',
+    code: `// A complete outdoor stage in a few calls: seeded low-poly terrain
+// (with an exact analytic heightAt), a gradient sky dome, a lighting
+// rig preset and matching fog. Change the seed — same world, elsewhere.
+import { createTerrain, createSky, createLightingRig, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+
+const terrain = createTerrain({ seed: 7, size: 90, amplitude: 6, palette });
+scene.add(terrain.mesh);
+scene.add(createSky({ palette }).mesh);
+scene.add(createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+
+// heightAt is the same function that built the mesh — never disagrees.
+console.log('height at origin:', terrain.heightAt(0, 0).toFixed(2));
+
+${orbit(36, 18)}
+game.start();`,
+  },
+
+  {
+    id: 'forest',
+    title: 'Scatter a forest',
+    group: 'Worldbuilding',
+    code: `// Empty plane → forest in one call. Density noise gives natural
+// clumps and clearings, a spatial hash enforces spacing, and the whole
+// forest renders as a handful of InstancedMeshes.
+import { createTerrain, createSky, createLightingRig, applyFog,
+         createTree, createRock, createBush, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+
+const terrain = createTerrain({ seed: 20, size: 90, amplitude: 5, palette });
+scene.add(terrain.mesh, createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+
+const forest = scatter({
+  seed: 21,
+  area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  surface: terrain.heightAt,           // exact — trees sit on the ground
+  density: 0.06,
+  minSpacing: 1.5,
+  items: [
+    { create: (rng) => createTree({ seed: rng.int(1, 1e9), palette }), weight: 4, variants: 6 },
+    { create: (rng) => createRock({ seed: rng.int(1, 1e9), palette }) },
+    { create: (rng) => createBush({ seed: rng.int(1, 1e9), palette }) },
+  ],
+  mask: (x, z, y) => y < 3.6,          // keep the peaks bare
+  keepOut: [{ center: { x: 0, z: 0 }, radius: 10 }],  // a clearing
+});
+scene.add(forest.group);
+console.log(forest.count, 'props,', forest.obstacles.length, 'obstacles');
+
+${orbit(34, 17)}
+game.start();`,
+  },
+
+  {
+    id: 'lod',
+    title: 'Scatter LOD tiles',
+    group: 'Worldbuilding',
+    code: `// Opt-in LOD: placements bucket into tiles; tiles beyond 'distance'
+// swap full trees for each item's createFar variant (here: one cone).
+// Watch trees pop between detail levels as the camera sweeps.
+import { createTerrain, createSky, createLightingRig, applyFog,
+         createTree, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, MeshStandardMaterial, CylinderGeometry, Group } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+const terrain = createTerrain({ seed: 9, size: 120, amplitude: 4, palette });
+scene.add(terrain.mesh, createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+
+const forest = scatter({
+  seed: 5,
+  area: { min: { x: -55, z: -55 }, max: { x: 55, z: 55 } },
+  surface: terrain.heightAt,
+  density: 0.08,
+  items: [{
+    create: (rng) => createTree({ seed: rng.int(1, 1e9), palette }),
+    createFar: (rng) => {                  // far stand-in: a single cone
+      const g = new Group();
+      const cone = new Mesh(new CylinderGeometry(0, 1.2, 3.2, 5),
+        new MeshStandardMaterial({ color: 0x2f9e57, flatShading: true }));
+      cone.position.y = 1.9;
+      g.add(cone);
+      return { object: g, obstacleRadius: 0 };
+    },
+  }],
+  lod: { distance: 26, tileSize: 12 },
+});
+scene.add(forest.group);
+console.log(forest.tiles.length, 'LOD tiles');
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.07;
+  game.camera.position.set(Math.cos(a) * 30, 10, Math.sin(a) * 30);
+  game.camera.lookAt(Math.cos(a + 1.2) * 20, 2, Math.sin(a + 1.2) * 20);
+  forest.update(game.camera);            // drive the tile swap
+});
+game.start();`,
+  },
+
+  {
+    id: 'props',
+    title: 'Prop gallery',
+    group: 'Props',
+    code: `// Every generator, one of each. All seeded (same seed = same prop),
+// all palette-themed, all reporting an obstacleRadius for steering.
+import { createTree, createRock, createCrate, createFence, createLamp,
+         createBush, createGrassTuft, createHouse, createTower, createWell,
+         createRuin, createLightingRig, createSky, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(80, 80),
+  new MeshStandardMaterial({ color: 0x3f9d5a }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const props = [
+  createTree({ seed: 3, palette }),   createTree({ seed: 4, style: 'oak', palette }),
+  createRock({ seed: 5, palette }),   createCrate({ seed: 6, palette }),
+  createLamp({ seed: 7, light: true, palette }), createBush({ seed: 8, palette }),
+  createWell({ seed: 9, palette }),   createHouse({ seed: 10, palette }),
+  createTower({ seed: 11, palette }), createRuin({ seed: 12, palette }),
+  createFence({ seed: 13, length: 4, palette }), createGrassTuft({ seed: 14, palette }),
+];
+props.forEach((prop, i) => {
+  prop.object.position.set((i % 4) * 8 - 12, 0, Math.floor(i / 4) * 9 - 9);
+  scene.add(prop.object);
+});
+
+${orbit(26, 14, 0.06)}
+game.start();`,
+  },
+
+  {
+    id: 'palettes',
+    title: 'Retheme with palettes',
+    group: 'Props',
+    code: `// One palette system themes every generator: the same four seeds,
+// grown in all four themes. Retheme a whole world by changing one word.
+import { createTree, createHouse, createLightingRig, createSky,
+         applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette: PALETTES.meadow }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', PALETTES.meadow);
+
+Object.entries(PALETTES).forEach(([name, palette], row) => {
+  const z = row * 9 - 13;
+  const ground = new Mesh(new PlaneGeometry(46, 8.6),
+    new MeshStandardMaterial({ color: palette.grassLow }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.z = z;
+  scene.add(ground);
+  const house = createHouse({ seed: 5, palette });
+  house.object.position.set(-14, 0, z);
+  scene.add(house.object);
+  for (let i = 0; i < 4; i++) {
+    const tree = createTree({ seed: 30 + i, palette });
+    tree.object.position.set(i * 7 - 4, 0, z);
+    scene.add(tree.object);
+  }
+  console.log(name, 'row at z =', z);
+});
+
+${orbit(30, 20, 0.04)}
+game.start();`,
+  },
+
+  {
+    id: 'village',
+    title: 'A seeded village',
+    group: 'Settlement',
+    code: `// A hamlet from one call: well-anchored plaza, houses facing inward,
+// street lamps, a watchtower, a ruin — plus the gameplay handshake
+// (obstacles, keepOut, lamps). Change the seed for a different village.
+import { createTerrain, createSky, createLightingRig, applyFog,
+         createVillage, createDayCycle, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+
+const terrain = createTerrain({ seed: 18, size: 90, amplitude: 5, palette });
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(terrain.mesh, sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+
+const village = createVillage({
+  seed: 30, radius: 9, houses: 5,
+  surface: terrain.heightAt,
+  palette,
+});
+scene.add(village.group);
+
+// Freeze the cycle at golden hour so the windows just start to glow.
+const cycle = createDayCycle({ sky, rig, scene, lamps: village.lamps, palette,
+  timeOfDay: 0.74 });
+console.log('sun elevation:', cycle.sunElevation.toFixed(2));
+
+${orbit(26, 13, 0.045)}
+game.start();`,
+  },
+
+  {
+    id: 'kit',
+    title: 'An ASCII fort (kits)',
+    group: 'Settlement',
+    code: `// Interiors and compounds from ASCII: every character is one
+// KIT_UNIT cell — walls '#', floors '.', doorways 'D', torches 'T',
+// spawns 'S'. Walls+floors render as just two InstancedMeshes.
+import { assembleKit, createLightingRig, createSky, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.dusk;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('night').group);
+applyFog(scene, 'thick', palette);
+const ground = new Mesh(new PlaneGeometry(70, 70),
+  new MeshStandardMaterial({ color: 0x2d3b4e }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.21;
+scene.add(ground);
+
+const fort = assembleKit([
+  '###########',
+  '#....#....#',
+  '#.T..#..T.#',
+  '#....D....#',
+  '##D####...#',
+  '#....#.S..#',
+  '#.T..D....#',
+  '#....#..T.#',
+  '###########',
+], { palette, torchLights: 4 });
+scene.add(fort.group);
+console.log('spawns:', fort.spawns.length,
+  '· walkable at spawn:', fort.floorAt(fort.spawns[0].x, fort.spawns[0].z));
+
+${orbit(17, 12, 0.05)}
+game.start();`,
+  },
+
+  {
+    id: 'living',
+    title: 'Water, wind & the day cycle',
+    group: 'Living world',
+    code: `// The living-world trio: an animated lake with sandy shores, wind
+// swaying every scattered plant (a vertex-shader patch on the instanced
+// meshes), and a fast day-night cycle driving sun, sky and fog.
+import { createTerrain, createSky, createLightingRig, applyFog, createWater,
+         aboveWater, applyWind, createDayCycle, createTree, createGrassTuft,
+         scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+
+const LEVEL = 0.9;
+const terrain = createTerrain({ seed: 3, size: 90, amplitude: 5,
+  waterLevel: LEVEL, palette });
+const water = createWater({ level: LEVEL, size: 120, palette });
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(terrain.mesh, water.mesh, sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+
+const dry = aboveWater(terrain, water, 0.3);
+const green = scatter({
+  seed: 4,
+  area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  surface: terrain.heightAt,
+  density: 0.09,
+  items: [
+    { create: (rng) => createTree({ seed: rng.int(1, 1e9), palette }), weight: 1 },
+    { create: (rng) => createGrassTuft({ seed: rng.int(1, 1e9), palette }), weight: 3, variants: 8 },
+  ],
+  mask: (x, z, y) => y < 3.6 && dry(x, z),   // nothing grows underwater
+});
+scene.add(green.group);
+
+const wind = applyWind(green.group, { strength: 0.08 });
+const cycle = createDayCycle({ sky, rig, scene, palette, dayLength: 24 });
+game.onUpdate((t) => { water.update(t.delta); wind.update(t.delta); cycle.update(t.delta); });
+
+${orbit(34, 16)}
+game.start();`,
+  },
+
+  {
+    id: 'path',
+    title: 'A road & its wardens',
+    group: 'Living world',
+    code: `// The SCENA handshake, live: ONE authored polyline becomes the dirt
+// ribbon, the scatter keep-out AND the patrol route; the forest's
+// obstacle metadata feeds GAMA's ObstacleAvoidance. Neither library
+// imports the other — the shapes are structural.
+import { createTerrain, createSky, createLightingRig, applyFog, createPath,
+         createTree, scatter, PALETTES } from 'scena3d';
+import { Game, MotionAgent, FollowPath, Path, ObstacleAvoidance, Separation } from 'gama3d';
+import { createCapsulePerson } from 'gama3d/templates';
+
+const palette = PALETTES.autumn;
+const game = new Game();
+const scene = game.world.scene;
+const terrain = createTerrain({ seed: 18, size: 90, amplitude: 5, palette });
+scene.add(terrain.mesh, createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+
+const road = createPath(
+  [{ x: -18, z: -10 }, { x: 0, z: -16 }, { x: 16, z: -6 },
+   { x: 14, z: 12 }, { x: -2, z: 14 }, { x: -20, z: 6 }],
+  { surface: terrain.heightAt, width: 2.2, loop: true, palette });
+scene.add(road.mesh);
+
+const forest = scatter({
+  seed: 21,
+  area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  surface: terrain.heightAt,
+  density: 0.05, minSpacing: 1.6,
+  items: [{ create: (rng) => createTree({ seed: rng.int(1, 1e9), palette }), variants: 6 }],
+  mask: (x, z, y) => y < 3.6,
+  keepOut: road.keepOut,               // nothing grows on the road
+});
+scene.add(forest.group);
+
+const wardens = [];
+for (let i = 0; i < 3; i++) {
+  const warden = game.world.spawn('warden');
+  warden.add(createCapsulePerson([0x60a5fa, 0xf87171, 0xfbbf24][i]));
+  const patrol = new Path(road.route.map((p) => p.clone()), true);
+  for (let s = 0; s < (i * road.route.length) / 3; s++) patrol.advance();
+  warden.position.copy(patrol.current());
+  const agent = warden.addComponent(new MotionAgent({ maxSpeed: 4.5, maxForce: 30, planar: true }));
+  agent.addBehavior(new FollowPath(patrol, 1.6));
+  agent.addBehavior(new ObstacleAvoidance(() => forest.obstacles, 3.5, 0.5), 2.5);
+  agent.addBehavior(new Separation(() => wardens, 1.6), 1.2);
+  wardens.push(agent);
+}
+game.onUpdate(() => {
+  for (const a of wardens) a.owner.position.y = terrain.heightAt(a.owner.position.x, a.owner.position.z);
+});
+
+${orbit(30, 15)}
+game.start();`,
+  },
+
+  {
+    id: 'manifest',
+    title: 'A world from JSON',
+    group: 'Manifests',
+    code: `// The entire world below is ONE plain-JSON object — storable,
+// diffable, network-shippable. buildScene() does all the cross-feature
+// wiring: scatters stay ashore/off-road/out of the village, and the
+// village's windows + lamps feed the day cycle. Edit the JSON and re-run.
+import { buildScene } from 'scena3d';
+import { Game } from 'gama3d';
+
+const game = new Game();
+const world = buildScene({
+  seed: 18,
+  palette: 'autumn',
+  terrain: { size: 90, amplitude: 5 },
+  water: { level: 0.25 },
+  dayCycle: { dayLength: 30, timeOfDay: 0.35 },
+  paths: [{ points: [
+    { x: -18, z: -10 }, { x: 0, z: -16 }, { x: 16, z: -6 },
+    { x: 14, z: 12 }, { x: -2, z: 14 }, { x: -20, z: 6 }], loop: true, width: 2.2 }],
+  village: { radius: 9, houses: 5 },
+  scatters: [
+    { density: 0.05, minSpacing: 1.6, maxHeight: 3.6,
+      items: [{ type: 'tree', weight: 4, variants: 6 }, { type: 'rock' }, { type: 'bush' }] },
+    { density: 0.12, minSpacing: 0.7, maxHeight: 3.4, items: [{ type: 'grass', variants: 8 }] },
+  ],
+}, game.world.scene);
+
+game.onUpdate((t) => world.update(t.delta));
+console.log(world.obstacles.length, 'obstacles ready for GAMA steering');
+
+${orbit(33, 16, 0.045)}
+game.start();`,
+  },
+];
+
+export function findExample(id: string): Example {
+  return EXAMPLES.find((e) => e.id === id) ?? EXAMPLES[0];
+}

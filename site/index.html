@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — scenes & environment assets for three.js</title>
+    <meta
+      name="description"
+      content="SCENA is a 3D world-building library on top of three.js: seeded procedural props, terrain, sky, water, day-night cycles, villages, kits and scattering — with gameplay metadata that game libraries like GAMA understand."
+    />
+    <link rel="stylesheet" href="./src/site.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="logo" href="./index.html">SCE<span>NA</span></a>
+      <a class="navlink" href="./guide.html">Guide</a>
+      <a class="navlink" href="./playground.html">Playground</a>
+      <span class="spacer"></span>
+      <a class="navlink" href="https://github.com/pariharshyamu/scena">GitHub</a>
+    </nav>
+
+    <header class="hero">
+      <iframe id="hero-demo" title="live village demo" tabindex="-1"></iframe>
+      <div class="inner">
+        <h1>SCE<span>NA</span></h1>
+        <p class="tag">three.js renders. GAMA makes it a game. <strong>SCENA gives it a world.</strong></p>
+        <p class="tag" style="font-size: 15px">
+          Seeded terrain · sky &amp; day-night cycles · water · wind · props · villages ·<br />
+          ASCII kits · instanced scattering with LOD · whole worlds from JSON manifests
+        </p>
+        <div class="buttons">
+          <a class="btn primary" href="./playground.html">Open the playground</a>
+          <a class="btn" href="./guide.html">Read the guide</a>
+        </div>
+        <p style="margin-top: 22px"><code>npm install scena3d three</code></p>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2>Worlds, not just meshes</h2>
+      <div class="cards">
+        <div class="card">
+          <span class="chip">createTerrain · heightAt(x, z)</span>
+          <h3><a href="./playground.html?example=world">Terrain with ground truth</a></h3>
+          <p>
+            Seeded low-poly terrain whose exact height function is exported, not just baked
+            into vertices — spawning, scattering and navmesh baking never disagree with the visuals.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">scatter · InstancedMesh · lod</span>
+          <h3><a href="./playground.html?example=forest">Forests in one call</a></h3>
+          <p>
+            Density-noise clumping, spacing, masks and keep-outs; thousands of props in a few
+            draw calls, with opt-in LOD tiles that collapse distant trees to cones.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">createDayCycle · createWater · applyWind</span>
+          <h3><a href="./playground.html?example=living">A living world</a></h3>
+          <p>
+            One <code>timeOfDay</code> drives sun, sky, fog and every lamp and window;
+            lakes get sandy shores; wind sways every scattered plant per-instance.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">createVillage · createHouse · assembleKit</span>
+          <h3><a href="./playground.html?example=village">Settlements</a></h3>
+          <p>
+            Seeded hamlets whose windows ignite at dusk, and ASCII maps that become
+            grid-snapped forts — walls, doorways, torches, spawn points.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">buildScene(manifest) · extractMarkers</span>
+          <h3><a href="./playground.html?example=manifest">Worlds as JSON</a></h3>
+          <p>
+            Declare a whole wired world as one plain-JSON manifest, or read
+            <code>spawn_*</code>/<code>route_*</code> markers straight out of Blender exports.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">Prop → { object, obstacleRadius }</span>
+          <h3><a href="./playground.html?example=path">Props know their gameplay</a></h3>
+          <p>
+            Every generator returns steering metadata GAMA understands structurally — a road's
+            one curve is its ribbon, its scatter keep-out and its patrol route.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">PALETTES · meadow autumn dusk winter</span>
+          <h3><a href="./playground.html?example=palettes">A matched set</a></h3>
+          <p>
+            One palette themes every prop, the terrain bands, sky, fog, water and roofs
+            together. Retheme a whole world by changing one word.
+          </p>
+        </div>
+        <div class="card">
+          <span class="chip">62 tests · seeded · ESM + CJS + d.ts</span>
+          <h3><a href="https://github.com/pariharshyamu/scena">Deterministic &amp; honest</a></h3>
+          <p>
+            Same seed, same world — enforced by snapshot hashes. Zero dependencies beyond
+            three; <code>Math.random</code> appears nowhere in the library.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>A world in ten lines</h2>
+      <pre><code>import { buildScene } from 'scena3d';
+
+const world = buildScene({
+  seed: 18,
+  palette: 'autumn',
+  terrain: { size: 90, amplitude: 5 },
+  water: { level: 0.25 },
+  dayCycle: { dayLength: 120 },
+  village: { radius: 9, houses: 5 },
+  scatters: [{ density: 0.05, items: [{ type: 'tree', weight: 4 }, { type: 'rock' }] }],
+}, scene);</code></pre>
+      <p>
+        <a href="./playground.html?example=manifest">Run it in the playground →</a>
+      </p>
+    </section>
+
+    <footer class="footer">
+      MIT · built on <a href="https://threejs.org">three.js</a> · pairs with
+      <a href="https://github.com/pariharshyamu/gama">GAMA</a> · the village behind the title is
+      <a href="./playground.html?example=village">live, editable code</a>
+    </footer>
+
+    <script type="module" src="./src/landing.ts"></script>
+  </body>
+</html>

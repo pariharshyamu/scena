@@ -107,7 +107,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Declarative scene manifests (JSON → scene) and Blender marker conventions (`spawn_*`, `route_*`, `obstacle_*`, `keepout_*`)
 - [x] LOD tiles for scatter (`createFar` variants, hysteresis)
 - [ ] CC0 asset-pack adapters (Kenney/Quaternius) and a KTX2/Draco pipeline
-- [ ] Docs site with live playground (reusing GAMA's runner)
+- [x] Docs site with live playground (10 runnable examples, 7 guides)
 
 ## Development
 
