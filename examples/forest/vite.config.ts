@@ -4,16 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// The GAMA handshake demo imports gama from a sibling clone
-// (../gama next to this repo). `npm run dev` after cloning both.
+// gama3d comes from npm (devDependency); scena3d aliases to this repo's
+// live source so the demo always runs against the working tree.
 export default defineConfig({
   resolve: {
-    alias: [
-      { find: 'gama3d/templates', replacement: resolve(here, '../../../gama/src/templates.ts') },
-      { find: /^gama3d$/, replacement: resolve(here, '../../../gama/src/index.ts') },
-      { find: /^scena3d$/, replacement: resolve(here, '../../src/index.ts') },
-    ],
+    alias: [{ find: /^scena3d$/, replacement: resolve(here, '../../src/index.ts') }],
     dedupe: ['three'],
   },
-  server: { fs: { allow: [resolve(here, '../../..')] } },
 });

@@ -14,6 +14,7 @@ export { createRock, type RockOptions } from './props/rock';
 export { createCrate, type CrateOptions } from './props/crate';
 export { createFence, type FenceOptions } from './props/fence';
 export { createLamp, type LampOptions } from './props/lamp';
+export { createGrassTuft, createBush, type GrassOptions, type BushOptions } from './props/grass';
 
 // Environment
 export { createTerrain, type Terrain, type TerrainOptions } from './environment/terrain';
@@ -25,6 +26,10 @@ export {
   type LightingPreset,
   type FogPreset,
 } from './environment/lighting';
+export { createWater, aboveWater, type Water, type WaterOptions } from './environment/water';
+export { createDayCycle, type DayCycle, type DayCycleOptions } from './environment/dayCycle';
+export { applyWind, type Wind, type WindOptions } from './environment/wind';
+export { createPath, type WorldPath, type PathOptions } from './environment/path';
 
 // Scattering
 export {

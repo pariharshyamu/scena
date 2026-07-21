@@ -13,9 +13,7 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "scena3d": ["./src/index.ts"],
-      "gama3d": ["../gama/src/index.ts"],
-      "gama3d/templates": ["../gama/src/templates.ts"]
+      "scena3d": ["./src/index.ts"]
     }
   },
   "include": ["src", "tests", "examples"]

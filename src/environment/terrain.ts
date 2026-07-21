@@ -21,6 +21,8 @@ export interface TerrainOptions {
   octaves?: number;
   /** Flatten low areas into meadows (0–1, higher = flatter valleys). Default 0.55. */
   valleyFlatness?: number;
+  /** Blend low bands toward sand below (waterLevel + shore margin). */
+  waterLevel?: number;
   palette?: Palette;
 }
 
@@ -72,13 +74,19 @@ export function createTerrain(options: TerrainOptions = {}): Terrain {
   const grassHigh = new Color(palette.grassHigh);
   const cliff = new Color(palette.cliff);
   const peak = new Color(palette.peak);
+  const sand = new Color(palette.sand);
+  const waterLevel = options.waterLevel;
   const scratch = new Color();
   for (let i = 0; i < positions.count; i++) {
-    const h = positions.getY(i) / amplitude;
+    const y = positions.getY(i);
+    const h = y / amplitude;
     const slope = 1 - normals.getY(i); // 0 flat … 1 vertical
     scratch.copy(grassLow).lerp(grassHigh, Math.min(1, h * 1.6));
     if (h > 0.75) scratch.lerp(peak, (h - 0.75) * 4);
     if (slope > 0.15) scratch.lerp(cliff, Math.min(1, (slope - 0.15) * 4));
+    if (waterLevel !== undefined && y < waterLevel + 0.5) {
+      scratch.lerp(sand, Math.min(1, (waterLevel + 0.5 - y) * 1.6));
+    }
     colors[i * 3] = scratch.r;
     colors[i * 3 + 1] = scratch.g;
     colors[i * 3 + 2] = scratch.b;
