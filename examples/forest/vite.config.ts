@@ -9,9 +9,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: [
-      { find: 'gama/templates', replacement: resolve(here, '../../../gama/src/templates.ts') },
-      { find: /^gama$/, replacement: resolve(here, '../../../gama/src/index.ts') },
-      { find: /^scena$/, replacement: resolve(here, '../../src/index.ts') },
+      { find: 'gama3d/templates', replacement: resolve(here, '../../../gama/src/templates.ts') },
+      { find: /^gama3d$/, replacement: resolve(here, '../../../gama/src/index.ts') },
+      { find: /^scena3d$/, replacement: resolve(here, '../../src/index.ts') },
     ],
     dedupe: ['three'],
   },

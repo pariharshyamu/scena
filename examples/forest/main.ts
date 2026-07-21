@@ -11,9 +11,9 @@ import {
   createFence,
   scatter,
   PALETTES,
-} from 'scena';
-import { Game, MotionAgent, FollowPath, Path, ObstacleAvoidance, Separation } from 'gama';
-import { createFlock, createCapsulePerson } from 'gama/templates';
+} from 'scena3d';
+import { Game, MotionAgent, FollowPath, Path, ObstacleAvoidance, Separation } from 'gama3d';
+import { createFlock, createCapsulePerson } from 'gama3d/templates';
 
 const palette = PALETTES.meadow;
 const game = new Game();

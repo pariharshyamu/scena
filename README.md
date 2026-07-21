@@ -14,14 +14,14 @@ three.js renders. GAMA makes it a game. **SCENA gives it a world.**
 ## Install
 
 ```bash
-npm install scena three
+npm install scena3d three
 ```
 
 ## A world in ten lines
 
 ```ts
 import { createTerrain, createSky, createLightingRig, applyFog,
-         createTree, createRock, scatter, PALETTES } from 'scena';
+         createTree, createRock, scatter, PALETTES } from 'scena3d';
 
 const terrain = createTerrain({ seed: 20, size: 90, amplitude: 5 });
 scene.add(terrain.mesh, createSky().mesh, createLightingRig('golden-hour').group);
@@ -45,7 +45,7 @@ scene.add(forest.group);               // InstancedMeshes — a few draw calls
 ## The GAMA handshake
 
 ```ts
-import { MotionAgent, ObstacleAvoidance, FollowPath } from 'gama';
+import { MotionAgent, ObstacleAvoidance, FollowPath } from 'gama3d';
 
 agent.addBehavior(new FollowPath(patrolPath, 1.5));
 agent.addBehavior(new ObstacleAvoidance(() => forest.obstacles), 2.5); // ← SCENA metadata
