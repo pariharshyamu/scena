@@ -22,6 +22,10 @@ export interface Palette {
   water: number;
   sand: number;
   path: number;
+  /** Building plaster/wall color. */
+  wall: number;
+  /** Building roof color. */
+  roof: number;
 }
 
 export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> = {
@@ -43,6 +47,8 @@ export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> 
     water: 0x3f7fae,
     sand: 0xc9b98a,
     path: 0x9a815f,
+    wall: 0xd9ccb0,
+    roof: 0xa8563e,
   },
   autumn: {
     foliage: [0xc9752f, 0xd98e3a, 0xb35c2a, 0xe0a545],
@@ -62,6 +68,8 @@ export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> 
     water: 0x4a7a92,
     sand: 0xcbb083,
     path: 0x8d7454,
+    wall: 0xccb894,
+    roof: 0x8a4a30,
   },
   dusk: {
     foliage: [0x1f5e46, 0x24684f, 0x1a5240, 0x2d7458],
@@ -81,6 +89,8 @@ export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> 
     water: 0x2d4a68,
     sand: 0x8a7a6a,
     path: 0x6a5a52,
+    wall: 0x8d8299,
+    roof: 0x453558,
   },
   winter: {
     foliage: [0x2e5c48, 0x38695a, 0x527a68, 0x87a596],
@@ -100,6 +110,8 @@ export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> 
     water: 0x4a7086,
     sand: 0xb8c2c6,
     path: 0x8b8378,
+    wall: 0xd2c9bb,
+    roof: 0x6b4638,
   },
 };
 

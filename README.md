@@ -54,15 +54,16 @@ game.onUpdate(() => {                                                  // ← SC
 });
 ```
 
-Neither library imports the other — the obstacle shape (`{ center, radius }`) is structural. Run the full demo (`npm run dev` — gama3d comes from npm): a day-night cycle over terrain, lakes, a windblown forest, and a dirt road whose single authored curve is at once the visual ribbon, the scatter keep-out, and the wardens' patrol route. Append `?t=0.85` to freeze the time of day.
+Neither library imports the other — the obstacle shape (`{ center, radius }`) is structural. Run the full demo (`npm run dev` — gama3d comes from npm): a day-night cycle over terrain, lakes, a windblown forest, a seeded hamlet whose windows ignite at dusk, and a dirt road whose single authored curve is at once the visual ribbon, the scatter keep-out, and the wardens' patrol route. Append `?t=0.85` to freeze the time of day.
 
 ## API
 
 | Area | Exports |
 |---|---|
-| Props | `createTree`, `createRock`, `createCrate`, `createFence`, `createLamp`, `createBush`, `createGrassTuft` — each returns `{ object, obstacleRadius }` |
+| Props | `createTree`, `createRock`, `createCrate`, `createFence`, `createLamp`, `createBush`, `createGrassTuft`, `createHouse`, `createTower`, `createWell`, `createRuin` — each returns `{ object, obstacleRadius }` |
 | Environment | `createTerrain` (with `heightAt(x, z)` and `waterLevel` sand bands), `createSky`, `createLightingRig(...)`, `applyFog(...)`, `createWater` + `aboveWater` mask, `createDayCycle` (one `timeOfDay` drives sun/sky/fog/lamps), `applyWind` (vegetation sway), `createPath` (ribbon + patrol route + keep-out from one curve) |
 | Scattering | `scatter({ seed, area, surface, density \| count, items, mask, minSpacing, keepOut })` → `{ group, placements, obstacles, count }` |
+| Generators | `createVillage({ seed, center, radius, houses, surface, mask })` → `{ group, props, obstacles, lamps, keepOut }` — a hamlet whose windows and lamps hand straight to `createDayCycle`, buildings to `ObstacleAvoidance`, clearing to `scatter` |
 | Core | `Rng` (seeded), `valueNoise2`/`fractalNoise2`, `PALETTES`, `collectObstacles` |
 
 Scatter placement uses density noise for natural clumping and clearings, a spatial hash for minimum spacing, and per-item visual variants; rendering merges everything into `InstancedMesh`es (one draw call per prop part).
@@ -78,9 +79,10 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Wind sway on scattered vegetation (per-instance phase)
 - [x] Paths: one curve = visual ribbon + scatter keep-out + GAMA patrol route
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
+- [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
 - [ ] Kits: dungeon/village pieces with shared snap dimensions
 - [ ] Declarative scene manifests (JSON → scene), Blender marker conventions (`spawn_*`, `route_*`, `nav_*`)
-- [ ] Buildings/ruins generators; LOD tiers for scatter
+- [ ] LOD tiers for scatter
 - [ ] CC0 asset-pack adapters (Kenney/Quaternius) and a KTX2/Draco pipeline
 - [ ] Docs site with live playground (reusing GAMA's runner)
 
@@ -88,7 +90,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 
 ```bash
 npm install
-npm test          # 39 vitest unit tests (determinism, metadata, scatter rules, snapshots)
+npm test          # 49 vitest unit tests (determinism, metadata, scatter rules, snapshots)
 npm run typecheck
 npm run build     # tsup → dist (ESM + CJS + d.ts)
 npm run dev       # the SCENA × GAMA living-forest demo

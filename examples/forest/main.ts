@@ -13,11 +13,9 @@ import {
   createRock,
   createGrassTuft,
   createBush,
-  createCrate,
-  createLamp,
+  createVillage,
   scatter,
   PALETTES,
-  type Prop,
 } from 'scena3d';
 import { Game, MotionAgent, FollowPath, Path, ObstacleAvoidance, Separation } from 'gama3d';
 import { createFlock, createCapsulePerson } from 'gama3d/templates';
@@ -50,20 +48,21 @@ const road = createPath(
 );
 scene.add(road.mesh);
 
-// --- The camp in the road's embrace: crates + lamps.
+// --- A hamlet in the road's embrace: well, cottages, street lamps, a
+// watchtower on the edge and a ruin beyond. Its windows and lamps all
+// ignite together at dusk; its buildings are steering obstacles.
 const CAMP = new Vector3(0, terrain.heightAt(0, 0), 0);
-const lamps: Prop[] = [];
-const place = (prop: Prop, x: number, z: number, rotY = 0): Prop => {
-  prop.object.position.set(x, terrain.heightAt(x, z), z);
-  prop.object.rotation.y = rotY;
-  scene.add(prop.object);
-  return prop;
-};
-place(createCrate({ seed: 2, palette }), 1.4, -1.2);
-place(createCrate({ seed: 3, size: 0.8, palette }), 2.3, -0.6, 0.8);
-lamps.push(place(createLamp({ seed: 4, light: true, palette }), -1.8, 1.4));
-lamps.push(place(createLamp({ seed: 5, light: true, palette }), 3, 2.2));
-lamps.push(place(createLamp({ seed: 6, light: true, palette }), 0.5, -14.5));
+const dryLand = aboveWater(terrain, water, 0.3);
+const village = createVillage({
+  seed: 30,
+  center: { x: CAMP.x, z: CAMP.z },
+  radius: 9,
+  houses: 5,
+  surface: terrain.heightAt,
+  mask: (x, z) => dryLand(x, z) && !road.contains(x, z),
+  palette,
+});
+scene.add(village.group);
 
 // --- Day-night cycle: one parameter drives sun, sky, fog and the lamps.
 // Deep-linkable time of day: ?t=0.85 freezes the cycle at that moment.
@@ -72,15 +71,14 @@ const cycle = createDayCycle({
   sky,
   rig,
   scene,
-  lamps,
+  lamps: village.lamps,
   palette,
   dayLength: 40, // fast days for the demo
   timeOfDay: fixedTime ? parseFloat(fixedTime) : 0.42,
 });
 if (!fixedTime) game.onUpdate((t) => cycle.update(t.delta));
 
-// --- The forest: trees + rocks + bushes, ashore, off the road, out of camp.
-const dryLand = aboveWater(terrain, water, 0.3);
+// --- The forest: trees + rocks + bushes, ashore, off the road and village.
 const forest = scatter({
   seed: 21,
   area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
@@ -93,7 +91,7 @@ const forest = scatter({
     { create: (rng) => createBush({ seed: rng.int(1, 1e9), palette }), weight: 1 },
   ],
   mask: (x, z, y) => y < 3.6 && dryLand(x, z),
-  keepOut: [{ center: { x: CAMP.x, z: CAMP.z }, radius: 8 }, ...road.keepOut],
+  keepOut: [...village.keepOut, ...road.keepOut],
 });
 scene.add(forest.group);
 
@@ -118,7 +116,8 @@ game.onUpdate((t) => {
 });
 
 // --- Life (GAMA): wardens patrol THE ROAD (its route is their Path),
-// dodging trees via the forest's obstacle metadata.
+// dodging trees and village buildings via prop obstacle metadata.
+const obstacles = [...forest.obstacles, ...village.obstacles];
 const wardens: MotionAgent[] = [];
 for (let i = 0; i < 3; i++) {
   const warden = game.world.spawn(`warden-${i}`);
@@ -128,7 +127,7 @@ for (let i = 0; i < 3; i++) {
   warden.position.copy(patrol.current());
   const agent = warden.addComponent(new MotionAgent({ maxSpeed: 4.5, maxForce: 30, planar: true }));
   agent.addBehavior(new FollowPath(patrol, 1.6));
-  agent.addBehavior(new ObstacleAvoidance(() => forest.obstacles, 3.5, 0.5), 2.5);
+  agent.addBehavior(new ObstacleAvoidance(() => obstacles, 3.5, 0.5), 2.5);
   agent.addBehavior(new Separation(() => wardens, 1.6), 1.2);
   wardens.push(agent);
 }

@@ -15,6 +15,16 @@ export { createCrate, type CrateOptions } from './props/crate';
 export { createFence, type FenceOptions } from './props/fence';
 export { createLamp, type LampOptions } from './props/lamp';
 export { createGrassTuft, createBush, type GrassOptions, type BushOptions } from './props/grass';
+export {
+  createHouse,
+  createTower,
+  createWell,
+  createRuin,
+  type HouseOptions,
+  type TowerOptions,
+  type WellOptions,
+  type RuinOptions,
+} from './props/building';
 
 // Environment
 export { createTerrain, type Terrain, type TerrainOptions } from './environment/terrain';
@@ -30,6 +40,9 @@ export { createWater, aboveWater, type Water, type WaterOptions } from './enviro
 export { createDayCycle, type DayCycle, type DayCycleOptions } from './environment/dayCycle';
 export { applyWind, type Wind, type WindOptions } from './environment/wind';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
+
+// Generators
+export { createVillage, type Village, type VillageOptions } from './generators/village';
 
 // Scattering
 export {
