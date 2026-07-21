@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "scena": ["./src/index.ts"],
+      "gama": ["../gama/src/index.ts"],
+      "gama/templates": ["../gama/src/templates.ts"]
+    }
+  },
+  "include": ["src", "tests", "examples"]
+}
