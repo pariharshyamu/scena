@@ -28,6 +28,7 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createRuin({ seed, size })` | crumbling walls with seeded gaps, tumbled blocks |
 | `createStall({ seed, goods })` | market stall: striped awning, counter, stocked by trade — `'produce'` / `'pottery'` / `'bakery'` / `'textiles'` |
 | `createStatue({ seed, figure, material })` | pedestal + figure: `'obelisk'` / `'figure'` / `'orb'` / `'bust'` / `'beast'`, in `'stone'` or `'bronze'` |
+| `createBanner({ seed, style, pattern })` | waving cloth on a pole: `'flag'` / `'banner'` / `'pennant'`, heraldic device baked in; **self-animating** (no update call needed) |
 
 Two prop behaviors worth knowing:
 

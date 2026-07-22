@@ -139,8 +139,8 @@ game.start();`,
 // all palette-themed, all reporting an obstacleRadius for steering.
 import { createTree, createRock, createCrate, createFence, createLamp,
          createBush, createGrassTuft, createHouse, createTower, createWell,
-         createRuin, createStall, createStatue, createLightingRig, createSky,
-         applyFog, PALETTES } from 'scena3d';
+         createRuin, createStall, createStatue, createBanner, createLightingRig,
+         createSky, applyFog, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
 
@@ -161,6 +161,7 @@ const props = [
   createWell({ seed: 9, palette }),   createHouse({ seed: 10, palette }),
   createTower({ seed: 11, palette }), createRuin({ seed: 12, palette }),
   createStall({ seed: 15, palette }), createStatue({ seed: 16, figure: 'beast', palette }),
+  createBanner({ seed: 17, style: 'flag', palette }), createBanner({ seed: 18, style: 'banner', palette }),
   createFence({ seed: 13, length: 4, palette }), createGrassTuft({ seed: 14, palette }),
 ];
 props.forEach((prop, i) => {
@@ -252,6 +253,42 @@ scene.add((() => { const s = createStatue({ seed: 99, figure: 'figure', material
   s.object.position.set(6.8, 0, -4); return s.object; })());
 
 ${orbit(18, 8, 0.05)}
+game.start();`,
+  },
+
+  {
+    id: 'banners',
+    title: 'Flags & banners (waving)',
+    group: 'Props',
+    code: `// Real cloth, not a stiff board: each flag is a subdivided plane rippled
+// by a GPU vertex wave — a travelling fold that grows toward the fly, droops
+// under gravity, and carries a seeded phase so no two wave alike. Heraldic
+// devices are baked as vertex colours (no textures). They animate themselves
+// from the render loop, so this needs no per-frame code at all.
+import { createBanner, createSurface, createSky, createLightingRig,
+         applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(90, 90), createSurface('dirt', { color: 0x7f6a4a }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const styles = ['flag', 'banner', 'pennant'];
+const patterns = ['cross', 'saltire', 'bands', 'diamond', 'bicolor', 'stripes'];
+patterns.forEach((pattern, i) => {
+  const banner = createBanner({ seed: 10 + i, style: styles[i % 3], pattern, palette });
+  banner.object.position.set((i - 2.5) * 3.4, 0, 0);
+  banner.object.rotation.y = -0.5;
+  scene.add(banner.object);
+});
+
+${orbit(15, 6, 0.04)}
 game.start();`,
   },
 

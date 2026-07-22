@@ -21,6 +21,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'the-prop-catalogue': 'props',
   palettes: 'palettes',
   'market-stalls-statues': 'market',
+  'flags-banners-waving': 'banners',
   presets: 'surfaces',
   'why-it-stays-cheap-and-correct': 'surfaces',
   'adopted-by-the-props': 'surfaces',

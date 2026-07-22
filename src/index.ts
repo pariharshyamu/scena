@@ -36,6 +36,12 @@ export {
 } from './props/building';
 export { createStall, type StallOptions, type StallGoods } from './props/stall';
 export {
+  createBanner,
+  type BannerOptions,
+  type BannerStyle,
+  type BannerPattern,
+} from './props/banner';
+export {
   createStatue,
   type StatueOptions,
   type StatueFigure,
