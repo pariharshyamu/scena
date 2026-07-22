@@ -34,6 +34,13 @@ export {
   type WellOptions,
   type RuinOptions,
 } from './props/building';
+export { createStall, type StallOptions, type StallGoods } from './props/stall';
+export {
+  createStatue,
+  type StatueOptions,
+  type StatueFigure,
+  type StatueMaterial,
+} from './props/statue';
 
 // Environment
 export { createTerrain, type Terrain, type TerrainOptions } from './environment/terrain';

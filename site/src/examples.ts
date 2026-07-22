@@ -139,7 +139,8 @@ game.start();`,
 // all palette-themed, all reporting an obstacleRadius for steering.
 import { createTree, createRock, createCrate, createFence, createLamp,
          createBush, createGrassTuft, createHouse, createTower, createWell,
-         createRuin, createLightingRig, createSky, applyFog, PALETTES } from 'scena3d';
+         createRuin, createStall, createStatue, createLightingRig, createSky,
+         applyFog, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
 
@@ -159,6 +160,7 @@ const props = [
   createLamp({ seed: 7, light: true, palette }), createBush({ seed: 8, palette }),
   createWell({ seed: 9, palette }),   createHouse({ seed: 10, palette }),
   createTower({ seed: 11, palette }), createRuin({ seed: 12, palette }),
+  createStall({ seed: 15, palette }), createStatue({ seed: 16, figure: 'beast', palette }),
   createFence({ seed: 13, length: 4, palette }), createGrassTuft({ seed: 14, palette }),
 ];
 props.forEach((prop, i) => {
@@ -208,6 +210,48 @@ const props = [createHouse({ seed: 7, palette }), createWell({ seed: 3, palette 
 props.forEach((p, i) => { p.object.position.set(i * 6 - 6, 0, 3); scene.add(p.object); });
 
 ${orbit(22, 10, 0.05)}
+game.start();`,
+  },
+
+  {
+    id: 'market',
+    title: 'A market & its statues',
+    group: 'Props',
+    code: `// Two lifelike prop families: market stalls — striped canvas awnings
+// over plank counters, stocked by trade (produce, pottery, bakery,
+// textiles) — and statues: five figures (obelisk, robed figure, orb, bust,
+// guardian beast) on stepped pedestals, in weathered stone or bronze.
+import { createStall, createStatue, createSurface, createSky,
+         createLightingRig, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(90, 90), createSurface('dirt', { color: 0x8a7250 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const trades = ['produce', 'pottery', 'bakery', 'textiles'];
+trades.forEach((goods, i) => {
+  const stall = createStall({ seed: 10 + i, goods, palette });
+  stall.object.position.set((i - 1.5) * 4, 0, 4);
+  scene.add(stall.object);
+});
+
+const figures = ['obelisk', 'figure', 'orb', 'bust', 'beast'];
+figures.forEach((figure, i) => {
+  const statue = createStatue({ seed: 30 + i, figure, palette });
+  statue.object.position.set((i - 2) * 3.4, 0, -4);
+  scene.add(statue.object);
+});
+scene.add((() => { const s = createStatue({ seed: 99, figure: 'figure', material: 'bronze', palette });
+  s.object.position.set(6.8, 0, -4); return s.object; })());
+
+${orbit(18, 8, 0.05)}
 game.start();`,
   },
 

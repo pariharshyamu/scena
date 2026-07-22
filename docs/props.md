@@ -26,6 +26,8 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createTower({ seed, height })` | wooden watchtower with platform and roof |
 | `createWell({ seed })` | stone ring, posts, roof, bucket |
 | `createRuin({ seed, size })` | crumbling walls with seeded gaps, tumbled blocks |
+| `createStall({ seed, goods })` | market stall: striped awning, counter, stocked by trade — `'produce'` / `'pottery'` / `'bakery'` / `'textiles'` |
+| `createStatue({ seed, figure, material })` | pedestal + figure: `'obelisk'` / `'figure'` / `'orb'` / `'bust'` / `'beast'`, in `'stone'` or `'bronze'` |
 
 Two prop behaviors worth knowing:
 

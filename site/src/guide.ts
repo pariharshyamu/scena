@@ -20,6 +20,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'paths-one-curve-three-jobs': 'path',
   'the-prop-catalogue': 'props',
   palettes: 'palettes',
+  'market-stalls-statues': 'market',
   presets: 'surfaces',
   'why-it-stays-cheap-and-correct': 'surfaces',
   'adopted-by-the-props': 'surfaces',
