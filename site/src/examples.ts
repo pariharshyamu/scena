@@ -140,7 +140,8 @@ game.start();`,
 import { createTree, createRock, createCrate, createFence, createLamp,
          createBush, createGrassTuft, createHouse, createTower, createWell,
          createRuin, createStall, createStatue, createBanner, createCampfire,
-         createLightingRig, createSky, applyFog, PALETTES } from 'scena3d';
+         createFountain, createCart, createLightingRig, createSky, applyFog,
+         PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
 
@@ -162,8 +163,9 @@ const props = [
   createTower({ seed: 11, palette }), createRuin({ seed: 12, palette }),
   createStall({ seed: 15, palette }), createStatue({ seed: 16, figure: 'beast', palette }),
   createBanner({ seed: 17, style: 'flag', palette }), createBanner({ seed: 18, style: 'banner', palette }),
-  createCampfire({ seed: 19, palette }), createFence({ seed: 13, length: 4, palette }),
-  createGrassTuft({ seed: 14, palette }),
+  createCampfire({ seed: 19, palette }), createFountain({ seed: 20, palette }),
+  createCart({ seed: 21, style: 'wagon', cargo: 'barrels', palette }),
+  createFence({ seed: 13, length: 4, palette }), createGrassTuft({ seed: 14, palette }),
 ];
 props.forEach((prop, i) => {
   prop.object.position.set((i % 4) * 8 - 12, 0, Math.floor(i / 4) * 9 - 9);
@@ -327,6 +329,53 @@ game.onUpdate((t) => {
   const a = t.elapsed * 0.05;
   game.camera.position.set(Math.cos(a) * 7, 2.6, Math.sin(a) * 7);
   game.camera.lookAt(0, 1.2, -0.5);
+});
+game.start();`,
+  },
+
+  {
+    id: 'fair',
+    title: 'A village fair',
+    group: 'Props',
+    code: `// Three lifelike props together: a tiered stone fountain with animated
+// water (SCENA's createWater, self-driven), festive bunting fluttering on
+// the flag cloth-wave, and loaded carts & wagons. The fountain and bunting
+// animate themselves — no update loop needed for them.
+import { createFountain, createBunting, createCart, createStall,
+         createSurface, createSky, createLightingRig, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(120, 120), createSurface('dirt', { color: 0x8a7a58 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+scene.add(createFountain({ seed: 4, palette }).object);
+for (let i = 0; i < 3; i++) {
+  const b = createBunting({ seed: 10 + i, span: 5.5, palette });
+  b.object.position.set((i - 1) * 6, 0, -6);
+  scene.add(b.object);
+}
+const c1 = createCart({ seed: 2, style: 'wagon', cargo: 'barrels', palette });
+c1.object.position.set(-5.5, 0, 3); c1.object.rotation.y = 0.6;
+const c2 = createCart({ seed: 7, style: 'cart', cargo: 'crates', palette });
+c2.object.position.set(5, 0, 2.5); c2.object.rotation.y = -1.1;
+const c3 = createCart({ seed: 9, style: 'wagon', cargo: 'hay', palette });
+c3.object.position.set(0, 0, 6); c3.object.rotation.y = Math.PI;
+scene.add(c1.object, c2.object, c3.object);
+const stall = createStall({ seed: 15, goods: 'produce', palette });
+stall.object.position.set(6.5, 0, -3); stall.object.rotation.y = -1.4;
+scene.add(stall.object);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.09;
+  game.camera.position.set(Math.sin(a) * 11, 5.5, 13);
+  game.camera.lookAt(0, 1.4, 0);
 });
 game.start();`,
   },

@@ -4,7 +4,6 @@ import {
   Color,
   ConeGeometry,
   CylinderGeometry,
-  DoubleSide,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -13,6 +12,7 @@ import {
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
+import { wavingClothMaterial } from '../materials/clothWave';
 import type { Prop } from '../core/types';
 
 export type BannerStyle = 'flag' | 'banner' | 'pennant';
@@ -235,8 +235,8 @@ function paintPattern(
 // ---- waving cloth material --------------------------------------------
 
 /**
- * A double-sided, flat-shaded, vertex-coloured MeshStandardMaterial whose
- * vertices are rippled in the shader and advanced from the render loop.
+ * A double-sided, flat-shaded, vertex-coloured cloth rippled in the shader —
+ * built on the shared cloth-wave material (also used by bunting).
  */
 function wavingCloth(
   freeLen: number,
@@ -245,53 +245,15 @@ function wavingCloth(
   style: BannerStyle,
   seed: number
 ): MeshStandardMaterial {
-  const material = new MeshStandardMaterial({
+  return wavingClothMaterial({
+    freeLen,
+    crossLen,
+    amp: (style === 'pennant' ? 0.16 : 0.13) * wind,
+    waves: style === 'pennant' ? 7.0 : 5.0,
+    speed: 3.4 + (seed % 7) * 0.12,
+    sag: style === 'banner' ? 0 : 0.14,
+    phase: (seed % 100) * 0.183,
+    cacheKey: 'scena-banner-v1',
     vertexColors: true,
-    flatShading: true,
-    side: DoubleSide,
-    roughness: 0.92,
-    metalness: 0,
   });
-
-  const amp = (style === 'pennant' ? 0.16 : 0.13) * wind;
-  const uniforms = {
-    uTime: { value: 0 },
-    uAmp: { value: amp },
-    uFreeLen: { value: freeLen },
-    uCrossLen: { value: crossLen },
-    uWaves: { value: style === 'pennant' ? 7.0 : 5.0 },
-    uSpeed: { value: 3.4 + (seed % 7) * 0.12 },
-    uSag: { value: style === 'banner' ? 0 : 0.14 },
-    uPhase: { value: (seed % 100) * 0.183 },
-  };
-
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-        uniform float uTime, uAmp, uFreeLen, uCrossLen, uWaves, uSpeed, uSag, uPhase;`
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-        {
-          float uf = clamp(position.x / uFreeLen, 0.0, 1.0);   // 0 fixed → 1 fly
-          float vc = position.y / uCrossLen + 0.5;              // 0..1 across
-          float base = uf * uWaves - uTime * uSpeed + uPhase;
-          float a = uAmp * uf;                                  // pinned at the pole
-          float z = a * (sin(base + vc * 1.7) + 0.35 * sin(base * 2.3 + vc * 3.1 + 1.0));
-          transformed.z += z;
-          transformed.y -= uSag * uf * uf;                      // gravity droop
-          transformed.x -= uAmp * 0.25 * uf * (1.0 - cos(base));// slack shortening
-        }`
-      );
-    // flatShading recomputes normals from the displaced positions, so the
-    // folds are lit correctly with no analytic-normal maths.
-  };
-  material.customProgramCacheKey = () => 'scena-banner-v1';
-  material.userData.waveUniforms = uniforms;
-
-  return material;
 }

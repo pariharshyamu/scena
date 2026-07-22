@@ -42,6 +42,14 @@ export {
   type BannerPattern,
 } from './props/banner';
 export { createBrazier, createCampfire, type FireOptions } from './props/fire';
+export { createBunting, type BuntingOptions } from './props/bunting';
+export { createFountain, type FountainOptions } from './props/fountain';
+export {
+  createCart,
+  type CartOptions,
+  type CartStyle,
+  type CartCargo,
+} from './props/cart';
 export {
   createStatue,
   type StatueOptions,

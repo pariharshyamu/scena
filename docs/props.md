@@ -31,6 +31,9 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createBanner({ seed, style, pattern })` | waving cloth on a pole: `'flag'` / `'banner'` / `'pennant'`, heraldic device baked in; **self-animating** (no update call needed) |
 | `createBrazier({ seed, light })` | metal fire-bowl on legs: shader flame, embers, glowing coals, flickering `PointLight`; **self-animating** |
 | `createCampfire({ seed, light })` | stone ring + charred logs, shader flame, embers, flickering `PointLight`; **self-animating** |
+| `createBunting({ seed, span, flags })` | festive pennants on a catenary cord between two poles, fluttering on the flag cloth-wave; **self-animating** |
+| `createFountain({ seed, figure })` | tiered stone basin with animated `createWater` pools, a spouting centre statue and falling water; **self-animating** |
+| `createCart({ seed, style, cargo })` | spoked-wheel `'cart'` (with shafts) or `'wagon'`, loaded with `'crates'`/`'barrels'`/`'sacks'`/`'hay'` |
 
 Two prop behaviors worth knowing:
 

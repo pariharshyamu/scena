@@ -23,6 +23,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'market-stalls-statues': 'market',
   'flags-banners-waving': 'banners',
   'braziers-campfires': 'fire',
+  'bunting-fountains-carts': 'fair',
   presets: 'surfaces',
   'why-it-stays-cheap-and-correct': 'surfaces',
   'adopted-by-the-props': 'surfaces',
