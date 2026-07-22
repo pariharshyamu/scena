@@ -171,6 +171,47 @@ game.start();`,
   },
 
   {
+    id: 'surfaces',
+    title: 'Procedural surfaces',
+    group: 'Props',
+    code: `// Why SCENA props can out-look a downloaded GLTF at a fraction of the
+// bytes: createSurface patches a MeshStandardMaterial with triplanar noise,
+// so weathered stone, wood grain, plaster, thatch and tile are generated in
+// the shader — no textures fetched, and every prop unique. Full PBR lighting,
+// fog and shadows survive because it stays a standard material.
+import { createSurface, SURFACE_PRESETS, createHouse, createWell, createRock,
+         createSky, createLightingRig, applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, SphereGeometry, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(80, 80), createSurface('dirt', { color: 0x6f5a3f }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// One primitive per preset — all the detail is in the shader.
+const kinds = Object.keys(SURFACE_PRESETS);
+kinds.forEach((kind, i) => {
+  const geo = kind === 'metal' ? new SphereGeometry(1.1, 24, 18) : new BoxGeometry(2, 2, 2);
+  const mesh = new Mesh(geo, createSurface(kind, { seed: i + 1 }));
+  mesh.position.set((i - (kinds.length - 1) / 2) * 3, 1.1, -3);
+  scene.add(mesh);
+});
+
+// The same surfaces on real props.
+const props = [createHouse({ seed: 7, palette }), createWell({ seed: 3, palette }),
+               createRock({ seed: 11, palette })];
+props.forEach((p, i) => { p.object.position.set(i * 6 - 6, 0, 3); scene.add(p.object); });
+
+${orbit(22, 10, 0.05)}
+game.start();`,
+  },
+
+  {
     id: 'palettes',
     title: 'Retheme with palettes',
     group: 'Props',

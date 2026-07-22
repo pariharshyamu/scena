@@ -1,12 +1,7 @@
-import {
-  BufferAttribute,
-  Group,
-  IcosahedronGeometry,
-  Mesh,
-  MeshStandardMaterial,
-} from 'three';
+import { BufferAttribute, Group, IcosahedronGeometry, Mesh } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
+import { createSurface } from '../materials/surface';
 import type { Prop } from '../core/types';
 
 export interface RockOptions {
@@ -48,7 +43,7 @@ export function createRock(options: RockOptions = {}): Prop {
 
   const rock = new Mesh(
     geometry,
-    new MeshStandardMaterial({ color: rng.pick(palette.rock), flatShading: true })
+    createSurface('stone', { color: rng.pick(palette.rock), seed: options.seed ?? 1 })
   );
   rock.position.y = size * 0.15;
   rock.scale.y = rng.range(0.6, 0.9);

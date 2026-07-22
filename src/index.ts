@@ -8,6 +8,15 @@ export { Rng, valueNoise2, fractalNoise2, hash2 } from './core/random';
 export { PALETTES, DEFAULT_PALETTE, type Palette } from './core/palette';
 export { collectObstacles, type Obstacle, type Prop } from './core/types';
 
+// Materials
+export {
+  createSurface,
+  SURFACE_PRESETS,
+  type SurfaceKind,
+  type SurfaceParams,
+  type SurfaceOptions,
+} from './materials/surface';
+
 // Props
 export { createTree, type TreeOptions } from './props/tree';
 export { createRock, type RockOptions } from './props/rock';

@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
+import { createSurface } from '../materials/surface';
 import type { Prop } from '../core/types';
 
 /** A gabled-roof prism: ridge along local z, base resting on y = 0. */
@@ -61,12 +62,15 @@ export function createHouse(options: HouseOptions = {}): Prop {
 
   const group = new Group();
   group.name = 'house';
-  const wall = new MeshStandardMaterial({ color: palette.wall, flatShading: true });
+  const seed = options.seed ?? 1;
+  // Procedural surfaces: plastered walls, ridged clay-tile roof, weathered
+  // stone foundation, planked door — all detail generated in-shader.
+  const wall = createSurface('plaster', { color: palette.wall, seed });
   wall.color.offsetHSL(0, 0, rng.range(-0.03, 0.03));
-  const roof = new MeshStandardMaterial({ color: palette.roof, flatShading: true });
+  const roof = createSurface('tile', { color: palette.roof, seed: seed + 7 });
   roof.color.offsetHSL(0, 0, rng.range(-0.04, 0.04));
-  const stone = new MeshStandardMaterial({ color: palette.rock[0], flatShading: true });
-  const wood = new MeshStandardMaterial({ color: palette.woodDark, flatShading: true });
+  const stone = createSurface('stone', { color: palette.rock[0], seed: seed + 13 });
+  const wood = createSurface('plank', { color: palette.woodDark, seed: seed + 21 });
 
   const foundation = new Mesh(new BoxGeometry(width + 0.3, 1.6, depth + 0.3), stone);
   foundation.position.y = -0.55;
@@ -125,9 +129,10 @@ export function createTower(options: TowerOptions = {}): Prop {
 
   const group = new Group();
   group.name = 'tower';
-  const wood = new MeshStandardMaterial({ color: palette.wood, flatShading: true });
-  const woodDark = new MeshStandardMaterial({ color: palette.woodDark, flatShading: true });
-  const roof = new MeshStandardMaterial({ color: palette.roof, flatShading: true });
+  const seed = options.seed ?? 1;
+  const wood = createSurface('wood', { color: palette.wood, seed });
+  const woodDark = createSurface('wood', { color: palette.woodDark, seed: seed + 9 });
+  const roof = createSurface('tile', { color: palette.roof, seed: seed + 17 });
 
   const spread = 1.0;
   for (const x of [-1, 1]) {
@@ -192,9 +197,10 @@ export function createWell(options: WellOptions = {}): Prop {
 
   const group = new Group();
   group.name = 'well';
-  const stone = new MeshStandardMaterial({ color: rng.pick(palette.rock), flatShading: true });
-  const wood = new MeshStandardMaterial({ color: palette.woodDark, flatShading: true });
-  const roof = new MeshStandardMaterial({ color: palette.roof, flatShading: true });
+  const seed = options.seed ?? 1;
+  const stone = createSurface('stone', { color: rng.pick(palette.rock), seed });
+  const wood = createSurface('wood', { color: palette.woodDark, seed: seed + 5 });
+  const roof = createSurface('tile', { color: palette.roof, seed: seed + 11 });
 
   const ring = new Mesh(new CylinderGeometry(0.85, 0.95, 0.75, 10), stone);
   ring.position.y = 0.375;
@@ -250,7 +256,7 @@ export function createRuin(options: RuinOptions = {}): Prop {
 
   const group = new Group();
   group.name = 'ruin';
-  const stone = new MeshStandardMaterial({ color: rng.pick(palette.rock), flatShading: true });
+  const stone = createSurface('stone', { color: rng.pick(palette.rock), seed: options.seed ?? 1 });
   stone.color.offsetHSL(0, 0, rng.range(-0.04, 0.02));
 
   const thickness = 0.35;

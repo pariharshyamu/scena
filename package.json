@@ -1,6 +1,6 @@
 {
   "name": "scena3d",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "SCENA — SCenes & ENvironment Assets: a 3D world-building library on top of three.js. Seeded procedural props, terrain, sky and scattering — with gameplay metadata (obstacles, walkability) that game libraries like GAMA understand.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "dev:manifest": "vite examples/manifest",
+    "dev:surfaces": "vite examples/surfaces",
     "site:dev": "node site/build-vendor.mjs && vite site",
     "site:build": "node site/build-vendor.mjs && vite build site",
     "site:publish": "npm run site:build && node site/publish-docs.mjs"

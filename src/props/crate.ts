@@ -1,6 +1,7 @@
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
+import { BoxGeometry, Group, Mesh } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
+import { createSurface } from '../materials/surface';
 import type { Prop } from '../core/types';
 
 export interface CrateOptions {
@@ -21,9 +22,9 @@ export function createCrate(options: CrateOptions = {}): Prop {
   const group = new Group();
   group.name = 'crate';
 
-  const panelMaterial = new MeshStandardMaterial({ color: palette.wood, flatShading: true });
+  const panelMaterial = createSurface('plank', { color: palette.wood, seed: options.seed ?? 1 });
   panelMaterial.color.offsetHSL(0, 0, -rng.range(0, wear * 0.18));
-  const frameMaterial = new MeshStandardMaterial({ color: palette.woodDark, flatShading: true });
+  const frameMaterial = createSurface('wood', { color: palette.woodDark, seed: (options.seed ?? 1) + 3 });
 
   const body = new Mesh(new BoxGeometry(size * 0.92, size * 0.92, size * 0.92), panelMaterial);
   body.position.y = size / 2;
