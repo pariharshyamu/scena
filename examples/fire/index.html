@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — braziers & campfires</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #05070c; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; color: #eef2f7;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6); max-width: 34em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — braziers &amp; campfires</strong><br />
+      A campfire between two braziers at dusk. Each flame is a particle-ish
+      cluster of tongues rippling in the shader, with rising embers, glowing
+      coals, and a flickering warm PointLight that spills onto the cottage and
+      statue. All self-animating — no per-frame code.
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

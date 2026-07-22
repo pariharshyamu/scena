@@ -139,8 +139,8 @@ game.start();`,
 // all palette-themed, all reporting an obstacleRadius for steering.
 import { createTree, createRock, createCrate, createFence, createLamp,
          createBush, createGrassTuft, createHouse, createTower, createWell,
-         createRuin, createStall, createStatue, createBanner, createLightingRig,
-         createSky, applyFog, PALETTES } from 'scena3d';
+         createRuin, createStall, createStatue, createBanner, createCampfire,
+         createLightingRig, createSky, applyFog, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, PlaneGeometry, MeshStandardMaterial } from 'three';
 
@@ -162,7 +162,8 @@ const props = [
   createTower({ seed: 11, palette }), createRuin({ seed: 12, palette }),
   createStall({ seed: 15, palette }), createStatue({ seed: 16, figure: 'beast', palette }),
   createBanner({ seed: 17, style: 'flag', palette }), createBanner({ seed: 18, style: 'banner', palette }),
-  createFence({ seed: 13, length: 4, palette }), createGrassTuft({ seed: 14, palette }),
+  createCampfire({ seed: 19, palette }), createFence({ seed: 13, length: 4, palette }),
+  createGrassTuft({ seed: 14, palette }),
 ];
 props.forEach((prop, i) => {
   prop.object.position.set((i % 4) * 8 - 12, 0, Math.floor(i / 4) * 9 - 9);
@@ -289,6 +290,44 @@ patterns.forEach((pattern, i) => {
 });
 
 ${orbit(15, 6, 0.04)}
+game.start();`,
+  },
+
+  {
+    id: 'fire',
+    title: 'Braziers & campfires',
+    group: 'Props',
+    code: `// Fire at dusk: each flame is a particle-ish cluster of tongues rippling
+// in the shader, with rising embers, glowing coals and a flickering warm
+// PointLight that spills onto everything nearby. Entirely self-animating —
+// no per-frame code — so a fire just burns wherever you drop it.
+import { createCampfire, createBrazier, createHouse, createSurface,
+         PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, Color, Fog, DirectionalLight, AmbientLight } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0x121a2a);
+scene.fog = new Fog(0x121a2a, 14, 44);
+scene.add(new DirectionalLight(0x4a5a7a, 0.35), new AmbientLight(0x223044, 0.4));
+const ground = new Mesh(new PlaneGeometry(120, 120), createSurface('dirt', { color: 0x4a4033 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+scene.add(createCampfire({ seed: 3, palette }).object);
+const b1 = createBrazier({ seed: 5, palette }); b1.object.position.set(-2.6, 0, 1.2);
+const b2 = createBrazier({ seed: 8, palette }); b2.object.position.set(2.6, 0, 1.2);
+scene.add(b1.object, b2.object);
+const house = createHouse({ seed: 10, palette }); house.object.position.set(0, 0, -4.5);
+scene.add(house.object);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.cos(a) * 7, 2.6, Math.sin(a) * 7);
+  game.camera.lookAt(0, 1.2, -0.5);
+});
 game.start();`,
   },
 

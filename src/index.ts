@@ -41,6 +41,7 @@ export {
   type BannerStyle,
   type BannerPattern,
 } from './props/banner';
+export { createBrazier, createCampfire, type FireOptions } from './props/fire';
 export {
   createStatue,
   type StatueOptions,
