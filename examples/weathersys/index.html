@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — weather controller</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
+      #hud { position: fixed; top: 12px; left: 12px; color: #eef2f7;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6); max-width: 34em; }
+      #state { position: fixed; bottom: 14px; left: 12px; color: #fff;
+        font: 600 20px/1 system-ui, sans-serif; text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+      code { background: rgba(255,255,255,0.14); padding: 0 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — weather controller</strong><br />
+      One <code>createWeather</code> cross-fades the whole scene between named
+      states — clear, overcast, fog, rain, storm, snow, blizzard — driving the
+      wind field, rain &amp; snow, the fog, the sky and the light together. The
+      trees are bound to the same wind, so they lean as it rises; storms crack
+      with lightning. It cycles automatically.
+    </div>
+    <div id="state">clear</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

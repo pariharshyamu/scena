@@ -105,6 +105,13 @@ export {
 } from './environment/precipitation';
 export { createOcean, type Ocean, type OceanOptions } from './environment/ocean';
 export {
+  createWeather,
+  type Weather,
+  type WeatherOptions,
+  type WeatherPreset,
+  type WeatherStateParams,
+} from './environment/weather';
+export {
   createGodRays,
   createCaustics,
   type GodRays,

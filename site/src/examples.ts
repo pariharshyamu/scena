@@ -192,6 +192,60 @@ game.start();`,
   },
 
   {
+    id: 'weathersys',
+    title: 'Weather controller',
+    group: 'Worldbuilding',
+    code: `// One createWeather cross-fades the whole scene between named states —
+// clear, overcast, fog, rain, storm, snow, blizzard — driving the wind field,
+// rain & snow, fog, sky and light together. The trees share the wind, so they
+// lean as it rises; storms crack with lightning. It cycles automatically.
+import { createWeather, createWindField, createTerrain, createTree,
+         createGrassTuft, createLightingRig, applyWind, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xbcd4e6);
+const rig = createLightingRig('overcast'); scene.add(rig.group);
+
+const terrain = createTerrain({ seed: 5, size: 100, amplitude: 4, valleyFlatness: 0.65, palette });
+scene.add(terrain.mesh);
+
+const wind = createWindField({ direction: 40, strength: 0.15, gust: 0.5 });
+const wood = scatter({
+  seed: 6, area: { min: { x: -44, z: -44 }, max: { x: 44, z: 44 } },
+  surface: terrain.heightAt, density: 0.02, minSpacing: 3.5,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), variants: 5 }],
+  mask: (x, z) => Math.hypot(x, z) > 8,
+});
+scene.add(wood.group);
+applyWind(wood.group, { field: wind, height: 4, stiffness: 1.8, anchor: 1 });
+
+const meadow = scatter({
+  seed: 7, area: { min: { x: -26, z: -26 }, max: { x: 26, z: 26 } },
+  surface: terrain.heightAt, density: 0.35, minSpacing: 0.7,
+  items: [{ create: (r) => createGrassTuft({ seed: r.int(1, 1e9), palette }), variants: 4 }],
+});
+scene.add(meadow.group);
+applyWind(meadow.group, { field: wind, height: 0.5, stiffness: 1.2, anchor: 0.03 });
+
+// The controller reuses the wind the flora is bound to, dims the rig, settles snow.
+const weather = createWeather(scene, { wind, sun: rig.sun, ambient: rig.ambient, accumulateOn: scene });
+const CYCLE = ['clear', 'overcast', 'fog', 'rain', 'storm', 'snow', 'blizzard'];
+let ci = 0;
+setInterval(() => { ci = (ci + 1) % CYCLE.length; weather.set(CYCLE[ci], { fade: 3.5 }); }, 6000);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.03;
+  game.camera.position.set(Math.sin(a) * 30, 10, Math.cos(a) * 30);
+  game.camera.lookAt(0, 4, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'ocean',
     title: 'Sea waves',
     group: 'Worldbuilding',
