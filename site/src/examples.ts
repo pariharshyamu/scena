@@ -392,7 +392,7 @@ game.start();`,
 import { createSign, buildTextGeometry, createSurface, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, PlaneGeometry, Color, Fog, DirectionalLight, AmbientLight,
-         MeshStandardMaterial } from 'three';
+         MeshStandardMaterial, Group, BoxGeometry, CylinderGeometry } from 'three';
 
 const palette = PALETTES.meadow;
 const game = new Game();
@@ -419,12 +419,27 @@ const stone = createSign({ kind: 'milestone', text: 'GREYMOOR 3', seed: 9, palet
 stone.object.position.set(5, 0, 0.8); stone.object.rotation.y = -0.3;
 scene.add(town.object, shop.object, finger.object, stone.object);
 
-// The text API used directly: a carved title, no sign attached.
-const title = new Mesh(
-  buildTextGeometry('WELCOME', { size: 0.9, weight: 0.18 }).geometry,
-  new MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.7, flatShading: true }));
-title.position.set(0, 3.4, -3);
-scene.add(title);
+// The text API used directly: a WELCOME plaque built by hand — dark panel
+// behind bright letters — proving lettering isn't locked inside createSign.
+const welcome = buildTextGeometry('WELCOME', { size: 0.68 });
+const arch = new Group();
+const pw = welcome.width + 0.9, ph = 1.15;
+const plaque = new Mesh(new BoxGeometry(pw, ph, 0.12), createSurface('plank', { color: palette.wood, seed: 21 }));
+const backing = new Mesh(new BoxGeometry(pw - 0.2, ph - 0.2, 0.03),
+  new MeshStandardMaterial({ color: 0x22392e, roughness: 0.62 }));
+backing.position.z = 0.075;
+const title = new Mesh(welcome.geometry, new MeshStandardMaterial({
+  color: 0xf3e2a8, roughness: 0.55, emissive: 0x4a4020, emissiveIntensity: 0.3 }));
+title.position.z = 0.1;
+arch.add(plaque, backing, title);
+arch.position.set(0, 3.3, -3);
+for (const dx of [-pw / 2 + 0.1, pw / 2 - 0.1]) {
+  const leg = new Mesh(new CylinderGeometry(0.07, 0.085, 3.3 + ph / 2, 9),
+    createSurface('wood', { color: palette.woodDark, seed: 22 }));
+  leg.position.set(dx, (3.3 + ph / 2) / 2 - 3.3, -0.01);
+  arch.add(leg);
+}
+scene.add(arch);
 
 game.onUpdate((t) => {
   const a = t.elapsed * 0.07;

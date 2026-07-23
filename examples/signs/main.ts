@@ -1,8 +1,11 @@
 import {
   AmbientLight,
+  BoxGeometry,
   Color,
+  CylinderGeometry,
   DirectionalLight,
   Fog,
+  Group,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -70,14 +73,37 @@ stone.object.position.set(5, 0, 0.8);
 stone.object.rotation.y = -0.3;
 scene.add(stone.object);
 
-// The public text API used directly: a big carved title floating over the row,
-// proving lettering isn't locked inside createSign.
-const title = new Mesh(
-  buildTextGeometry('WELCOME', { size: 0.9, weight: 0.18, align: 'center' }).geometry,
-  new MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.7, flatShading: true })
+// The public text API used directly: a WELCOME plaque over the road, built
+// by hand from buildTextGeometry — dark panel behind bright letters, mounted
+// on its own posts — proving lettering isn't locked inside createSign.
+const welcome = buildTextGeometry('WELCOME', { size: 0.68, weight: 0.22, align: 'center' });
+const arch = new Group();
+const plaqueW = welcome.width + 0.9;
+const plaqueH = 1.15;
+const plaque = new Mesh(new BoxGeometry(plaqueW, plaqueH, 0.12), createSurface('plank', { color: palette.wood, seed: 21 }));
+arch.add(plaque);
+const welcomePanel = new Mesh(
+  new BoxGeometry(plaqueW - 0.2, plaqueH - 0.2, 0.03),
+  new MeshStandardMaterial({ color: 0x22392e, roughness: 0.62 })
 );
-title.position.set(0, 3.4, -3);
-scene.add(title);
+welcomePanel.position.z = 0.075;
+arch.add(welcomePanel);
+const title = new Mesh(
+  welcome.geometry,
+  new MeshStandardMaterial({ color: 0xf3e2a8, roughness: 0.55, emissive: 0x4a4020, emissiveIntensity: 0.3 })
+);
+title.position.z = 0.1;
+arch.add(title);
+arch.position.set(0, 3.3, -3);
+for (const dx of [-plaqueW / 2 + 0.1, plaqueW / 2 - 0.1]) {
+  const leg = new Mesh(
+    new CylinderGeometry(0.07, 0.085, 3.3 + plaqueH / 2, 9),
+    createSurface('wood', { color: palette.woodDark, seed: 22 })
+  );
+  leg.position.set(dx, (3.3 + plaqueH / 2) / 2 - 3.3, -0.01);
+  arch.add(leg);
+}
+scene.add(arch);
 
 let t = 0.1;
 function frame(): void {

@@ -12,7 +12,7 @@ scene.add(createSign({ kind: 'post', text: 'HAVENBROOK' }).object);
 
 The obvious way to put words in three.js is `TextGeometry` + `FontLoader` (a JSON typeface to fetch and parse) or a `CanvasTexture` (a DOM, so nothing renders in a headless test or a worker). SCENA takes neither.
 
-Instead it ships a compact **single-stroke vector font** — each glyph is a handful of polylines on a fixed grid — and thickens every stroke into a shallow **carved-relief `BufferGeometry`**: a front face plus lit side walls, all merged into **one draw call** per string. It is pure geometry built from three's own math, so a sign reads identically in a browser, a headless capture and a Node test — no assets to ship, nothing to fetch, no DOM required.
+Instead it ships a compact **single-stroke vector font** — each glyph is a handful of polylines on a fixed grid — and thickens every stroke into a **solid, constant-width mitred ribbon** (the way a bold typeface is drawn), extruded to shallow relief and merged into **one draw call** per string. Butt ends are extended half a stroke so crossing strokes weld into solid joints. It is pure geometry built from three's own math, so a sign reads identically in a browser, a headless capture and a Node test — no assets to ship, nothing to fetch, no DOM required.
 
 Proportional advances are baked into the font, so spacing falls out for free; lowercase maps onto the capitals (medieval signage is caps anyway) and unknown characters simply advance the pen instead of throwing.
 
@@ -20,10 +20,10 @@ Proportional advances are baked into the font, so spacing falls out for free; lo
 
 | `kind` | What it is |
 |---|---|
-| `post` | a plank on a post, lettered on **both faces** — a town or district sign |
+| `post` | a framed board on twin posts, painted panel behind the lettering, **both faces** — a town or district sign |
 | `hanging` | a shop sign on a wrought bracket that **sways gently on its hooks**, self-animated from the render loop like the banners |
-| `fingerpost` | a cluster of **pointed arms**, each naming a place and pointing the way — pass `directions: [{ text, angle }]` |
-| `milestone` | a weathered stone marker with the name **cut dark** into the face |
+| `fingerpost` | a cluster of **pointed arms** with a painted stripe, each naming a place and pointing the way — pass `directions: [{ text, angle }]` |
+| `milestone` | a weathered stone marker, the name painted on a **band sized to the text** |
 
 ```js
 // A crossroads fingerpost.
@@ -37,7 +37,7 @@ createSign({
 });
 ```
 
-The board of a `post` or `hanging` sign **sizes itself to the text** (measured with `measureText`), so a long name gets a long board. Lettering is painted with a touch of emissive so it stays readable at dusk — but kept below the day/night cycle's lamp threshold, so a sign never glows like a lamp.
+The board of a `post` or `hanging` sign **sizes itself to the text** (measured with `measureText`), so a long name gets a long board. Every sign sets its bright lettering on a **dark painted panel** — that contrast, not the letters alone, is what makes a sign readable across a street. The paint carries a touch of emissive so it stays readable at dusk, kept below the day/night cycle's lamp threshold so a sign never glows like a lamp. Pass `inkColor` / `panelColor` to restyle the paintwork.
 
 Like every SCENA prop, `createSign` returns `{ object, obstacleRadius }`, so it drops straight into `scatter`, a village, or GAMA's obstacle set.
 
