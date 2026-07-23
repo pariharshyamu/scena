@@ -103,6 +103,7 @@ export {
   type PrecipitationType,
   type AccumulateOptions,
 } from './environment/precipitation';
+export { createOcean, type Ocean, type OceanOptions } from './environment/ocean';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
 
 // Generators

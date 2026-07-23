@@ -192,6 +192,64 @@ game.start();`,
   },
 
   {
+    id: 'ocean',
+    title: 'Sea waves',
+    group: 'Worldbuilding',
+    code: `// A Gerstner-wave sea: crests peak and troughs flatten like real swell,
+// with analytic normals, whitecap foam and a fresnel sky tint. It reads the
+// terrain's heightAt, so it fades out over the island and foams at the shore
+// — and the boat rides the swell via the SAME heightAt on the CPU.
+import { createOcean, createTerrain, createSky, createLightingRig, applyFog,
+         createWindField, createSurface, createTree, createRock, scatter,
+         aboveWater, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, Group, BoxGeometry, CylinderGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+
+const SEA = 3.2, ISLE = 38;
+const terrain = createTerrain({ seed: 7, size: ISLE * 2, amplitude: 7, waterLevel: SEA, palette });
+scene.add(terrain.mesh);
+// Beyond the island it's open, deep sea; inside, the terrain's own coast.
+const shore = (x, z) => (Math.abs(x) < ISLE && Math.abs(z) < ISLE ? terrain.heightAt(x, z) : SEA - 6);
+
+const wind = createWindField({ direction: 35, strength: 0.4 });
+const ocean = createOcean({ level: SEA, size: 320, amplitude: 0.55, choppiness: 0.8, wind, shore });
+scene.add(ocean.mesh);
+
+const island = scatter({
+  seed: 3, area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  surface: terrain.heightAt, density: 0.04, minSpacing: 2.5,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), weight: 3, variants: 5 },
+          { create: (r) => createRock({ seed: r.int(1, 1e9), palette }) }],
+  mask: aboveWater(terrain, { level: SEA }, 0.6),
+});
+scene.add(island.group);
+
+// A boat that rides the swell — the buoyancy handshake.
+const boat = new Group();
+const hull = new Mesh(new BoxGeometry(1.5, 0.5, 3.4), createSurface('plank', { color: palette.wood }));
+const mast = new Mesh(new CylinderGeometry(0.05, 0.07, 3, 6), createSurface('wood', { color: palette.woodDark }));
+mast.position.set(0, 1.6, -0.2);
+boat.add(hull, mast);
+scene.add(boat);
+const bx = 20, bz = 30;
+
+game.onUpdate((t) => {
+  boat.position.set(bx, ocean.heightAt(bx, bz), bz);
+  boat.rotation.z = (ocean.heightAt(bx - 1, bz) - ocean.heightAt(bx + 1, bz)) * 0.35;
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.sin(a) * 26, SEA + 5, 44);
+  game.camera.lookAt(0, SEA, 6);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',
