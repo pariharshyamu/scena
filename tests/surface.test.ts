@@ -126,6 +126,35 @@ describe('createSurface', () => {
     expect(SURFACE_PRESETS.bark.grain).toBeGreaterThan(0);
   });
 
+  it('adds the masonry-tiling uniforms; tile presets enable the grid, others do not', () => {
+    const shader = compilePatched(createSurface('brick'));
+    for (const u of ['uSurfTile', 'uSurfTileSize', 'uSurfMortar', 'uSurfTileBond', 'uSurfMortarColor']) {
+      expect(shader.uniforms[u], u).toBeDefined();
+    }
+    // Tiled presets turn the grid on…
+    for (const k of ['brick', 'cobblestone', 'ashlar', 'floortile', 'shingle'] as SurfaceKind[]) {
+      expect(SURFACE_PRESETS[k].tile, k).toBe(1);
+      expect(SURFACE_PRESETS[k].tileW, k).toBeGreaterThan(0);
+    }
+    // …and cobblestone is the domed one.
+    expect(SURFACE_PRESETS.cobblestone.round).toBe(1);
+    expect(SURFACE_PRESETS.brick.round).toBe(0);
+    // Non-tiled presets leave it off → the uniform defaults to 0 (grid a no-op).
+    expect(SURFACE_PRESETS.stone.tile).toBeUndefined();
+    expect(compilePatched(createSurface('stone')).uniforms.uSurfTile.value).toBe(0);
+    // The grid source is present, and it feeds relief + roughness + albedo.
+    expect(shader.fragmentShader).toContain('scenaTile');
+    expect(shader.fragmentShader).toContain('uSurfMortarColor');
+  });
+
+  it('tiling is opt-in on any surface via overrides', () => {
+    const plain = compilePatched(createSurface('sandstone'));
+    const tiled = compilePatched(createSurface('sandstone', { tile: 1, tileW: 0.6 }));
+    expect(plain.uniforms.uSurfTile.value).toBe(0);
+    expect(tiled.uniforms.uSurfTile.value).toBe(1);
+    expect((tiled.uniforms.uSurfTileSize.value as { x: number }).x).toBe(0.6);
+  });
+
   it('stays dayCycle-safe: emissive is black, so intensity dimming is a no-op', () => {
     // dayCycle modulates emissiveIntensity on every material it sees; a
     // surface must not accidentally glow at night.

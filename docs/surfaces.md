@@ -49,6 +49,11 @@ From one triplanar fractal-noise field per fragment: fine albedo mottle, low-fre
 | `rust` | corroded iron — patchy orange, part-metallic |
 | `bronze` | bells & statues — warm dark metal, patina in cavities |
 | `brass` | fittings & instruments — bright warm metal, shinier |
+| `brick` | fired brick in running bond — pale mortar, per-brick variation |
+| `cobblestone` | rounded setts — wide earthy joints, streets & yards |
+| `ashlar` | large squared blocks — tight joints, castle walls |
+| `floortile` | aligned square flags — dark grout, halls & plazas |
+| `shingle` | overlapping wooden shingles — grain, deep shadow lines |
 
 Every preset also carries a **`baseColor`**, so `createSurface('sand')` looks like sand with no colour passed. A caller's `color` always wins:
 
@@ -70,6 +75,25 @@ createSurface('wood', {
 ```
 
 `SURFACE_PRESETS` exposes every preset's parameters if you want to read or tweak the defaults directly.
+
+## Tiled masonry
+
+The `brick`, `cobblestone`, `ashlar`, `floortile` and `shingle` presets add a **mortar grid** on top of the noise. It's the same shader — the grid is computed from a handful of extra uniforms, so tiled and untiled surfaces still share **one GPU program**.
+
+The grid is drawn on the **dominant-axis face** of the geometry (so a `BoxGeometry` wall, floor and roof each get a clean 2D pattern) and it's laid out in **world space** — meaning several abutting boxes read as one continuous wall, with the courses lining up across the seams rather than restarting per box. Each cell darkens and recesses to the mortar colour (a real groove via normal perturbation), rows offset for running bond, and every brick/stone takes a small per-cell shift in brightness and roughness so no two look stamped from the same mould.
+
+Because it's just parameters, you can tile *any* surface — turn sandstone into a block wall, or dial your own courses:
+
+```js
+createSurface('sandstone', {
+  tile: 1,            // turn the grid on
+  tileW: 0.6, tileH: 0.3,   // block size in metres
+  mortar: 0.02,       // joint width
+  bond: 1,            // 0 = aligned grid, 1 = running bond
+  round: 0,           // 0 = flat blocks, 1 = domed cobbles
+  mortarColor: 0x8a8578,
+});
+```
 
 ## Adopted by the props
 

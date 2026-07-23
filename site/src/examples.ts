@@ -218,6 +218,21 @@ const props = [createHouse({ seed: 7, palette }), createWell({ seed: 3, palette 
                createRock({ seed: 11, palette })];
 props.forEach((p, i) => { p.object.position.set(i * 6 - 6, 0, 4); scene.add(p.object); });
 
+// Tier-2 tiling at architectural scale — a brick wall between ashlar pillars
+// on a cobblestone floor. The grid is world-space, so the boxes align into
+// continuous masonry instead of obvious repeats.
+const wall = new Mesh(new BoxGeometry(6, 2.6, 0.4), createSurface('brick', { seed: 2 }));
+wall.position.set(0, 1.3, -12);
+scene.add(wall);
+[-3.1, 3.1].forEach((dx) => {
+  const pillar = new Mesh(new BoxGeometry(0.8, 3.2, 0.8), createSurface('ashlar', { seed: 4 }));
+  pillar.position.set(dx, 1.6, -12);
+  scene.add(pillar);
+});
+const cobbles = new Mesh(new BoxGeometry(8, 0.3, 4), createSurface('cobblestone', { seed: 6 }));
+cobbles.position.set(0, 0.15, -9.8);
+scene.add(cobbles);
+
 ${orbit(20, 11, 0.05)}
 game.start();`,
   },

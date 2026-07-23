@@ -4,6 +4,7 @@ import {
   Color,
   DirectionalLight,
   Fog,
+  Group,
   Mesh,
   PerspectiveCamera,
   Scene,
@@ -82,6 +83,24 @@ crate.object.position.set(6.5, 0, 4.5);
 crate.object.scale.setScalar(1.6);
 scene.add(crate.object);
 
+// Tier-2 tiling at architectural scale: a brick wall, ashlar pillars and a
+// cobblestone floor — the grid is world-space, so abutting boxes align and a
+// wall reads as continuous masonry, not repeated tiles.
+const built = new Group();
+const wall = new Mesh(new BoxGeometry(6, 2.6, 0.4), createSurface('brick', { seed: 2 }));
+wall.position.set(0, 1.3, 0);
+built.add(wall);
+for (const dx of [-3.1, 3.1]) {
+  const pillar = new Mesh(new BoxGeometry(0.8, 3.2, 0.8), createSurface('ashlar', { seed: 4 }));
+  pillar.position.set(dx, 1.6, 0);
+  built.add(pillar);
+}
+const floor = new Mesh(new BoxGeometry(8, 0.3, 4), createSurface('cobblestone', { seed: 6 }));
+floor.position.set(0, 0.15, 2.2);
+built.add(floor);
+built.position.set(0, 0, -12);
+scene.add(built);
+
 const view = new URLSearchParams(location.search).get('view');
 
 // A slow orbit so relief catches the light from many angles.
@@ -91,6 +110,9 @@ function frame(): void {
   if (view === 'grid') {
     camera.position.set(Math.sin(t * 0.4) * 6, 8.5, 6);
     camera.lookAt(0, 0.9, -5.5);
+  } else if (view === 'built') {
+    camera.position.set(Math.sin(t * 0.4) * 5, 2.4, -6);
+    camera.lookAt(0, 1.4, -12);
   } else {
     camera.position.set(Math.sin(t) * 17, 7, 12 + Math.cos(t) * 4);
     camera.lookAt(0, 1, -2);

@@ -1,4 +1,4 @@
-import { Color, MeshStandardMaterial, Vector3 } from 'three';
+import { Color, MeshStandardMaterial, Vector2, Vector3 } from 'three';
 
 /**
  * Procedural surface materials — the reason low-poly SCENA props can look
@@ -48,7 +48,13 @@ export type SurfaceKind =
   // Tier 1 — metals
   | 'rust'
   | 'bronze'
-  | 'brass';
+  | 'brass'
+  // Tier 2 — masonry tiling
+  | 'brick'
+  | 'cobblestone'
+  | 'ashlar'
+  | 'floortile'
+  | 'shingle';
 
 export interface SurfaceParams {
   /**
@@ -83,6 +89,26 @@ export interface SurfaceParams {
   grainAxis: Vector3;
   /** flatShading default for this kind. */
   flat: boolean;
+
+  // --- masonry tiling (all optional; `tile: 0` — the default — disables it) ---
+  /** Tiling strength (0 off, 1 full). Turns on the brick/tile grid. */
+  tile?: number;
+  /** Cell width in world metres (the length of a brick/tile). */
+  tileW?: number;
+  /** Cell height in world metres (the course height). */
+  tileH?: number;
+  /** Mortar-joint width in world metres. */
+  mortar?: number;
+  /** Row offset: 0 = aligned grid, 1 = half-cell running bond. */
+  bond?: number;
+  /** Cell profile: 0 = flat tiles, 1 = domed cobbles. */
+  round?: number;
+  /** Per-cell brightness/roughness jitter (0–1), so no two read alike. */
+  tileJitter?: number;
+  /** Mortar-joint colour, as a hex int. */
+  mortarColor?: number;
+  /** Groove relief strength for the joints (normal perturbation). */
+  tileRelief?: number;
 }
 
 const V = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
@@ -257,6 +283,57 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     tintAmount: 0.16, ao: 0.16, bump: 0.1, roughVar: 0.14, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
   },
+
+  // --- Tier 2: masonry tiling -------------------------------------------
+  // Fired brick in running bond: long thin courses, pale mortar, bricks that
+  // each weather a little differently.
+  brick: {
+    baseColor: 0x9e4a34,
+    roughness: 0.86, metalness: 0, scale: 6.0, albedoVar: 0.14, tint: 0x5a2418,
+    tintAmount: 0.16, ao: 0.2, bump: 0.1, roughVar: 0.12, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    tile: 1, tileW: 0.25, tileH: 0.085, mortar: 0.014, bond: 1, round: 0,
+    tileJitter: 0.18, mortarColor: 0xb3a892, tileRelief: 0.06,
+  },
+  // Rounded cobblestones: small domed setts, wide earthy joints, heavy
+  // per-stone variation — streets and courtyards.
+  cobblestone: {
+    baseColor: 0x8a8f98,
+    roughness: 0.9, metalness: 0, scale: 5.0, albedoVar: 0.2, tint: 0x4a4436,
+    tintAmount: 0.18, ao: 0.28, bump: 0.2, roughVar: 0.14, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    tile: 1, tileW: 0.17, tileH: 0.15, mortar: 0.03, bond: 1, round: 1,
+    tileJitter: 0.24, mortarColor: 0x35322b, tileRelief: 0.13,
+  },
+  // Ashlar: large squared blocks, tight fine joints — castle and keep walls.
+  ashlar: {
+    baseColor: 0xb9b2a4,
+    roughness: 0.9, metalness: 0, scale: 3.0, albedoVar: 0.16, tint: 0x7a725f,
+    tintAmount: 0.16, ao: 0.2, bump: 0.12, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    tile: 1, tileW: 0.55, tileH: 0.32, mortar: 0.02, bond: 0.5, round: 0,
+    tileJitter: 0.1, mortarColor: 0x857e6f, tileRelief: 0.05,
+  },
+  // Floor tiles: an aligned grid of square flags, dark grout, low relief —
+  // halls and plazas.
+  floortile: {
+    baseColor: 0x6a6e72,
+    roughness: 0.5, metalness: 0, scale: 4.0, albedoVar: 0.12, tint: 0x33363a,
+    tintAmount: 0.16, ao: 0.16, bump: 0.08, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    tile: 1, tileW: 0.4, tileH: 0.4, mortar: 0.014, bond: 0, round: 0,
+    tileJitter: 0.12, mortarColor: 0x2a2a2c, tileRelief: 0.045,
+  },
+  // Wooden shingles: overlapping courses with grain, deep shadow lines —
+  // roofs and spires.
+  shingle: {
+    baseColor: 0x6b4a33,
+    roughness: 0.85, metalness: 0, scale: 6.0, albedoVar: 0.16, tint: 0x2e2012,
+    tintAmount: 0.18, ao: 0.24, bump: 0.12, roughVar: 0.12, grain: 0.32,
+    grainScale: 6.0, grainAxis: V(0, 1, 0), flat: true,
+    tile: 1, tileW: 0.2, tileH: 0.13, mortar: 0.012, bond: 1, round: 0,
+    tileJitter: 0.2, mortarColor: 0x241811, tileRelief: 0.09,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -285,6 +362,14 @@ uniform float uSurfGrain;
 uniform float uSurfGrainScale;
 uniform vec3  uSurfGrainAxis;
 uniform vec3  uSurfSeed;
+uniform float uSurfTile;
+uniform vec2  uSurfTileSize;
+uniform float uSurfMortar;
+uniform float uSurfTileBond;
+uniform float uSurfTileRound;
+uniform float uSurfTileJitter;
+uniform vec3  uSurfMortarColor;
+uniform float uSurfTileRelief;
 
 float scenaHash13(vec3 p){
   p = fract(p * 0.1031);
@@ -324,6 +409,39 @@ float scenaGrain(vec3 wp){
   vec3 perp = wp - ax * along;
   float rings = length(perp) * uSurfGrainScale + scenaFbm(wp * uSurfGrainScale * 0.4) * 2.0;
   return abs(fract(rings) - 0.5) * 2.0; // triangle wave 0..1
+}
+// A masonry grid on the dominant-axis face (so box walls/floors/roofs get a
+// clean 2D pattern and abutting boxes align). Running-bond rows, mortar bands
+// and per-cell jitter. Returns: x = mortar mask (1 in the joint), y = per-cell
+// hash (0..1), z = surface height (tile face high → joint low), w = the domed
+// stone height for cobbles.
+vec4 scenaTile(vec3 wp, vec3 wn){
+  vec3 an = abs(normalize(wn));
+  vec2 uv;
+  if (an.x >= an.y && an.x >= an.z) uv = wp.zy;
+  else if (an.y >= an.x && an.y >= an.z) uv = wp.xz;
+  else uv = wp.xy;
+  uv += uSurfSeed.xy;
+  vec2 ts = max(uSurfTileSize, vec2(1e-3));
+  float row = floor(uv.y / ts.y);
+  float bond = mod(row, 2.0) * uSurfTileBond * 0.5;
+  float cxf = uv.x / ts.x + bond;
+  float col = floor(cxf);
+  vec2 cell = vec2(col, row);
+  float fx = fract(cxf);
+  float fy = fract(uv.y / ts.y);
+  // Distance to the nearest cell edge, in world units → mortar band.
+  float ex = min(fx, 1.0 - fx) * ts.x;
+  float ey = min(fy, 1.0 - fy) * ts.y;
+  float edge = min(ex, ey);
+  float m = max(uSurfMortar, 1e-4);
+  float mortar = 1.0 - smoothstep(m, m * 1.7, edge);
+  // Domed profile for cobbles: peaks at the cell centre, falls to the joint.
+  float dome = clamp(1.0 - length(vec2(fx - 0.5, fy - 0.5)) * 2.0, 0.0, 1.0);
+  float flatH = 1.0 - mortar;
+  float height = mix(flatH, dome * (1.0 - mortar), uSurfTileRound);
+  float h = scenaHash13(vec3(cell + vec2(3.1, 7.3), 5.0));
+  return vec4(mortar, h, height, dome);
 }
 `;
 
@@ -366,26 +484,36 @@ function fragmentPatch(src: string): string {
       float scenaN   = scenaTri(vSurfWorldPos, vSurfWorldNormal, uSurfScale);
       float scenaLow = scenaTri(vSurfWorldPos, vSurfWorldNormal, uSurfScale * 0.25);
       float scenaG   = scenaGrain(vSurfWorldPos);
+      // masonry grid (no-op when uSurfTile == 0)
+      vec4  scenaT   = scenaTile(vSurfWorldPos, vSurfWorldNormal);
+      float scenaMortar = scenaT.x * uSurfTile;
       // fine mottle
       diffuseColor.rgb *= 1.0 + (scenaN - 0.5) * uSurfAlbedoVar;
+      // per-cell brightness jitter, so no two bricks/stones read the same
+      diffuseColor.rgb *= 1.0 + uSurfTileJitter * (scenaT.y - 0.5) * uSurfTile;
       // cavity ambient occlusion (dark where the low band is low)
       diffuseColor.rgb *= 1.0 - uSurfAO * (1.0 - scenaLow);
       // cavity tint
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint, uSurfTintAmount * (1.0 - scenaLow));
       // grain darkening (no-op when uSurfGrain == 0)
-      diffuseColor.rgb *= 1.0 - uSurfGrain * scenaG * 0.5;`
+      diffuseColor.rgb *= 1.0 - uSurfGrain * scenaG * 0.5;
+      // recessed mortar joint: to the mortar colour, shadowed in the groove
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfMortarColor, scenaMortar);
+      diffuseColor.rgb *= 1.0 - 0.35 * scenaMortar;`
     )
     .replace(
       '#include <roughnessmap_fragment>',
       `#include <roughnessmap_fragment>
-      roughnessFactor = clamp(roughnessFactor + (scenaN - 0.5) * uSurfRoughVar + uSurfGrain * scenaG * 0.12, 0.04, 1.0);`
+      roughnessFactor = clamp(roughnessFactor + (scenaN - 0.5) * uSurfRoughVar + uSurfGrain * scenaG * 0.12
+        + scenaMortar * 0.25 + (scenaT.y - 0.5) * uSurfTileJitter * 0.3 * uSurfTile, 0.04, 1.0);`
     )
     .replace(
       '#include <normal_fragment_maps>',
       `#include <normal_fragment_maps>
       {
-        // three's perturbNormalArb, in view space, driven by the noise height.
-        float scenaH = scenaN + uSurfGrain * scenaG * 0.5;
+        // three's perturbNormalArb, in view space, driven by the noise height
+        // plus the tile relief (a step down into each mortar joint).
+        float scenaH = scenaN + uSurfGrain * scenaG * 0.5 + scenaT.z * uSurfTile * uSurfTileRelief;
         vec3 sX = dFdx(-vViewPosition);
         vec3 sY = dFdy(-vViewPosition);
         vec3 sN = normal;
@@ -433,6 +561,15 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
         Math.sin(seed * 37.719) * 29.41
       ),
     },
+    // Masonry tiling (uSurfTile 0 disables the whole grid at no visual cost).
+    uSurfTile: { value: p.tile ?? 0 },
+    uSurfTileSize: { value: new Vector2(p.tileW ?? 0.25, p.tileH ?? 0.1) },
+    uSurfMortar: { value: p.mortar ?? 0.014 },
+    uSurfTileBond: { value: p.bond ?? 1 },
+    uSurfTileRound: { value: p.round ?? 0 },
+    uSurfTileJitter: { value: p.tileJitter ?? 0.12 },
+    uSurfMortarColor: { value: new Color(p.mortarColor ?? 0x3a3a3a) },
+    uSurfTileRelief: { value: p.tileRelief ?? 0.06 },
   };
 
   material.onBeforeCompile = (shader) => {
