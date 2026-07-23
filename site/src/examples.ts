@@ -293,6 +293,56 @@ game.start();`,
   },
 
   {
+    id: 'herd',
+    title: 'Herds & grazing',
+    group: 'Worldbuilding',
+    code: `// Ground-dwelling ambient life. A boid sim steers the herd across the
+// terrain (cohesion high, so they clump), feet clamped to terrain.heightAt
+// every frame. They graze in place then walk on; legs stride and the head
+// dips in the vertex shader, scaled by each animal's real speed.
+import { createHerd, createTerrain, createTree,
+         createLightingRig, applyFog, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color, Vector3 } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xbcd3e6);
+scene.add(createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+
+const terrain = createTerrain({ seed: 6, size: 120, resolution: 110,
+  amplitude: 4, noiseScale: 34, valleyFlatness: 0.7, palette });
+scene.add(terrain.mesh);
+
+const wood = scatter({
+  seed: 8, area: { min: { x: -56, z: -56 }, max: { x: 56, z: 56 } },
+  density: 0.012, minSpacing: 4,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), variants: 5 }],
+  mask: (x, z) => Math.hypot(x, z) > 22,
+});
+for (const c of wood.group.children) c.position.y = terrain.heightAt(c.position.x, c.position.z);
+scene.add(wood.group);
+
+// A herd of deer grazing — try type:'sheep' for a tighter, woollier flock.
+const herd = createHerd({ type: 'deer', count: 14, center: [0, 0], radius: 18,
+  ground: terrain.heightAt, seed: 3 });
+scene.add(herd.object);
+
+const focus = new Vector3();
+game.onUpdate((t) => {
+  focus.set(0, 0, 0);
+  for (const p of herd.positions) focus.add(p);
+  focus.multiplyScalar(1 / herd.count);
+  const a = t.elapsed * 0.03;
+  game.camera.position.set(focus.x + Math.sin(a) * 22, focus.y + 9, focus.z + Math.cos(a) * 22);
+  game.camera.lookAt(focus.x, focus.y + 0.5, focus.z);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',
