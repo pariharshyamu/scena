@@ -69,6 +69,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'adopted-by-the-props': 'surfaces',
   'scatter-in-one-call': 'forest',
   'lod-tiles': 'lod',
+  'billboard-impostors-for-giant-forests': 'giants',
   'createvillage': 'village',
   'kits-ascii-architecture': 'kit',
   'buildscene-a-world-from-json': 'manifest',

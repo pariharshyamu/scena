@@ -60,7 +60,7 @@ Two prop behaviors worth knowing:
 | `baobab` | fat bottle trunk, sparse high crown | stiff | height × 0.16 |
 | `acacia` | thin trunk, broad flat umbrella | medium | 0.5 |
 
-The four **giants** (`sequoia`, `banyan`, `baobab`, `acacia`) are big and few — a sequoia stands `22–32` units tall and towers over an ordinary wood — so their **`obstacleRadius` scales with height**, giving agent steering an honest footprint. Place them sparingly; the [scatter LOD tiles](scatter.md) cull them at distance like anything else.
+The four **giants** (`sequoia`, `banyan`, `baobab`, `acacia`) are big and few — a sequoia stands `22–32` units tall and towers over an ordinary wood — so their **`obstacleRadius` scales with height**, giving agent steering an honest footprint. Place them sparingly. For a *dense* stand of them, pair each with a [billboard impostor](scatter.md#billboard-impostors-for-giant-forests) via `treeLOD` — full geometry up close, a single camera-facing quad at range — so thousands of giants stay a few draw calls.
 
 ```js
 import { createTree, TREE_SPECIES, PALETTES } from 'scena3d';

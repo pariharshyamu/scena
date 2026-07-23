@@ -655,6 +655,53 @@ game.start();`,
   },
 
   {
+    id: 'giants',
+    title: 'Giant forest impostors',
+    group: 'Worldbuilding',
+    code: `// treeLOD pairs a full createTree with a billboard createImpostor — a
+// single camera-facing quad whose species silhouette is carved in the shader,
+// no texture. A dense stand of giants keeps full geometry up close and swaps to
+// billboards past the swap distance. The camera flies out and back to trip it.
+import { createTerrain, createLightingRig, applyFog, createWindField,
+         applyWind, scatter, treeLOD, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xaecadf);
+scene.add(createLightingRig('golden-hour').group);
+const terrain = createTerrain({ seed: 7, size: 300, amplitude: 8, valleyFlatness: 0.6, palette });
+scene.add(terrain.mesh);
+applyFog(scene, 'haze', palette);
+
+const wind = createWindField({ direction: 40, strength: 0.25, gust: 0.5 });
+const forest = scatter({
+  seed: 9,
+  area: { min: { x: -140, z: -140 }, max: { x: 140, z: 140 } },
+  surface: terrain.heightAt, density: 0.02, minSpacing: 6,
+  items: [
+    treeLOD('sequoia', { palette, weight: 2 }),   // towering redwoods
+    treeLOD('pine', { palette, weight: 4 }),
+    treeLOD('cypress', { palette, weight: 2 }),
+  ],
+  lod: { distance: 90, tileSize: 28 },
+});
+scene.add(forest.group);
+applyWind(forest.group, { field: wind, height: 8, stiffness: 2.4, anchor: 1 });
+
+game.onUpdate((t) => {
+  const R = 130 + Math.sin(t.elapsed * 0.12) * 95;
+  const a = t.elapsed * 0.07;
+  game.camera.position.set(Math.cos(a) * R, 26, Math.sin(a) * R);
+  game.camera.lookAt(0, 12, 0);
+  forest.update(game.camera);            // drive the billboard swap
+});
+game.start();`,
+  },
+
+  {
     id: 'props',
     title: 'Prop gallery',
     group: 'Props',

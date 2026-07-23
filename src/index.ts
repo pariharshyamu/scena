@@ -39,6 +39,13 @@ export {
   type TreeBiome,
   type TreeBiomeOptions,
 } from './props/tree';
+export {
+  createImpostor,
+  treeLOD,
+  type ImpostorOptions,
+  type ImpostorProfile,
+  type TreeLODOptions,
+} from './props/impostor';
 export { createRock, type RockOptions } from './props/rock';
 export { createCrate, type CrateOptions } from './props/crate';
 export { createFence, type FenceOptions } from './props/fence';
