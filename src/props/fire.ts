@@ -136,8 +136,11 @@ void main() {
   gl_FragColor = vec4(uColor, (1.0 - vLife) * (1.0 - d * 2.0));
 }`;
 
-/** Build the animated flame + embers, plus the uniforms driving them. */
-function makeFlame(
+/**
+ * Build the animated flame + embers, plus the uniforms driving them.
+ * Internal — shared with the room hearth; not part of the public API.
+ */
+export function makeFlame(
   rng: Rng,
   scale: number,
   tongues: number,
@@ -216,8 +219,9 @@ function makeFlame(
  * the glowing coals and an optional flickering PointLight are all advanced
  * from the render loop, so a fire lives on its own with no per-frame code —
  * drop it in `scatter` or a village and it burns.
+ * Internal — shared with the room hearth; not part of the public API.
  */
-function animateFire(
+export function animateFire(
   driver: Mesh,
   flameU: { uTime: { value: number } },
   emberU: { uTime: { value: number } },

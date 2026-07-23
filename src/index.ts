@@ -158,6 +158,19 @@ export { createVillage, type Village, type VillageOptions } from './generators/v
 
 // Kits
 export { KIT_UNIT, assembleKit, type Kit, type KitOptions } from './kits/kit';
+export {
+  createRoom,
+  type Room,
+  type RoomOptions,
+  type RoomWindow,
+  type RoomHearth,
+} from './kits/room';
+export {
+  createInteriorLight,
+  type InteriorLight,
+  type InteriorLightOptions,
+  type InteriorSun,
+} from './environment/interiorLight';
 
 // Scene assembly
 export {

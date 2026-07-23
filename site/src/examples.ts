@@ -1170,6 +1170,50 @@ game.start();`,
   },
 
   {
+    id: 'interior',
+    title: 'A cottage interior',
+    group: 'Settlement',
+    code: `// createRoom takes the kit grid indoors — plastered walls over
+// floorboards under a beamed ceiling, windows that know which way they
+// face, and a burning hearth — while createInteriorLight pours dusty
+// daylight shafts through the sun-facing windows, swinging east to west
+// as the day cycles. No real lights but the hearth's flicker.
+import { createRoom, createInteriorLight, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0x0a0d13);
+
+const room = createRoom([
+  '##H####',
+  '#.....#',
+  'W..~..W',
+  '#.....#',
+  '#T....#',
+  '##WDW##',
+], { seed: 11, palette });
+scene.add(room.group);
+
+// A little day the demo drives: sun east at dawn, west at dusk.
+const cycle = { sunElevation: 1, timeOfDay: 0.5 };
+const light = createInteriorLight(room, { cycle, shaftStrength: 0.2 });
+
+let day = 0.34;
+game.onUpdate((t) => {
+  day = (day + t.delta / 40) % 1;              // a 40-second day
+  cycle.timeOfDay = day;
+  cycle.sunElevation = Math.sin(2 * Math.PI * (day - 0.25));
+  light.update();
+  game.camera.position.set(0.6 + Math.sin(t.elapsed * 0.13) * 0.5, 1.9, 3.6);
+  game.camera.lookAt(Math.sin(t.elapsed * 0.09) * 0.8, 1.15, -3.5);
+});
+game.start();`,
+  },
+
+  {
     id: 'living',
     title: 'Water, wind & the day cycle',
     group: 'Living world',

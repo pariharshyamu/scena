@@ -65,3 +65,39 @@ Each character is one **`KIT_UNIT`** (2 world units) cell — the shared snap di
 However large the map, walls and floors render as **two `InstancedMesh`es**. The result reports `obstacles` (one per wall cell), `spawns`, `torches`, `size`, and `floorAt(x, z)` — a walkability query for spawning and AI ("is this point inside the fort?").
 
 Kits and villages compose: a village for the exterior, a kit for the keep on the hill, one obstacle list feeding the same agents.
+
+## Interiors: createRoom
+
+`createRoom` is `assembleKit` gone indoors — the same grid, the same map characters, and the same `Kit`-shaped gameplay data (`obstacles`, `spawns`, `floorAt`), plus everything a room needs to feel like a room: plastered walls over floorboards (or flagstones, `floor: 'stone'`), a beamed ceiling, and three new cell types:
+
+| Char | Meaning |
+|---|---|
+| `W` | **window** — wall with a real opening (sill, jambs, header, glowing daylight pane), recorded in `windows` with the direction it faces |
+| `H` | **hearth** — wall cell replaced by a burning stone fireplace: mantel, sooty firebox, live flame, glowing coals and a flickering `PointLight` (budgeted by `hearthLight`) |
+| `~` | floor + a woven **rug** |
+
+```js
+const cottage = createRoom([
+  '##H####',
+  '#.....#',
+  'W..~..W',
+  '#.....#',
+  '##WDW##',
+], { seed: 11, palette });
+scene.add(cottage.group);
+```
+
+The architecture is still a handful of `InstancedMesh`es however big the plan; hearths are already burning (the same self-animating flame as `createCampfire`); and `room.setActive(false)` hides the whole interior *and* its real lights in one call — the cheap culling switch for stepping outdoors.
+
+### Daylight: createInteriorLight
+
+Indoors, light is the mood. `createInteriorLight(room)` adds a palette-tinted hemisphere fill (cool sky from above, warm wood bounce from below) and — the showpiece — a **volumetric-looking light shaft through every sun-facing window**: angled by the sun's elevation and azimuth, landing in a soft pool on the floor, with dust motes drifting through it. The window panes brighten toward noon and go dark at night.
+
+```js
+const light = createInteriorLight(cottage, { cycle });  // follow the day cycle
+game.onUpdate(() => light.update());                    // dawn: east shafts; dusk: west
+```
+
+Bind a [`createDayCycle`](./environment.md) via `cycle` and the sun swings east to west through the day, shafts dying at dusk exactly as the hearth's flicker takes over; or aim it by hand with `setSun({ elevation, azimuth })`. None of it costs real lights — shafts, pools and dust are a few additive quads, so the only `PointLight`s in a room remain the ones the room budgeted (hearth, torches).
+
+The light rig attaches itself to `room.group` (shafts are room-local), so `setActive(false)` hides it too.

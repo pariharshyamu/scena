@@ -72,6 +72,8 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'billboard-impostors-for-giant-forests': 'giants',
   'createvillage': 'village',
   'kits-ascii-architecture': 'kit',
+  'interiors-createroom': 'interior',
+  'daylight-createinteriorlight': 'interior',
   'buildscene-a-world-from-json': 'manifest',
   'steering-around-props': 'path',
 };
