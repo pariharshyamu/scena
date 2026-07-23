@@ -381,6 +381,60 @@ game.start();`,
   },
 
   {
+    id: 'signs',
+    title: 'Signposts & stylised text',
+    group: 'Props',
+    code: `// Real, legible lettering carved from an embedded vector font — no
+// textures, no font files, no loaders, so it renders anywhere. createSign
+// gives you a post board, a swaying hanging shop sign, a fingerpost that
+// points the way, and a carved stone milestone. buildTextGeometry is the
+// same lettering exposed directly, to label any prop you like.
+import { createSign, buildTextGeometry, createSurface, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, Color, Fog, DirectionalLight, AmbientLight,
+         MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xaecbe0);
+scene.fog = new Fog(0xaecbe0, 40, 90);
+scene.add(new DirectionalLight(0xfff2df, 2.3), new AmbientLight(0xaecbe0, 0.6));
+const ground = new Mesh(new PlaneGeometry(160, 160), createSurface('dirt', { color: palette.grassLow }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const town = createSign({ kind: 'post', text: 'HAVENBROOK', seed: 1, palette });
+town.object.position.set(-4.5, 0, 0); town.object.rotation.y = 0.25;
+
+const shop = createSign({ kind: 'hanging', text: 'THE FORGE', seed: 4, palette });
+shop.object.position.set(-1.4, 0, 0.5);
+
+const finger = createSign({ kind: 'fingerpost', seed: 6, palette, directions: [
+  { text: 'MARKET', angle: 0.2 }, { text: 'HARBOUR', angle: 2.3 }, { text: 'THE MILL', angle: 4.1 },
+] });
+finger.object.position.set(2.2, 0, 0);
+
+const stone = createSign({ kind: 'milestone', text: 'GREYMOOR 3', seed: 9, palette });
+stone.object.position.set(5, 0, 0.8); stone.object.rotation.y = -0.3;
+scene.add(town.object, shop.object, finger.object, stone.object);
+
+// The text API used directly: a carved title, no sign attached.
+const title = new Mesh(
+  buildTextGeometry('WELCOME', { size: 0.9, weight: 0.18 }).geometry,
+  new MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.7, flatShading: true }));
+title.position.set(0, 3.4, -3);
+scene.add(title);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.07;
+  game.camera.position.set(Math.sin(a) * 4, 2.4, 8.5);
+  game.camera.lookAt(0.2, 1.6, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'palettes',
     title: 'Retheme with palettes',
     group: 'Props',

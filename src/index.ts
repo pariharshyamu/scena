@@ -17,6 +17,16 @@ export {
   type SurfaceOptions,
 } from './materials/surface';
 
+// Text — stylised lettering carved from an embedded vector font (no textures,
+// no font files, no loaders); label any prop, in the browser or a Node test.
+export {
+  buildTextGeometry,
+  measureText,
+  type TextOptions,
+  type TextGeometry,
+  type TextAlign,
+} from './text/textGeometry';
+
 // Props
 export { createTree, type TreeOptions } from './props/tree';
 export { createRock, type RockOptions } from './props/rock';
@@ -56,6 +66,12 @@ export {
   type StatueFigure,
   type StatueMaterial,
 } from './props/statue';
+export {
+  createSign,
+  type SignOptions,
+  type SignKind,
+  type Direction,
+} from './props/sign';
 
 // Environment
 export { createTerrain, type Terrain, type TerrainOptions } from './environment/terrain';

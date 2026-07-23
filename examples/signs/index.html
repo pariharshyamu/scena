@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — signposts &amp; stylised text</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; color: #eef2f7;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6); max-width: 34em;
+      }
+      code { background: rgba(255,255,255,0.12); padding: 0 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — stylised text on props</strong><br />
+      Real, legible lettering carved from an embedded vector font — no
+      textures, no font files, no loaders. A <b>post</b> sign, a swaying
+      <b>hanging</b> shop sign, a <b>fingerpost</b> pointing the way, and a
+      carved <b>milestone</b>. Try <code>?view=front</code> or
+      <code>?view=finger</code>.
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
