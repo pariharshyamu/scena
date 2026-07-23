@@ -104,6 +104,14 @@ export {
   type AccumulateOptions,
 } from './environment/precipitation';
 export { createOcean, type Ocean, type OceanOptions } from './environment/ocean';
+export {
+  createGodRays,
+  createCaustics,
+  type GodRays,
+  type GodRaysOptions,
+  type Caustics,
+  type CausticsOptions,
+} from './environment/underwater';
 export { createFlock, type Flock, type FlockOptions, type FlockType } from './environment/flock';
 export { createHerd, type Herd, type HerdOptions, type HerdType } from './environment/herd';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';

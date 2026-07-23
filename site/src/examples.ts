@@ -250,6 +250,54 @@ game.start();`,
   },
 
   {
+    id: 'underwater',
+    title: 'God rays & caustics',
+    group: 'Worldbuilding',
+    code: `// Below the surface: volumetric god rays fall as crossed additive shafts,
+// and caustics — a shifting net of light — are added to the seabed's emissive
+// (so they glow through any lighting). A school of fish drifts through.
+import { createGodRays, createCaustics, createFlock, createRock,
+         createSurface, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color, Fog, Group, Mesh, PlaneGeometry, DirectionalLight, AmbientLight } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0x0e3a49);
+scene.fog = new Fog(0x0e3a49, 8, 46);
+scene.add(new DirectionalLight(0xbfe8f0, 1.1), new AmbientLight(0x2c6675, 0.9));
+
+const SEABED = -6;
+const seabed = new Group();
+const sand = new Mesh(new PlaneGeometry(120, 120), createSurface('sand', { color: 0x7d8a76 }));
+sand.rotation.x = -Math.PI / 2; sand.position.y = SEABED; seabed.add(sand);
+for (let i = 0; i < 12; i++) {
+  const rock = createRock({ seed: 30 + i, palette });
+  const a = (i / 12) * Math.PI * 2 + i * 0.7, r = 6 + (i % 4) * 4;
+  rock.object.position.set(Math.cos(a) * r, SEABED, Math.sin(a) * r);
+  rock.object.scale.setScalar(1.2 + (i % 3) * 0.5);
+  seabed.add(rock.object);
+}
+scene.add(seabed);
+
+// Caustics onto the sand + rocks; god rays streaming down from above.
+createCaustics({ intensity: 0.55, scale: 0.42, speed: 0.7 }).apply(seabed);
+const rays = createGodRays({ count: 24, height: 26, width: 1.6, spread: 20, tilt: 22, opacity: 0.16, seed: 4 });
+rays.object.position.y = 6; scene.add(rays.object);
+
+const fish = createFlock({ type: 'fish', count: 90, center: [0, -1.5, 0], bounds: [14, 3, 14], seed: 9 });
+scene.add(fish.object);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.06;
+  game.camera.position.set(Math.sin(a) * 20, 1.5, Math.cos(a) * 20);
+  game.camera.lookAt(0, -2, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'flock',
     title: 'Flocks & schools',
     group: 'Worldbuilding',
