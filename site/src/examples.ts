@@ -182,9 +182,10 @@ game.start();`,
     group: 'Props',
     code: `// Why SCENA props can out-look a downloaded GLTF at a fraction of the
 // bytes: createSurface patches a MeshStandardMaterial with triplanar noise,
-// so weathered stone, wood grain, plaster, thatch and tile are generated in
-// the shader — no textures fetched, and every prop unique. Full PBR lighting,
-// fog and shadows survive because it stays a standard material.
+// so weathered stone, sand, bark, canvas, terracotta, bronze and 17 more are
+// generated in the shader — no textures fetched, every prop unique, and each
+// preset carries its own colour. Full PBR lighting, fog and shadows survive
+// because it stays a standard material.
 import { createSurface, SURFACE_PRESETS, createHouse, createWell, createRock,
          createSky, createLightingRig, applyFog, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
@@ -195,25 +196,29 @@ const game = new Game();
 const scene = game.world.scene;
 scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
 applyFog(scene, 'haze', palette);
-const ground = new Mesh(new PlaneGeometry(80, 80), createSurface('dirt', { color: 0x6f5a3f }));
+const ground = new Mesh(new PlaneGeometry(80, 80), createSurface('dirt'));
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// One primitive per preset — all the detail is in the shader.
+// The whole palette as a grid — one primitive per preset, no colours passed
+// (each carries its own baseColor), all the detail in the shader.
 const kinds = Object.keys(SURFACE_PRESETS);
+const metals = new Set(['metal', 'rust', 'bronze', 'brass']);
+const perRow = 8;
 kinds.forEach((kind, i) => {
-  const geo = kind === 'metal' ? new SphereGeometry(1.1, 24, 18) : new BoxGeometry(2, 2, 2);
+  const col = i % perRow, row = Math.floor(i / perRow);
+  const geo = metals.has(kind) ? new SphereGeometry(0.95, 24, 18) : new BoxGeometry(1.8, 1.8, 1.8);
   const mesh = new Mesh(geo, createSurface(kind, { seed: i + 1 }));
-  mesh.position.set((i - (kinds.length - 1) / 2) * 3, 1.1, -3);
+  mesh.position.set((col - (perRow - 1) / 2) * 2.5, 1, -3 - row * 2.6);
   scene.add(mesh);
 });
 
 // The same surfaces on real props.
 const props = [createHouse({ seed: 7, palette }), createWell({ seed: 3, palette }),
                createRock({ seed: 11, palette })];
-props.forEach((p, i) => { p.object.position.set(i * 6 - 6, 0, 3); scene.add(p.object); });
+props.forEach((p, i) => { p.object.position.set(i * 6 - 6, 0, 4); scene.add(p.object); });
 
-${orbit(22, 10, 0.05)}
+${orbit(20, 11, 0.05)}
 game.start();`,
   },
 

@@ -105,6 +105,27 @@ describe('createSurface', () => {
     expect(SURFACE_PRESETS.plaster.grain).toBe(0);
   });
 
+  it('falls back to each preset baseColor, but a passed color always wins', () => {
+    // No color passed → the preset's own baseColor (sand looks like sand).
+    expect(createSurface('sand').color.getHex()).toBe(SURFACE_PRESETS.sand.baseColor);
+    expect(createSurface('brass').color.getHex()).toBe(SURFACE_PRESETS.brass.baseColor);
+    // Caller color overrides the baseColor.
+    expect(createSurface('sand', { color: 0x123456 }).color.getHex()).toBe(0x123456);
+    // Every preset carries a baseColor now.
+    for (const k of KINDS) expect(SURFACE_PRESETS[k].baseColor, k).toBeGreaterThan(0);
+  });
+
+  it('covers the Tier-1 range: metals are metallic, ground/organic are not', () => {
+    for (const k of ['bronze', 'brass', 'rust'] as SurfaceKind[]) {
+      expect(SURFACE_PRESETS[k].metalness, k).toBeGreaterThan(0);
+    }
+    for (const k of ['sand', 'gravel', 'mud', 'leather', 'canvas', 'parchment'] as SurfaceKind[]) {
+      expect(SURFACE_PRESETS[k].metalness, k).toBe(0);
+    }
+    // bark reads as timber: it carries grain.
+    expect(SURFACE_PRESETS.bark.grain).toBeGreaterThan(0);
+  });
+
   it('stays dayCycle-safe: emissive is black, so intensity dimming is a no-op', () => {
     // dayCycle modulates emissiveIntensity on every material it sees; a
     // surface must not accidentally glow at night.

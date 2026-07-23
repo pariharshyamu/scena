@@ -29,9 +29,34 @@ export type SurfaceKind =
   | 'thatch'
   | 'tile'
   | 'metal'
-  | 'dirt';
+  | 'dirt'
+  // Tier 1 — ground & terrain
+  | 'sand'
+  | 'gravel'
+  | 'mud'
+  // Tier 1 — stone & masonry
+  | 'sandstone'
+  | 'granite'
+  | 'slate'
+  // Tier 1 — organic
+  | 'bark'
+  | 'leather'
+  | 'canvas'
+  | 'parchment'
+  | 'terracotta'
+  | 'bone'
+  // Tier 1 — metals
+  | 'rust'
+  | 'bronze'
+  | 'brass';
 
 export interface SurfaceParams {
+  /**
+   * Natural base colour for this kind (hex int). Used when the caller passes
+   * no `color`, so `createSurface('sand')` looks like sand out of the box.
+   * A caller's `color` always wins.
+   */
+  baseColor?: number;
   /** PBR base roughness. */
   roughness: number;
   /** PBR metalness. */
@@ -65,51 +90,172 @@ const V = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
 export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
   // Lime-washed cottage walls: soft warm mottle, gentle relief.
   plaster: {
+    baseColor: 0xd9ccb0,
     roughness: 0.92, metalness: 0, scale: 3.4, albedoVar: 0.14, tint: 0x9c8f74,
     tintAmount: 0.12, ao: 0.18, bump: 0.15, roughVar: 0.1, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
   },
   // Rough weathered stone: strong cavity AO + mossy tint, pitted relief.
   stone: {
+    baseColor: 0x8a8f98,
     roughness: 0.96, metalness: 0, scale: 2.6, albedoVar: 0.26, tint: 0x5c6b44,
     tintAmount: 0.16, ao: 0.34, bump: 0.42, roughVar: 0.14, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
   },
   // Structural timber: pronounced grain rings darkening the albedo.
   wood: {
+    baseColor: 0x8a6642,
     roughness: 0.82, metalness: 0, scale: 5.5, albedoVar: 0.12, tint: 0x3a2a1c,
     tintAmount: 0.14, ao: 0.16, bump: 0.12, roughVar: 0.12, grain: 0.55,
     grainScale: 3.2, grainAxis: V(0, 1, 0), flat: true,
   },
   // Sawn planks: finer, straighter grain, a touch smoother.
   plank: {
+    baseColor: 0x9a7a52,
     roughness: 0.78, metalness: 0, scale: 6.5, albedoVar: 0.1, tint: 0x40301f,
     tintAmount: 0.1, ao: 0.12, bump: 0.1, roughVar: 0.1, grain: 0.4,
     grainScale: 5.0, grainAxis: V(1, 0, 0), flat: true,
   },
   // Straw thatch: busy fibrous streaking, high roughness, deep shadowing.
   thatch: {
+    baseColor: 0xb39a5c,
     roughness: 0.98, metalness: 0, scale: 9.0, albedoVar: 0.3, tint: 0x6a5324,
     tintAmount: 0.2, ao: 0.28, bump: 0.3, roughVar: 0.08, grain: 0.35,
     grainScale: 8.0, grainAxis: V(0, 0, 1), flat: true,
   },
   // Clay roof tiles: regular ridged rows, warm cavity tint.
   tile: {
+    baseColor: 0xa8563e,
     roughness: 0.7, metalness: 0, scale: 4.0, albedoVar: 0.14, tint: 0x6e2f22,
     tintAmount: 0.16, ao: 0.24, bump: 0.34, roughVar: 0.1, grain: 0.6,
     grainScale: 6.0, grainAxis: V(1, 0, 0), flat: true,
   },
   // Aged iron/bronze: mild mottle, low roughness variance, metallic.
   metal: {
+    baseColor: 0x3d4451,
     roughness: 0.52, metalness: 0.85, scale: 4.5, albedoVar: 0.16, tint: 0x2a2118,
     tintAmount: 0.18, ao: 0.22, bump: 0.16, roughVar: 0.2, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
   },
   // Packed earth: broad soft variation, strong low-frequency patches.
   dirt: {
+    baseColor: 0x8a7a58,
     roughness: 1.0, metalness: 0, scale: 2.0, albedoVar: 0.22, tint: 0x4a3524,
     tintAmount: 0.2, ao: 0.3, bump: 0.1, roughVar: 0.05, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+
+  // --- Tier 1: ground & terrain -----------------------------------------
+  // Fine granular sand with soft wind ripples; smooth-shaded dunes.
+  sand: {
+    baseColor: 0xcbb98a,
+    roughness: 1.0, metalness: 0, scale: 7.0, albedoVar: 0.16, tint: 0x9c8048,
+    tintAmount: 0.14, ao: 0.14, bump: 0.14, roughVar: 0.06, grain: 0.18,
+    grainScale: 3.0, grainAxis: V(1, 0, 0), flat: false,
+  },
+  // Loose gravel / riverbed: chunky faceted stones, strong relief.
+  gravel: {
+    baseColor: 0x9a948a,
+    roughness: 0.95, metalness: 0, scale: 5.5, albedoVar: 0.3, tint: 0x605a4f,
+    tintAmount: 0.18, ao: 0.32, bump: 0.5, roughVar: 0.16, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Wet churned mud: darkened patches with a damp sheen (lower roughness).
+  mud: {
+    baseColor: 0x4a3826,
+    roughness: 0.6, metalness: 0, scale: 2.4, albedoVar: 0.2, tint: 0x241708,
+    tintAmount: 0.3, ao: 0.34, bump: 0.16, roughVar: 0.24, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+
+  // --- Tier 1: stone & masonry ------------------------------------------
+  // Warm sandstone: soft, faintly streaked, gentle relief — temples, cliffs.
+  sandstone: {
+    baseColor: 0xc9a06a,
+    roughness: 0.9, metalness: 0, scale: 3.4, albedoVar: 0.18, tint: 0x8a6a3c,
+    tintAmount: 0.16, ao: 0.22, bump: 0.24, roughVar: 0.1, grain: 0.22,
+    grainScale: 2.4, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Speckled granite: fine mineral fleck, low relief, a hint of polish.
+  granite: {
+    baseColor: 0x8e8a94,
+    roughness: 0.58, metalness: 0, scale: 9.0, albedoVar: 0.34, tint: 0x45414d,
+    tintAmount: 0.14, ao: 0.14, bump: 0.12, roughVar: 0.2, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Dark slate: blue-grey cleavage plates, low roughness, subtle streaks.
+  slate: {
+    baseColor: 0x50565e,
+    roughness: 0.55, metalness: 0, scale: 3.0, albedoVar: 0.14, tint: 0x2c3540,
+    tintAmount: 0.2, ao: 0.2, bump: 0.18, roughVar: 0.12, grain: 0.2,
+    grainScale: 3.0, grainAxis: V(1, 0, 0), flat: true,
+  },
+
+  // --- Tier 1: organic --------------------------------------------------
+  // Tree bark: deep vertical ridges (grain rings around the trunk axis).
+  bark: {
+    baseColor: 0x5a4535,
+    roughness: 0.92, metalness: 0, scale: 6.0, albedoVar: 0.2, tint: 0x2a1c10,
+    tintAmount: 0.2, ao: 0.26, bump: 0.45, roughVar: 0.12, grain: 0.7,
+    grainScale: 5.5, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Leather / hide: soft mottled grain with a gentle sheen — straps, armour.
+  leather: {
+    baseColor: 0x6a4630,
+    roughness: 0.62, metalness: 0, scale: 5.0, albedoVar: 0.16, tint: 0x2e1a0f,
+    tintAmount: 0.22, ao: 0.2, bump: 0.18, roughVar: 0.12, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Woven canvas: fine directional weave, matte — tents, sails, sacks.
+  canvas: {
+    baseColor: 0xcabd9c,
+    roughness: 0.95, metalness: 0, scale: 11.0, albedoVar: 0.14, tint: 0x8a7a5c,
+    tintAmount: 0.12, ao: 0.14, bump: 0.12, roughVar: 0.06, grain: 0.3,
+    grainScale: 12.0, grainAxis: V(1, 0, 0), flat: false,
+  },
+  // Aged parchment: near-white with soft foxing stains — signs, scrolls.
+  parchment: {
+    baseColor: 0xe0d4b0,
+    roughness: 0.9, metalness: 0, scale: 3.0, albedoVar: 0.12, tint: 0x9a8558,
+    tintAmount: 0.18, ao: 0.16, bump: 0.08, roughVar: 0.06, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Unglazed terracotta: warm clay, smooth, low relief — pots, urns.
+  terracotta: {
+    baseColor: 0xb5623a,
+    roughness: 0.72, metalness: 0, scale: 4.0, albedoVar: 0.12, tint: 0x7a3a20,
+    tintAmount: 0.16, ao: 0.16, bump: 0.14, roughVar: 0.08, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Weathered bone / ivory: off-white with cavity staining — ossuaries, décor.
+  bone: {
+    baseColor: 0xdcd2ba,
+    roughness: 0.55, metalness: 0, scale: 6.0, albedoVar: 0.14, tint: 0x8a7f66,
+    tintAmount: 0.2, ao: 0.22, bump: 0.12, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+
+  // --- Tier 1: metals ---------------------------------------------------
+  // Rusted iron: patchy orange corrosion, part-metallic, high roughness spread.
+  rust: {
+    baseColor: 0x8a4a2c,
+    roughness: 0.85, metalness: 0.25, scale: 4.0, albedoVar: 0.28, tint: 0x5a2a12,
+    tintAmount: 0.3, ao: 0.26, bump: 0.28, roughVar: 0.3, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Bronze: warm dark metal with patina in the cavities — bells, statues.
+  bronze: {
+    baseColor: 0x9a6a3a,
+    roughness: 0.44, metalness: 0.9, scale: 4.5, albedoVar: 0.16, tint: 0x3a2410,
+    tintAmount: 0.24, ao: 0.22, bump: 0.16, roughVar: 0.18, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Brass: brighter warm metal, smoother and shinier — fittings, instruments.
+  brass: {
+    baseColor: 0xc9a24a,
+    roughness: 0.34, metalness: 0.95, scale: 5.0, albedoVar: 0.12, tint: 0x6a4a12,
+    tintAmount: 0.16, ao: 0.16, bump: 0.1, roughVar: 0.14, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
   },
 };
 
@@ -262,7 +408,7 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   const seed = options.seed ?? 0;
 
   const material = new MeshStandardMaterial({
-    color: options.color ?? 0x9a9a9a,
+    color: options.color ?? preset.baseColor ?? 0x9a9a9a,
     roughness: p.roughness,
     metalness: p.metalness,
     flatShading: p.flat,

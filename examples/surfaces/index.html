@@ -17,11 +17,13 @@
   <body>
     <div id="hud">
       <strong>SCENA — procedural surfaces</strong><br />
-      Eight surface presets (plaster, stone, wood, plank, thatch, tile, metal,
-      dirt) — each is a single primitive, all the weathering, grain, cavity AO
-      and relief generated in the shader from triplanar noise. No textures are
-      fetched. Behind: a cottage, well, rock and crate wearing the same
-      surfaces on real low-poly geometry.
+      The full surface palette — 23 presets from plaster and stone to sand,
+      gravel, sandstone, granite, slate, bark, leather, canvas, terracotta and
+      aged bronze/brass. Each block is a single primitive; all the weathering,
+      grain, cavity AO and relief is generated in the shader from triplanar
+      noise, and every preset carries its own colour. No textures are fetched.
+      Behind: a cottage, well, rock and crate wearing the same surfaces. Try
+      <code>?view=grid</code>.
     </div>
     <script type="module" src="./main.ts"></script>
   </body>

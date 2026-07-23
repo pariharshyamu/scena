@@ -32,8 +32,30 @@ From one triplanar fractal-noise field per fragment: fine albedo mottle, low-fre
 | `plank` | sawn boards — finer, straighter grain |
 | `thatch` | straw roofing — busy fibrous streaking, deep shadow |
 | `tile` | clay roof tiles — regular ridged rows |
-| `metal` | aged iron/bronze — metallic, mild mottle |
+| `metal` | aged iron — metallic, mild mottle |
 | `dirt` | packed earth — broad soft patches |
+| `sand` | dune / beach ground — fine grains, soft wind ripples |
+| `gravel` | paths & riverbed — chunky faceted stones, strong relief |
+| `mud` | wet churned ground — dark damp patches with a sheen |
+| `sandstone` | warm desert stone — soft, faintly streaked |
+| `granite` | speckled hard stone — mineral fleck, a hint of polish |
+| `slate` | dark blue-grey plates — flagstone, roofing |
+| `bark` | tree bark — deep vertical ridges |
+| `leather` | hide & straps — soft mottled grain, gentle sheen |
+| `canvas` | tents, sails, sacks — fine directional weave, matte |
+| `parchment` | signs & scrolls — near-white with foxing stains |
+| `terracotta` | unglazed clay — warm pots, urns, tiles |
+| `bone` | ivory & ossuary — off-white with cavity staining |
+| `rust` | corroded iron — patchy orange, part-metallic |
+| `bronze` | bells & statues — warm dark metal, patina in cavities |
+| `brass` | fittings & instruments — bright warm metal, shinier |
+
+Every preset also carries a **`baseColor`**, so `createSurface('sand')` looks like sand with no colour passed. A caller's `color` always wins:
+
+```js
+createSurface('bronze');                 // natural bronze
+createSurface('bronze', { color: 0x9c8f74 }); // a greenish patinated bronze
+```
 
 Pass a preset name plus any overrides:
 
@@ -51,4 +73,4 @@ createSurface('wood', {
 
 ## Adopted by the props
 
-`createHouse`, `createTower`, `createWell`, `createRuin`, `createRock` and `createCrate` are built on surfaces out of the box — plastered walls, tiled roofs, stone foundations, planked doors, grained crates. Their emissive windows are left as ordinary materials so the day-night cycle still lights them at dusk. Try the **Procedural surfaces** playground example to see all eight presets beside the props that use them.
+`createHouse`, `createTower`, `createWell`, `createRuin`, `createRock` and `createCrate` are built on surfaces out of the box — plastered walls, tiled roofs, stone foundations, planked doors, grained crates. Their emissive windows are left as ordinary materials so the day-night cycle still lights them at dusk. Try the **Procedural surfaces** playground example to see the whole preset palette beside the props that use them.

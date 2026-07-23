@@ -48,50 +48,53 @@ const ground = new Mesh(new BoxGeometry(80, 1, 80), createSurface('dirt', { colo
 ground.position.y = -0.5;
 scene.add(ground);
 
-// A row of preset sample blocks — one BoxGeometry each, all detail in-shader.
-const KINDS: SurfaceKind[] = ['plaster', 'stone', 'wood', 'plank', 'thatch', 'tile', 'metal', 'dirt'];
-const SAMPLE_COLOR: Record<SurfaceKind, number> = {
-  plaster: palette.wall,
-  stone: palette.rock[0],
-  wood: palette.wood,
-  plank: palette.woodDark,
-  thatch: 0xb99a4e,
-  tile: palette.roof,
-  metal: palette.metal,
-  dirt: 0x7a6144,
-};
+// The whole surface palette as a grid of sample blocks — one BoxGeometry
+// each, no colours passed (every preset carries its own baseColor), all the
+// detail generated in-shader. Metals get a sphere to show their highlight.
+const KINDS = Object.keys(SURFACE_PRESETS) as SurfaceKind[];
+const METALS = new Set<SurfaceKind>(['metal', 'rust', 'bronze', 'brass']);
+const PER_ROW = 8;
 KINDS.forEach((kind, i) => {
-  const geo = kind === 'metal' ? new SphereGeometry(0.95, 24, 18) : new BoxGeometry(1.8, 1.8, 1.8);
-  const mesh = new Mesh(geo, createSurface(kind, { color: SAMPLE_COLOR[kind], seed: i + 1 }));
-  mesh.position.set((i - (KINDS.length - 1) / 2) * 2.6, 0.9, -3);
+  const col = i % PER_ROW;
+  const row = Math.floor(i / PER_ROW);
+  const geo = METALS.has(kind) ? new SphereGeometry(0.9, 24, 18) : new BoxGeometry(1.7, 1.7, 1.7);
+  const mesh = new Mesh(geo, createSurface(kind, { seed: i + 1 }));
+  mesh.position.set((col - (PER_ROW - 1) / 2) * 2.4, 0.9, -2.5 - row * 2.5);
   scene.add(mesh);
 });
 
 // The upgraded props, showing the surfaces on real geometry.
 const house = createHouse({ seed: 7, palette });
-house.object.position.set(-4.5, 0, 2.5);
+house.object.position.set(-4.5, 0, 3.5);
 scene.add(house.object);
 
 const well = createWell({ seed: 3, palette });
-well.object.position.set(1, 0, 3);
+well.object.position.set(1, 0, 4);
 scene.add(well.object);
 
 const rock = createRock({ seed: 11, palette });
-rock.object.position.set(4, 0, 2.5);
+rock.object.position.set(4, 0, 3.5);
 rock.object.scale.setScalar(2.2);
 scene.add(rock.object);
 
 const crate = createCrate({ seed: 5, palette });
-crate.object.position.set(6, 0, 3.5);
+crate.object.position.set(6.5, 0, 4.5);
 crate.object.scale.setScalar(1.6);
 scene.add(crate.object);
+
+const view = new URLSearchParams(location.search).get('view');
 
 // A slow orbit so relief catches the light from many angles.
 let t = 0;
 function frame(): void {
   t += 0.005;
-  camera.position.set(Math.sin(t) * 15, 6.5, 11 + Math.cos(t) * 4);
-  camera.lookAt(0, 1.2, 0);
+  if (view === 'grid') {
+    camera.position.set(Math.sin(t * 0.4) * 6, 8.5, 6);
+    camera.lookAt(0, 0.9, -5.5);
+  } else {
+    camera.position.set(Math.sin(t) * 17, 7, 12 + Math.cos(t) * 4);
+    camera.lookAt(0, 1, -2);
+  }
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
