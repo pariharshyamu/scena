@@ -167,7 +167,9 @@ export function furnishRoom(room: Room, options: FurnishOptions = {}): Furnished
       ? { x: room.rugs[0].x, z: room.rugs[0].z, normal: null }
       : openSpot(1.1);
   for (const hearth of room.hearths) {
-    markers.hearth.push(hearth.position.clone().addScaledVector(hearth.normal, unit * 0.8));
+    // A step back from the hearthstone — close enough to warm hands, not
+    // standing in the flames (the fire itself sits ~1.5 units from the cell).
+    markers.hearth.push(hearth.position.clone().addScaledVector(hearth.normal, unit * 1.35));
   }
 
   // ---- role scripts -----------------------------------------------------
