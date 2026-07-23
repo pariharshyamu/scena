@@ -1,4 +1,5 @@
 import {
+  BoxGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
@@ -12,10 +13,32 @@ import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import type { WindField } from '../environment/wind';
 import type { Prop } from '../core/types';
 
-export type TreeSpecies = 'pine' | 'oak' | 'cypress' | 'birch' | 'cedar' | 'maple';
+export type TreeSpecies =
+  | 'pine'
+  | 'oak'
+  | 'cypress'
+  | 'birch'
+  | 'cedar'
+  | 'maple'
+  | 'sakura'
+  | 'palm'
+  | 'willow';
+
+/** The season a tree wears. Currently shapes `sakura` (bloom / green / warm / bare). */
+export type TreeSeason = 'spring' | 'summer' | 'autumn' | 'winter';
 
 /** Every species `createTree` can build. */
-export const TREE_SPECIES: readonly TreeSpecies[] = ['pine', 'oak', 'cypress', 'birch', 'cedar', 'maple'];
+export const TREE_SPECIES: readonly TreeSpecies[] = [
+  'pine',
+  'oak',
+  'cypress',
+  'birch',
+  'cedar',
+  'maple',
+  'sakura',
+  'palm',
+  'willow',
+];
 
 export interface TreeOptions {
   seed?: number;
@@ -25,6 +48,8 @@ export interface TreeOptions {
   species?: TreeSpecies;
   /** @deprecated Use `species`. Kept as an alias so old calls keep working. */
   style?: TreeSpecies;
+  /** Season — currently drives `sakura` (blossom in spring, green in summer, warm in autumn, bare in winter). */
+  season?: TreeSeason;
   /** A WindField to sway the canopy in (the trunk stays planted). */
   wind?: WindField;
   palette?: Palette;
@@ -41,6 +66,97 @@ function tint(base: number, toward: number, t: number): number {
   return new Color(base).lerp(new Color(toward), t).getHex();
 }
 
+// --- silhouette builders (shared by the recipes) ------------------------
+
+/** A gently curving trunk from stacked segments — the lean of a palm. Returns the crown position. */
+function curvedTrunk(
+  group: Group,
+  material: MeshStandardMaterial,
+  height: number,
+  baseR: number,
+  topR: number,
+  curve: number
+): { x: number; y: number } {
+  const segs = 7;
+  const segH = height / segs;
+  let cx = 0;
+  for (let i = 0; i < segs; i++) {
+    const f = i / segs;
+    const r0 = baseR + (topR - baseR) * f;
+    const r1 = baseR + (topR - baseR) * ((i + 1) / segs);
+    cx = curve * f * f; // accelerating lean
+    const seg = new Mesh(new CylinderGeometry(r1, r0, segH * 1.04, 6), material);
+    seg.position.set(cx, segH * (i + 0.5), 0);
+    seg.rotation.z = -curve * 0.12;
+    group.add(seg);
+  }
+  return { x: curve, y: height };
+}
+
+/** A crown of long, drooping, radial fronds — a palm top. */
+function frondCrown(
+  group: Group,
+  material: MeshStandardMaterial,
+  rng: Rng,
+  cx: number,
+  cy: number,
+  count: number,
+  length: number,
+  droopDeg: number
+): void {
+  const droop = (droopDeg * Math.PI) / 180;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + rng.range(-0.12, 0.12);
+    const frond = new Group();
+    const w = length * 0.13;
+    const blade = new Mesh(new ConeGeometry(w, length, 4), material); // tapered blade
+    blade.rotation.z = -Math.PI / 2; // point along +x
+    blade.position.x = length * 0.5;
+    blade.scale.z = 0.28; // flatten into a frond
+    frond.add(blade);
+    frond.position.set(cx, cy, 0);
+    frond.rotation.y = a;
+    frond.rotation.z = -(droop + rng.range(-0.14, 0.14)); // droop down
+    group.add(frond);
+  }
+}
+
+/** Long strands hanging and swaying from the canopy hem — a willow's veil. */
+function droopStrands(
+  group: Group,
+  material: MeshStandardMaterial,
+  rng: Rng,
+  cy: number,
+  radius: number,
+  count: number,
+  minLen: number,
+  maxLen: number
+): void {
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + rng.range(-0.12, 0.12);
+    const rr = radius * rng.range(0.78, 1.02); // hang from the outer hem
+    const len = Math.min(rng.range(minLen, maxLen), cy - 0.4); // never punch through the ground
+    if (len <= 0.3) continue;
+    // A leafy strip, wide enough to read as a veil from any angle.
+    const strand = new Mesh(new BoxGeometry(0.12, len, 0.12), material);
+    strand.position.set(Math.cos(a) * rr, cy - len / 2, Math.sin(a) * rr);
+    strand.rotation.y = -a;
+    strand.rotation.z = rng.range(-0.08, 0.08);
+    group.add(strand);
+  }
+}
+
+/** A few splayed structural branches — visible on a bare sakura. */
+function branches(group: Group, material: MeshStandardMaterial, rng: Rng, trunkTop: number, count: number, len: number): void {
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + rng.range(-0.25, 0.25);
+    const br = new Mesh(new CylinderGeometry(0.025, 0.055, len, 5), material);
+    br.position.set(Math.cos(a) * len * 0.28, trunkTop + len * 0.34, Math.sin(a) * len * 0.28);
+    br.rotation.set(-Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7);
+    group.add(br);
+  }
+}
+
 /**
  * A species recipe: the height band, its wind response (how stiffly it sways),
  * its steering footprint, and how to build it. `build` returns the single
@@ -54,7 +170,7 @@ interface Recipe {
   anchorFrac: number;
   /** Steering footprint radius (the GAMA handshake). */
   obstacleRadius: number;
-  build(group: Group, rng: Rng, palette: Palette, height: number): MeshStandardMaterial;
+  build(group: Group, rng: Rng, palette: Palette, height: number, season?: TreeSeason): MeshStandardMaterial;
 }
 
 // --- species recipes ----------------------------------------------------
@@ -269,21 +385,123 @@ const SPECIES: Record<TreeSpecies, Recipe> = {
       return foliageMaterial;
     },
   },
+
+  // A wide, low umbrella of blossom on a short dark trunk. `season` decides its
+  // dress: pink in spring, green in summer, warm in autumn, bare in winter.
+  sakura: {
+    heightRange: [3, 4.6],
+    stiffness: 2,
+    anchorFrac: 0.3,
+    obstacleRadius: 0.7,
+    build(group, rng, palette, height, season) {
+      const s = season ?? 'spring';
+      const barkMaterial = mat(tint(palette.trunk, 0x2e2320, 0.4)); // dark cherry bark
+      const trunkH = height * 0.4;
+      const trunk = new Mesh(new CylinderGeometry(0.1, 0.16, trunkH, 6), barkMaterial);
+      trunk.position.y = trunkH / 2;
+      trunk.rotation.z = rng.range(-0.06, 0.06);
+      group.add(trunk);
+      branches(group, barkMaterial, rng, trunkH, rng.int(4, 6), height * 0.5);
+
+      // Canopy colour by season (blossom pink is blossom pink, palette aside).
+      const canopyColor =
+        s === 'summer'
+          ? tint(rng.pick(palette.foliage), 0x7fb04a, 0.2)
+          : s === 'autumn'
+            ? tint(rng.pick(palette.foliage), 0xe08a3a, 0.7)
+            : tint(0xf3c1d6, 0xfdeaf1, rng.range(0, 0.4)); // spring blossom
+      const canopyMaterial = mat(canopyColor);
+
+      if (s !== 'winter') {
+        const crownBase = trunkH + height * 0.16;
+        const R = height * rng.range(0.34, 0.4);
+        const center = new Mesh(new IcosahedronGeometry(R, 1), canopyMaterial);
+        center.position.y = crownBase;
+        center.scale.y = 0.55; // flatten into an umbrella
+        group.add(center);
+        const ring = rng.int(5, 7);
+        for (let i = 0; i < ring; i++) {
+          const a = (i / ring) * Math.PI * 2 + rng.range(-0.2, 0.2);
+          const r = R * rng.range(0.5, 0.72);
+          const blob = new Mesh(new IcosahedronGeometry(r, 0), canopyMaterial);
+          blob.position.set(Math.cos(a) * R * 0.8, crownBase - R * 0.1 + rng.range(-0.05, 0.1), Math.sin(a) * R * 0.8);
+          blob.scale.y = 0.6;
+          group.add(blob);
+        }
+      }
+      return canopyMaterial;
+    },
+  },
+
+  // A curved bare stem crowned with long drooping fronds — a palm.
+  palm: {
+    heightRange: [5, 8],
+    stiffness: 1.2,
+    anchorFrac: 0.7,
+    obstacleRadius: 0.4,
+    build(group, rng, palette, height) {
+      const trunkMaterial = mat(tint(0x9c7b4e, palette.trunk, 0.3)); // tan stem
+      const crown = curvedTrunk(group, trunkMaterial, height * 0.86, 0.16, 0.1, height * 0.12);
+      const frondMaterial = mat(tint(rng.pick(palette.foliage), 0x4e8f3a, 0.3));
+      frondCrown(group, frondMaterial, rng, crown.x, crown.y, rng.int(9, 13), height * 0.42, 24);
+      // A cluster of coconuts under the crown.
+      const nutMaterial = mat(0x6b4a2f);
+      const nuts = rng.int(2, 4);
+      for (let i = 0; i < nuts; i++) {
+        const a = (i / nuts) * Math.PI * 2;
+        const nut = new Mesh(new IcosahedronGeometry(height * 0.045, 0), nutMaterial);
+        nut.position.set(crown.x + Math.cos(a) * 0.12, crown.y - 0.12, Math.sin(a) * 0.12);
+        group.add(nut);
+      }
+      return frondMaterial;
+    },
+  },
+
+  // A rounded crown trailing a veil of long swaying strands — a weeping willow.
+  willow: {
+    heightRange: [4, 6],
+    stiffness: 1.5,
+    anchorFrac: 0.05,
+    obstacleRadius: 0.7,
+    build(group, rng, palette, height) {
+      const trunkMaterial = mat(palette.trunk);
+      const trunkH = height * 0.42;
+      const trunk = new Mesh(new CylinderGeometry(0.12, 0.2, trunkH, 6), trunkMaterial);
+      trunk.position.y = trunkH / 2;
+      trunk.rotation.z = rng.range(-0.05, 0.05);
+      group.add(trunk);
+
+      const foliageMaterial = mat(tint(rng.pick(palette.foliage), 0xb6cf6e, 0.4)); // willow yellow-green
+      const crownBase = trunkH + height * 0.22;
+      const R = height * rng.range(0.32, 0.4);
+      const dome = new Mesh(new IcosahedronGeometry(R, 1), foliageMaterial);
+      dome.position.y = crownBase;
+      dome.scale.y = 0.7;
+      group.add(dome);
+
+      // The signature: a veil of strands hanging from the canopy hem.
+      droopStrands(group, foliageMaterial, rng, crownBase - R * 0.35, R * 0.95, rng.int(30, 38), height * 0.42, height * 0.72);
+      return foliageMaterial;
+    },
+  },
 };
 
 /**
- * A seeded low-poly tree. Six species — `pine` and `oak` (the originals), plus
+ * A seeded low-poly tree. Nine species — `pine` and `oak` (the originals), plus
  * `cypress` (a tall narrow flame), `birch` (slender, pale, banded), `cedar`
- * (broad flat tiers) and `maple` (a full rounded dome) — each with its own
- * silhouette, colour, wind response and steering footprint. Same seed →
- * identical tree, forever.
+ * (broad flat tiers), `maple` (a full rounded dome), `sakura` (a blossom
+ * umbrella), `palm` (a curved stem with drooping fronds) and `willow` (a veil of
+ * swaying strands) — each with its own silhouette, colour, wind response and
+ * steering footprint. Same seed → identical tree, forever.
  *
  * New species are opt-in via `species`; with none given, a forest stays the
- * familiar pine/oak mix, so existing scenes are untouched.
+ * familiar pine/oak mix, so existing scenes are untouched. `season` dresses a
+ * `sakura` — pink in spring, green in summer, warm in autumn, bare in winter.
  *
  * ```ts
  * const cypress = createTree({ species: 'cypress', seed: 7 });
- * const grove = createTree({ species: 'maple', palette: PALETTES.autumn });
+ * const bloom = createTree({ species: 'sakura', season: 'spring' });
+ * const palm = createTree({ species: 'palm', seed: 3 });
  * ```
  */
 export function createTree(options: TreeOptions = {}): Prop {
@@ -296,7 +514,7 @@ export function createTree(options: TreeOptions = {}): Prop {
 
   const group = new Group();
   group.name = `tree-${species}`;
-  const foliageMaterial = recipe.build(group, rng, palette, height);
+  const foliageMaterial = recipe.build(group, rng, palette, height, options.season);
 
   // Only the canopy sways — the trunk material is left unbound, so it stays
   // planted. (For a scattered forest, prefer applyWind(forest.group), which

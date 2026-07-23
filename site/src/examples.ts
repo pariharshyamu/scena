@@ -513,11 +513,11 @@ game.start();`,
     id: 'trees',
     title: 'Tree species',
     group: 'Worldbuilding',
-    code: `// Six seeded species from one createTree — pine, oak, cypress, birch, cedar,
-// maple — each with its own silhouette, colour, wind response and steering
-// footprint. Scatter the whole set for a varied wood; all sway in one wind.
-import { createTree, createWindField, createLightingRig, createSurface,
-         applyFog, applyWind, scatter, TREE_SPECIES, PALETTES } from 'scena3d';
+    code: `// Nine seeded species from one createTree — pine, oak, cypress, birch, cedar,
+// maple, sakura, palm, willow — each with its own silhouette, colour, wind
+// response and footprint. Scatter the set for a varied wood; blossom drifts down.
+import { createTree, createPrecipitation, createWindField, createLightingRig,
+         createSurface, applyFog, applyWind, scatter, TREE_SPECIES, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Color, Mesh, PlaneGeometry } from 'three';
 
@@ -543,6 +543,9 @@ const wood = scatter({
 });
 scene.add(wood.group);
 applyWind(wood.group, { field: wind, height: 5, stiffness: 2, anchor: 0.8 });
+
+// Blossom drifting through the wood (try type:'petal', color:0xd98e3a for leaf-fall).
+scene.add(createPrecipitation({ type: 'petal', wind, count: 900 }).object);
 
 game.onUpdate((t) => {
   const a = t.elapsed * 0.05;

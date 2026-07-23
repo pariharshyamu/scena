@@ -16,6 +16,19 @@ describe('createPrecipitation', () => {
     expect(snow.object.geometry.getAttribute('position').count).toBe(100);
   });
 
+  it('petals are spinning, fluttering points that only snow-style settle is refused', () => {
+    const petal = createPrecipitation({ type: 'petal', count: 80 });
+    expect(petal.object).toBeInstanceOf(Points);
+    expect(petal.object.geometry.getAttribute('position').count).toBe(80);
+    expect(petal.material.vertexShader).toContain('vSpin'); // petals spin
+    expect(petal.material.fragmentShader).toContain('mat2(cs'); // rotated oval petal
+    // Default blossom-pink tint, and a lazy fall.
+    expect((petal.material.uniforms.uColor.value as Color).getHexString()).toBe('f3c1d6');
+    expect(petal.material.uniforms.uFall.value).toBeLessThan(3);
+    // Petals don't accumulate (only snow does) — accumulate is a no-op that returns self.
+    expect(petal.accumulate({ traverse() {} } as unknown as Group)).toBe(petal);
+  });
+
   it('the material is an unlit, transparent, non-depth-writing shader', () => {
     const rain = createPrecipitation({ count: 10 });
     expect(rain.material.transparent).toBe(true);

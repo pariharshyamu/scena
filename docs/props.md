@@ -42,7 +42,7 @@ Two prop behaviors worth knowing:
 
 ## Tree species
 
-`createTree` builds six seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
+`createTree` builds nine seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
 
 | `species` | Silhouette | In the wind | `obstacleRadius` |
 |---|---|---|---|
@@ -52,12 +52,27 @@ Two prop behaviors worth knowing:
 | `birch` | slender, high crown, pale banded bark | light & whippy | 0.32 |
 | `cedar` | broad flat horizontal tiers | stiff | 0.75 |
 | `maple` | full rounded dome | medium | 0.65 |
+| `sakura` | wide blossom umbrella | springy | 0.7 |
+| `palm` | curved bare stem, drooping fronds | whippy fronds | 0.4 |
+| `willow` | rounded crown, veil of swaying strands | very whippy | 0.7 |
 
 ```js
 import { createTree, TREE_SPECIES, PALETTES } from 'scena3d';
 
 const avenue = createTree({ species: 'cypress', seed: 7 });     // for a formal row
 const blaze  = createTree({ species: 'maple', palette: PALETTES.autumn }); // goes orange
+const bloom  = createTree({ species: 'sakura', season: 'spring' });        // pink blossom
+```
+
+### Seasons
+
+`season` dresses a **sakura**: `'spring'` blossoms pink, `'summer'` leafs green, `'autumn'` turns warm, and `'winter'` strips it bare to its branches. (Other species accept `season` and currently ignore it — the hook is there to grow.)
+
+For falling **blossom or leaves**, the [precipitation](precipitation.md) system has a `'petal'` type — fluttering, spinning, blossom-pink points that reuse the whole GPU particle path. Drop one over a grove and the cherries shed:
+
+```js
+import { createPrecipitation } from 'scena3d';
+scene.add(createPrecipitation({ type: 'petal', wind }).object);   // or tint it autumn-orange for leaf-fall
 ```
 
 Three things make the species system safe to adopt:

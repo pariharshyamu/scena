@@ -8,6 +8,7 @@ import {
 } from 'three';
 import {
   createTree,
+  createPrecipitation,
   createWindField,
   createLightingRig,
   createSurface,
@@ -17,9 +18,12 @@ import {
   TREE_SPECIES,
   PALETTES,
   type TreeSpecies,
+  type TreeSeason,
 } from 'scena3d';
 
-const scatterMode = new URLSearchParams(location.search).get('scatter') === '1';
+const params = new URLSearchParams(location.search);
+const scatterMode = params.get('scatter') === '1';
+const season = (params.get('season') as TreeSeason) ?? 'spring';
 const palette = PALETTES.meadow;
 const scene = new Scene();
 scene.background = new Color(0xbcd6e6);
@@ -66,8 +70,8 @@ if (scatterMode) {
   // A labelled lineup: back row = meadow, front row = autumn, one of each species.
   TREE_SPECIES.forEach((species, i) => {
     const x = (i - (TREE_SPECIES.length - 1) / 2) * 6;
-    for (const [z, pal] of [[-3, palette], [6, PALETTES.autumn]] as const) {
-      const tree = createTree({ species, seed: 100 + i, palette: pal, wind });
+    for (const [z, pal] of [[-3, palette], [7, PALETTES.autumn]] as const) {
+      const tree = createTree({ species, seed: 100 + i, palette: pal, season, wind });
       tree.object.position.set(x, 0, z);
       tree.object.traverse((o) => {
         if (o instanceof Mesh) o.castShadow = true;
@@ -75,14 +79,19 @@ if (scatterMode) {
       scene.add(tree.object);
     }
   });
+  // Blossom drifting down when the cherries are in bloom.
+  if (season === 'spring') {
+    const petals = createPrecipitation({ type: 'petal', wind, count: 900, area: [60, 24, 40] });
+    scene.add(petals.object);
+  }
 }
 
 let t = 0;
 function frame(): void {
   t += 0.0016;
-  const R = scatterMode ? 44 : 24;
-  camera.position.set(Math.sin(t) * R, scatterMode ? 14 : 7, Math.cos(t) * R * 0.6 + (scatterMode ? 0 : 20));
-  camera.lookAt(0, scatterMode ? 4 : 3.5, scatterMode ? 0 : 1.5);
+  const R = scatterMode ? 44 : 34;
+  camera.position.set(Math.sin(t) * R, scatterMode ? 14 : 9, Math.cos(t) * R * 0.6 + (scatterMode ? 0 : 26));
+  camera.lookAt(0, scatterMode ? 4 : 4, scatterMode ? 0 : 2);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

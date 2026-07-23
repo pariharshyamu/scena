@@ -14,28 +14,28 @@ import {
 import { Rng } from '../core/random';
 import type { WindField } from './wind';
 
-export type PrecipitationType = 'rain' | 'snow';
+export type PrecipitationType = 'rain' | 'snow' | 'petal';
 
 export interface PrecipitationOptions {
-  /** rain (slanted streaks) or snow (drifting flakes). Default 'rain'. */
+  /** rain (slanted streaks), snow (drifting flakes) or petal (fluttering, spinning blossom/leaf fall). Default 'rain'. */
   type?: PrecipitationType;
-  /** Particle count. Default 6000 (rain) / 3500 (snow). */
+  /** Particle count. Default 6000 (rain) / 3500 (snow) / 1400 (petal). */
   count?: number;
   /** Box size around the camera the weather fills, in metres. Default [55, 34, 55]. */
   area?: number | [number, number, number];
   /** How heavy, 0–1. Default 1. */
   intensity?: number;
-  /** A WindField — rain slants and snow drifts along it. */
+  /** A WindField — rain slants and snow/petals drift along it. */
   wind?: WindField;
-  /** How strongly the wind pushes the fall (metres/s per unit strength). Default 9 (rain) / 4 (snow). */
+  /** How strongly the wind pushes the fall (metres/s per unit strength). Default 9 (rain) / 4 (snow) / 5 (petal). */
   windInfluence?: number;
-  /** Fall speed, metres/s. Default 14 (rain) / 2.2 (snow). */
+  /** Fall speed, metres/s. Default 14 (rain) / 2.2 (snow) / 1.4 (petal). */
   speed?: number;
-  /** Streak length (rain) or flake size in px (snow). Default 0.5 / 9. */
+  /** Streak length (rain) or particle size in px (snow/petal). Default 0.5 / 9 / 11. */
   size?: number;
-  /** Particle colour. Default light blue-grey (rain) / white (snow). */
+  /** Particle colour. Default light blue-grey (rain) / white (snow) / blossom pink (petal). */
   color?: number;
-  /** Particle opacity. Default 0.5 (rain) / 0.85 (snow). */
+  /** Particle opacity. Default 0.5 (rain) / 0.85 (snow) / 0.9 (petal). */
   opacity?: number;
   seed?: number;
 }
@@ -150,6 +150,52 @@ void main() {
 }
 `;
 
+// Petals/leaves: drift like snow but flutter wide and spin as they fall.
+const PETAL_VERT = /* glsl */ `
+uniform float uTime;
+uniform vec3  uArea;
+uniform vec2  uWind;
+uniform float uFall;
+uniform float uSize;
+uniform float uIntensity;
+varying float vKeep;
+varying float vSpin;
+void main() {
+  vec3 home = position * uArea;
+  vKeep = step(fract(position.x * 91.7 + position.z * 47.3), uIntensity);
+  float seed = fract(position.y * 57.3 + position.x * 13.1) * 6.2831;
+  vec3 p = home;
+  p.y -= uFall * uTime;
+  // Wide, lazy flutter — petals swing far more than a snowflake wobbles.
+  p.x += uWind.x * uTime + sin(uTime * 1.6 + home.y * 3.1 + seed) * 1.4;
+  p.z += uWind.y * uTime + cos(uTime * 1.3 + home.x * 3.7 + seed) * 1.4;
+  vec3 halfA = uArea * 0.5;
+  vec3 world = mod(p - (cameraPosition - halfA), uArea) + (cameraPosition - halfA);
+  vec4 mv = viewMatrix * vec4(world, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = vKeep * min(uSize * (320.0 / max(-mv.z, 1.0)), 18.0);
+  vSpin = uTime * 2.0 + seed;
+  if (vKeep < 0.5) gl_Position = vec4(2.0);
+}
+`;
+
+const PETAL_FRAG = /* glsl */ `
+uniform vec3 uColor;
+uniform float uOpacity;
+varying float vKeep;
+varying float vSpin;
+void main() {
+  if (vKeep < 0.5) discard;
+  vec2 c = gl_PointCoord - 0.5;
+  float cs = cos(vSpin), sn = sin(vSpin);
+  c = mat2(cs, -sn, sn, cs) * c;   // spin the petal
+  c.x *= 1.7;                       // squash to an oval petal
+  float a = (1.0 - smoothstep(0.28, 0.5, length(c))) * uOpacity;
+  if (a <= 0.0) discard;
+  gl_FragColor = vec4(uColor, a);
+}
+`;
+
 function toArea(a: number | [number, number, number] | undefined, fallback: Vector3): Vector3 {
   if (a === undefined) return fallback;
   if (typeof a === 'number') return new Vector3(a, a, a);
@@ -180,11 +226,12 @@ function nowSeconds(): number {
 export function createPrecipitation(options: PrecipitationOptions = {}): Precipitation {
   const type = options.type ?? 'rain';
   const isRain = type === 'rain';
-  const count = options.count ?? (isRain ? 6000 : 3500);
+  const isPetal = type === 'petal';
+  const count = options.count ?? (isRain ? 6000 : isPetal ? 1400 : 3500);
   const area = toArea(options.area, new Vector3(55, 34, 55));
-  const speed = options.speed ?? (isRain ? 14 : 2.2);
-  const size = options.size ?? (isRain ? 0.5 : 9);
-  const windInfluence = options.windInfluence ?? (isRain ? 9 : 4);
+  const speed = options.speed ?? (isRain ? 14 : isPetal ? 1.4 : 2.2);
+  const size = options.size ?? (isRain ? 0.5 : isPetal ? 11 : 9);
+  const windInfluence = options.windInfluence ?? (isRain ? 9 : isPetal ? 5 : 4);
   const rng = new Rng(options.seed ?? 1);
   const wind = options.wind;
 
@@ -218,8 +265,8 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
   geometry.boundingSphere = new Sphere(new Vector3(), 1e6);
 
   const material = new ShaderMaterial({
-    vertexShader: isRain ? RAIN_VERT : SNOW_VERT,
-    fragmentShader: isRain ? RAIN_FRAG : SNOW_FRAG,
+    vertexShader: isRain ? RAIN_VERT : isPetal ? PETAL_VERT : SNOW_VERT,
+    fragmentShader: isRain ? RAIN_FRAG : isPetal ? PETAL_FRAG : SNOW_FRAG,
     transparent: true,
     depthWrite: false,
     uniforms: {
@@ -228,8 +275,8 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
       uWind: { value: new Vector2(0, 0) },
       uFall: { value: speed },
       uIntensity: { value: options.intensity ?? 1 },
-      uColor: { value: new Color(options.color ?? (isRain ? 0xafc4d8 : 0xf4f8fc)) },
-      uOpacity: { value: options.opacity ?? (isRain ? 0.5 : 0.85) },
+      uColor: { value: new Color(options.color ?? (isRain ? 0xafc4d8 : isPetal ? 0xf3c1d6 : 0xf4f8fc)) },
+      uOpacity: { value: options.opacity ?? (isRain ? 0.5 : isPetal ? 0.9 : 0.85) },
       ...(isRain ? { uStreak: { value: size } } : { uSize: { value: size } }),
     },
   });
@@ -293,7 +340,7 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
       material.uniforms.uIntensity.value = Math.max(0, Math.min(1, value));
     },
     accumulate(target, opts = {}) {
-      if (isRain) return precip; // rain doesn't settle
+      if (type !== 'snow') return precip; // only snow settles
       const entries: Accumulation['entries'] = [];
       target.traverse((o) => {
         const mats = ((o as { material?: Material | Material[] }).material ?? []) as Material | Material[];

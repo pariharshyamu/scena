@@ -37,6 +37,17 @@ snow.accumulate(scene, {
 
 It only settles on **plain** surfaces (ones with no cap of their own), so it never fights a preset `snow` or `moss` material. Because it's the same cap the surfaces already carry, there's no extra geometry or texture — the snow is *painted on by the light*.
 
+## Petals & leaves
+
+A third `type`, `'petal'`, reuses the same GPU path for **falling blossom or leaves** — points that flutter wide and *spin* as they drift down, tinted blossom-pink by default. It's what makes a [sakura](props.md#tree-species) grove shed:
+
+```js
+scene.add(createPrecipitation({ type: 'petal', wind }).object);
+scene.add(createPrecipitation({ type: 'petal', color: 0xd98e3a }).object); // autumn leaf-fall
+```
+
+Petals don't accumulate (only snow settles), but everything else — the wind lean, the camera-following wrap, the one-draw-call cost — is identical.
+
 ## A storm, composed
 
 Precipitation is one layer of weather. Pair it with a close, desaturated `Fog`, an overcast sky, and a stiff `WindField` and you have a proper storm; drop the intensity and clear the fog and it passes. Rain and snow are the same call with a different `type`, so a weather controller can cross-fade between them.

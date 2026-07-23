@@ -28,7 +28,7 @@ export {
 } from './text/textGeometry';
 
 // Props
-export { createTree, TREE_SPECIES, type TreeOptions, type TreeSpecies } from './props/tree';
+export { createTree, TREE_SPECIES, type TreeOptions, type TreeSpecies, type TreeSeason } from './props/tree';
 export { createRock, type RockOptions } from './props/rock';
 export { createCrate, type CrateOptions } from './props/crate';
 export { createFence, type FenceOptions } from './props/fence';

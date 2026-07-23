@@ -70,6 +70,21 @@ describe('createTree species', () => {
     expect(createTree({ species: 'birch', style: 'oak', seed: 2 }).object.name).toBe('tree-birch');
   });
 
+  it('sakura wears its season: bloom is pink and full, winter is bare', () => {
+    const spring = createTree({ species: 'sakura', season: 'spring', seed: 3 });
+    const winter = createTree({ species: 'sakura', season: 'winter', seed: 3 });
+    // A bare winter sakura drops its whole canopy → far fewer meshes.
+    expect(meshCount(winter.object)).toBeLessThan(meshCount(spring.object));
+    // The spring canopy is a pink blossom, not a green.
+    let pink: Mesh | undefined;
+    spring.object.traverse((o) => {
+      if (o instanceof Mesh && o.geometry.type === 'IcosahedronGeometry') pink = o;
+    });
+    const c = (pink!.material as unknown as { color: { r: number; g: number; b: number } }).color;
+    expect(c.r).toBeGreaterThan(c.g); // reddish-pink, red dominant over green
+    expect(c.b).toBeGreaterThan(c.g * 0.9); // and blue-ish, not a leaf green
+  });
+
   it('binds exactly one (foliage) material to the wind for any species', () => {
     for (const species of TREE_SPECIES) {
       const wind = createWindField();
