@@ -52,6 +52,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'god-rays': 'underwater',
   'caustics': 'underwater',
   'putting-it-together': 'underwater',
+  'storm-surge': 'surge',
   'boids-then-one-draw-call': 'flock',
   'birds-and-fish': 'flock',
   'reading-the-flock': 'flock',

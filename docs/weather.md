@@ -52,4 +52,12 @@ weather.set('duststorm');
 
 ## Reading it
 
-`weather.state` is the current target, `weather.wind` is the field to bind flora to, and `weather.rain` / `weather.snow` are the live systems if you want to poke them directly. The one field also drives the [ocean](ocean.md) swell, so a storm raises the sea at the same time it bends the trees — the whole world weathers together.
+`weather.state` is the current target, `weather.wind` is the field to bind flora to, and `weather.rain` / `weather.snow` are the live systems if you want to poke them directly.
+
+And `weather.storminess` — a live, cross-faded 0–1 sea-roughness — is the seam to the sea. Hand it to an [ocean](ocean.md)'s `storm` and a storm surge whips the water up at the same moment it bends the trees:
+
+```js
+const ocean = createOcean({ wind: weather.wind, storm: () => weather.storminess, surge: 1.5 });
+```
+
+The one field drives the flora bend, the rain's slant, *and* the swell, so a storm raises the sea while it darkens the sky — the whole world weathers together.

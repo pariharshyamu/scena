@@ -304,6 +304,67 @@ game.start();`,
   },
 
   {
+    id: 'surge',
+    title: 'Storm surge',
+    group: 'Worldbuilding',
+    code: `// The weather controller's storminess is wired into the ocean's storm, so a
+// storm whips the sea up: taller, choppier, foamier, darker waves AND a surge
+// that raises the sea level (heightAt rises with it, lifting the boat). It
+// cycles calm to storm. The trees share the wind, so they thrash in it too.
+import { createOcean, createWeather, createWindField, createTerrain,
+         createLightingRig, createSurface, createTree, createRock,
+         scatter, aboveWater, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color, Group, Mesh, BoxGeometry, CylinderGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xaecbe0);
+const rig = createLightingRig('golden-hour'); scene.add(rig.group);
+
+const SEA = 3.2, ISLE = 30;
+const terrain = createTerrain({ seed: 4, size: ISLE * 2, amplitude: 3.4, noiseScale: 22, waterLevel: SEA, palette });
+scene.add(terrain.mesh);
+const shore = (x, z) => (Math.abs(x) < ISLE && Math.abs(z) < ISLE ? terrain.heightAt(x, z) : SEA - 6);
+
+// One wind, one weather controller — storminess is the seam to the sea.
+const wind = createWindField({ direction: 35, strength: 0.4 });
+const weather = createWeather(scene, { wind, sun: rig.sun, ambient: rig.ambient, initial: 'clear' });
+const ocean = createOcean({ level: SEA, size: 320, amplitude: 0.55, choppiness: 0.8,
+  wavelength: 24, wind, shore, surge: 1.6, storm: () => weather.storminess });
+scene.add(ocean.mesh);
+
+const island = scatter({
+  seed: 3, area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  surface: terrain.heightAt, density: 0.04, minSpacing: 2.5,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), weight: 3, variants: 5 },
+          { create: (r) => createRock({ seed: r.int(1, 1e9), palette }) }],
+  mask: aboveWater(terrain, { level: SEA }, 0.6),
+});
+scene.add(island.group);
+
+const boat = new Group();
+const w = createSurface('plank', { color: palette.wood, seed: 2 });
+boat.add(new Mesh(new BoxGeometry(1.6, 0.55, 3.6), w));
+const mast = new Mesh(new CylinderGeometry(0.05, 0.08, 3.2, 6), createSurface('wood', { color: palette.woodDark }));
+mast.position.set(0, 1.7, -0.2); boat.add(mast);
+scene.add(boat);
+const bx = 18, bz = 26;
+
+let flip = 0;
+setInterval(() => { flip ^= 1; weather.set(flip ? 'storm' : 'clear', { fade: 5 }); }, 7000);
+
+game.onUpdate((t) => {
+  boat.position.set(bx, ocean.heightAt(bx, bz), bz);
+  boat.rotation.z = (ocean.heightAt(bx - 1, bz) - ocean.heightAt(bx + 1, bz)) * 0.35;
+  game.camera.position.set(Math.sin(t.elapsed * 0.08) * 12, SEA + 6.5, 60);
+  game.camera.lookAt(0, SEA + 0.5, 20);
+});
+game.start();`,
+  },
+
+  {
     id: 'underwater',
     title: 'God rays & caustics',
     group: 'Worldbuilding',

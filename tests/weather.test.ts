@@ -61,6 +61,19 @@ describe('createWeather', () => {
     expect(sum / 40).toBeLessThan(1.2); // dimmer than the 1.2 it began at
   });
 
+  it('exposes a cross-faded storminess for wiring an ocean surge', () => {
+    const scene = new Scene();
+    const w = createWeather(scene, { initial: 'clear' });
+    expect(w.storminess).toBeCloseTo(0.05, 1); // calm sea when clear
+    w.set('storm', { fade: 4 });
+    for (let i = 0; i < 10; i++) w.update(0.05); // 0.5s in — partway
+    const mid = w.storminess;
+    expect(mid).toBeGreaterThan(0.05);
+    expect(mid).toBeLessThan(1);
+    for (let i = 0; i < 100; i++) w.update(0.05); // settle
+    expect(w.storminess).toBeCloseTo(1, 1); // full storm sea
+  });
+
   it('honours custom / overridden states', () => {
     const scene = new Scene();
     const w = createWeather(scene, {

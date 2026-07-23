@@ -43,4 +43,25 @@ boat.rotation.z = -dy * 0.4;
 
 Because both the visual and the gameplay read the *same* Gerstner sum, a boat never floats above or sinks below the wave you can see — exactly the guarantee `terrain.heightAt` gives for the ground.
 
+## Storm surge
+
+The sea shouldn't be indifferent to the sky. Pass **`storm`** — a number, or a live source like `() => weather.storminess` — and the ocean answers as a storm builds:
+
+- waves grow **taller** (up to ~3× amplitude) and **choppier** (crests peak),
+- **whitecaps spread** across the swell, not just the highest crests,
+- the water **darkens and greys** between the foam,
+- and the **surge raises the sea level** by `surge` metres — the waterline climbs, flooding higher up the beach, and `heightAt` rises with it, so boats lift on the swell.
+
+```js
+const weather = createWeather(scene, { wind });
+const ocean = createOcean({
+  level: 0, wind, shore: terrain.heightAt,
+  storm: () => weather.storminess,   // ← the whole sea now tracks the weather
+  surge: 1.5,
+});
+// weather.set('storm') → the wind rises, the trees lean, AND the sea heaves up.
+```
+
+Because the surge feeds through `heightAt`, the buoyancy handshake keeps holding: a boat bobbing on a calm swell is lifted by the surge and pitched by the bigger waves, all from the same function. It's the [weather controller](weather.md) reaching all the way down into the sea — one `storminess` value, and the whole world weathers together.
+
 *(For a still pond or a fountain, reach for the simpler `createWater` instead — `createOcean` is for open, wind-driven sea.)*

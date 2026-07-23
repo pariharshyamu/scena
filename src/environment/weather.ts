@@ -32,6 +32,9 @@ export interface WeatherStateParams {
   sky: number;
   /** Light level multiplier, 0–1 (dims the sun & ambient in storms). */
   light: number;
+  /** Sea roughness, 0–1 — wire an ocean's `storm` to `() => weather.storminess`
+   *  and it whips up a surge (bigger, choppier, foamier, higher seas). Default 0. */
+  sea?: number;
   /** Whether lightning flashes fire in this state. */
   lightning?: boolean;
 }
@@ -71,6 +74,8 @@ export interface Weather {
   objects: Object3D[];
   /** The current target state name. */
   readonly state: string;
+  /** The live, cross-faded sea roughness, 0–1 — wire an ocean's `storm` to this. */
+  readonly storminess: number;
   /** Cross-fade to a state over `fade` seconds (default 4). */
   set(name: WeatherPreset | string, options?: { fade?: number }): Weather;
   /** Advance manually instead of self-driving (for deterministic loops). */
@@ -78,13 +83,13 @@ export interface Weather {
 }
 
 const BUILT_IN: Record<WeatherPreset, WeatherStateParams> = {
-  clear: { wind: 0.15, gust: 0.4, rain: 0, snow: 0, fogColor: 0xbcd4e6, fogNear: 30, fogFar: 200, sky: 0xbcd4e6, light: 1 },
-  overcast: { wind: 0.3, gust: 0.5, rain: 0, snow: 0, fogColor: 0x9aa7b0, fogNear: 24, fogFar: 140, sky: 0x9aa7b0, light: 0.7 },
-  fog: { wind: 0.1, gust: 0.3, rain: 0, snow: 0, fogColor: 0xc2c8cc, fogNear: 3, fogFar: 30, sky: 0xc2c8cc, light: 0.85 },
-  rain: { wind: 0.4, gust: 0.6, rain: 0.7, snow: 0, fogColor: 0x74808a, fogNear: 16, fogFar: 90, sky: 0x74808a, light: 0.55 },
-  storm: { wind: 0.9, gust: 0.9, rain: 1, snow: 0, fogColor: 0x565f68, fogNear: 10, fogFar: 62, sky: 0x565f68, light: 0.4, lightning: true },
-  snow: { wind: 0.25, gust: 0.4, rain: 0, snow: 0.7, fogColor: 0xcdd6dd, fogNear: 16, fogFar: 90, sky: 0xcdd6dd, light: 0.8 },
-  blizzard: { wind: 0.8, gust: 0.9, rain: 0, snow: 1, fogColor: 0xdde6ec, fogNear: 6, fogFar: 40, sky: 0xdde6ec, light: 0.62, lightning: false },
+  clear: { wind: 0.15, gust: 0.4, rain: 0, snow: 0, fogColor: 0xbcd4e6, fogNear: 30, fogFar: 200, sky: 0xbcd4e6, light: 1, sea: 0.05 },
+  overcast: { wind: 0.3, gust: 0.5, rain: 0, snow: 0, fogColor: 0x9aa7b0, fogNear: 24, fogFar: 140, sky: 0x9aa7b0, light: 0.7, sea: 0.22 },
+  fog: { wind: 0.1, gust: 0.3, rain: 0, snow: 0, fogColor: 0xc2c8cc, fogNear: 3, fogFar: 30, sky: 0xc2c8cc, light: 0.85, sea: 0.08 },
+  rain: { wind: 0.4, gust: 0.6, rain: 0.7, snow: 0, fogColor: 0x74808a, fogNear: 16, fogFar: 90, sky: 0x74808a, light: 0.55, sea: 0.5 },
+  storm: { wind: 0.9, gust: 0.9, rain: 1, snow: 0, fogColor: 0x565f68, fogNear: 10, fogFar: 62, sky: 0x565f68, light: 0.4, sea: 1, lightning: true },
+  snow: { wind: 0.25, gust: 0.4, rain: 0, snow: 0.7, fogColor: 0xcdd6dd, fogNear: 16, fogFar: 90, sky: 0xcdd6dd, light: 0.8, sea: 0.15 },
+  blizzard: { wind: 0.8, gust: 0.9, rain: 0, snow: 1, fogColor: 0xdde6ec, fogNear: 6, fogFar: 40, sky: 0xdde6ec, light: 0.62, sea: 0.7, lightning: false },
 };
 
 /** A live, colour-aware copy of a state we can interpolate in place. */
@@ -98,6 +103,7 @@ interface LiveState {
   fogFar: number;
   sky: Color;
   light: number;
+  sea: number;
   lightning: boolean;
 }
 
@@ -112,6 +118,7 @@ function toLive(p: WeatherStateParams): LiveState {
     fogFar: p.fogFar,
     sky: new Color(p.sky),
     light: p.light,
+    sea: p.sea ?? 0,
     lightning: !!p.lightning,
   };
 }
@@ -233,6 +240,7 @@ export function createWeather(scene: Scene, options: WeatherOptions = {}): Weath
       cur.fogNear = lerp(from.fogNear, to.fogNear, e);
       cur.fogFar = lerp(from.fogFar, to.fogFar, e);
       cur.light = lerp(from.light, to.light, e);
+      cur.sea = lerp(from.sea, to.sea, e);
       cur.fogColor.lerpColors(from.fogColor, to.fogColor, e);
       cur.sky.lerpColors(from.sky, to.sky, e);
       cur.lightning = e > 0.5 ? to.lightning : from.lightning;
@@ -268,6 +276,9 @@ export function createWeather(scene: Scene, options: WeatherOptions = {}): Weath
     objects: [rain.object, snow.object],
     get state() {
       return targetName;
+    },
+    get storminess() {
+      return cur.sea;
     },
     set(name, opts = {}) {
       from = copyLive(cur);

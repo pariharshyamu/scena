@@ -28,6 +28,11 @@ export interface OceanOptions {
   speed?: number;
   /** A WindField — the swell turns downwind and grows with the wind. */
   wind?: WindField;
+  /** Storm surge, 0–1, or a live source (`() => weather.storminess`): whips up
+   *  bigger, choppier, foamier, darker seas and raises the sea level. Default 0. */
+  storm?: number | (() => number);
+  /** Sea-level rise at full storm, metres (the surge). Default 1.2. */
+  surge?: number;
   /** Terrain height sampler (`terrain.heightAt`): the ocean fades out over land and foams at the shore. */
   shore?: (x: number, z: number) => number;
   /** Deep-water colour. Default 0x184a63. */
@@ -65,6 +70,7 @@ interface Wave {
 
 const WAVE_UNIFORMS = /* glsl */ `
 uniform float uTime;
+uniform float uStorm;
 uniform vec2  uWaveDir[${N}];
 uniform vec4  uWaveParams[${N}];  // (wavenumber, amplitude, steepness Q, phase speed)
 `;
@@ -90,7 +96,8 @@ for (int i = 0; i < ${N}; i++) {
   scCrest += Q * wa * s;
 }
 objectNormal = normalize(vec3(-scNx, 1.0 - scNy, -scNz));
-vOceanFoam = smoothstep(0.5, 1.0, scCrest);   // whitecaps where the sum folds
+// Whitecaps where the sum folds — a storm broadens them across the crests.
+vOceanFoam = smoothstep(mix(0.5, 0.18, uStorm), 1.0, scCrest);
 `;
 
 const OCEAN_BEGIN = /* glsl */ `
@@ -133,6 +140,13 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   const speedMul = options.speed ?? 1;
   const wind = options.wind;
   const shore = options.shore;
+  const surge = options.surge ?? 1.2;
+  const stormSrc =
+    typeof options.storm === 'function'
+      ? options.storm
+      : options.storm !== undefined
+        ? () => options.storm as number
+        : null;
 
   // --- geometry: an XZ grid at the origin (local space = world), with a
   // per-vertex shore depth (level − terrain height) baked from the handshake.
@@ -195,9 +209,14 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     uSkyColor: { value: new Color(options.skyColor ?? 0xbcd4e6) },
     uShoalDepth: { value: 3.0 },
     uFoamBand: { value: 0.6 },
+    uStorm: { value: 0 },
+    uSurge: { value: 0 },
   };
+  // The current sea level, lifted by the surge — mirrored into heightAt so
+  // boats ride the rising water, not just the base level.
+  let curLevel = level;
 
-  // Reproject the wave set for the current heading + wind strength.
+  // Reproject the wave set for the current heading + wind strength + storm.
   const retune = (): void => {
     let heading = ((options.direction ?? 30) * Math.PI) / 180;
     let ampScale = 1;
@@ -206,14 +225,21 @@ export function createOcean(options: OceanOptions = {}): Ocean {
       heading = Math.atan2(d.y, d.x);
       ampScale = Math.max(0.55, Math.min(1.7, 0.55 + (wind.uniforms.uWindStrength.value as number) * 2.4));
     }
+    // Storm surge: taller, steeper seas and a raised waterline.
+    const sm = stormSrc ? Math.max(0, Math.min(1, stormSrc())) : 0;
+    const stormAmp = 1 + sm * 2.2; // up to ~3.2× at full storm
+    const chop = Math.min(1, choppiness + sm * (1 - choppiness));
+    uniforms.uStorm.value = sm;
+    uniforms.uSurge.value = surge * sm;
+    curLevel = level + surge * sm;
     for (let i = 0; i < N; i++) {
       const a = heading + REL_ANGLE[i];
       curDir[i].set(Math.cos(a), Math.sin(a));
       uWaveDir[i].copy(curDir[i]);
-      const amp = waves[i].amp * ampScale;
+      const amp = waves[i].amp * ampScale * stormAmp;
       curAmp[i] = amp;
-      // Steepness kept so Σ Q·w·A ≤ choppiness ≤ 1 (no self-intersection).
-      const q = Math.min(choppiness / (waves[i].w * amp * N || 1), 0.98 / (waves[i].w * amp || 1));
+      // Steepness kept so Σ Q·w·A ≤ chop ≤ 1 (no self-intersection).
+      const q = Math.min(chop / (waves[i].w * amp * N || 1), 0.98 / (waves[i].w * amp || 1));
       const p = uniforms.uWaveParams.value[i] as { x: number; y: number; z: number; w: number };
       p.x = waves[i].w;
       p.y = amp;
@@ -240,17 +266,21 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
+        `#include <common>\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
       )
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
-        if (vOceanShore < -0.06) discard;        // terrain stands above the sea here
-        float shoal = clamp(vOceanShore / uShoalDepth, 0.0, 1.0);
+        // The surge lifts the waterline, so a storm floods higher up the beach.
+        float shoreD = vOceanShore + uSurge;
+        if (shoreD < -0.06) discard;             // terrain stands above the sea here
+        float shoal = clamp(shoreD / uShoalDepth, 0.0, 1.0);
         diffuseColor.rgb = mix(uShallowColor, uDeepColor, shoal);
-        float shoreFoam = (1.0 - smoothstep(0.0, uFoamBand, vOceanShore)) * step(0.0, vOceanShore);
+        float shoreFoam = (1.0 - smoothstep(0.0, uFoamBand, shoreD)) * step(0.0, shoreD);
         float oceanFoam = clamp(max(vOceanFoam, shoreFoam), 0.0, 1.0);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.94, 0.96, 0.97), oceanFoam);`
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.94, 0.96, 0.97), oceanFoam);
+        // A storm darkens and greys the water between the whitecaps.
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.18, 0.2), uStorm * 0.45 * (1.0 - oceanFoam));`
       )
       .replace(
         '#include <normal_fragment_maps>',
@@ -278,6 +308,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     if (!manual) {
       uniforms.uTime.value = nowSeconds();
       retune();
+      mesh.position.y = curLevel; // ride the surge up
     }
   };
 
@@ -287,7 +318,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     for (let i = 0; i < N; i++) {
       y += curAmp[i] * Math.sin((curDir[i].x * x + curDir[i].y * z) * waves[i].w + t * waves[i].speed);
     }
-    return level + y;
+    return curLevel + y;
   };
 
   return {
@@ -298,6 +329,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
       manual = true;
       uniforms.uTime.value += dt;
       retune();
+      mesh.position.y = curLevel;
     },
   };
 }

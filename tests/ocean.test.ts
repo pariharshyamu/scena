@@ -65,6 +65,49 @@ describe('createOcean', () => {
     expect(sawDeep).toBe(true);
   });
 
+  it('a storm surge whips the sea up and raises the waterline', () => {
+    let storm = 0;
+    const ocean = createOcean({ level: 0, amplitude: 0.5, direction: 0, surge: 1.5, storm: () => storm });
+    ocean.update(0); // retune at calm
+
+    // Peak height sampled across the surface — a proxy for wave size + level.
+    const peak = (): number => {
+      let hi = -Infinity;
+      for (let x = 0; x < 40; x += 2) for (let z = 0; z < 40; z += 2) hi = Math.max(hi, ocean.heightAt(x, z, 0.3));
+      return hi;
+    };
+    const calmPeak = peak();
+    const calmLevel = ocean.mesh.position.y;
+
+    storm = 1;
+    ocean.update(0.1); // retune at full storm
+    const stormPeak = peak();
+    const stormLevel = ocean.mesh.position.y;
+
+    expect(stormLevel).toBeGreaterThan(calmLevel + 1); // surge raised the sea (~1.5 m)
+    expect(stormPeak).toBeGreaterThan(calmPeak + 1); // taller, choppier waves
+  });
+
+  it('the storm uniforms (uStorm, uSurge) reach the material and drive foam', () => {
+    let storm = 0;
+    const ocean = createOcean({ surge: 1.2, storm: () => storm });
+    const shader = compile(ocean.mesh.material as MeshStandardMaterial);
+    expect(shader.vertexShader).toContain('uStorm'); // foam broadens with the storm
+    expect(shader.fragmentShader).toContain('uSurge'); // waterline lifted in the shader
+    storm = 1;
+    ocean.update(0.05);
+    expect(shader.uniforms.uStorm.value).toBeCloseTo(1);
+    expect(shader.uniforms.uSurge.value).toBeCloseTo(1.2);
+  });
+
+  it('with no storm source the sea is unchanged (backward compatible)', () => {
+    const ocean = createOcean({ level: 3 });
+    ocean.update(0.1);
+    expect(ocean.mesh.position.y).toBeCloseTo(3); // no surge
+    const shader = compile(ocean.mesh.material as MeshStandardMaterial);
+    expect(shader.uniforms.uStorm.value).toBe(0);
+  });
+
   it('update(dt) advances the swell; a WindField turns it', () => {
     const ocean = createOcean({ direction: 0 });
     const before = ocean.heightAt(5, 5);
