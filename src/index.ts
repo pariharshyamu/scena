@@ -71,6 +71,28 @@ export {
   type BannerPattern,
 } from './props/banner';
 export { createBrazier, createCampfire, type FireOptions } from './props/fire';
+export {
+  createTable,
+  createSeat,
+  createBed,
+  createShelf,
+  createChest,
+  createCandle,
+  createRug,
+  type TableOptions,
+  type TableStyle,
+  type SeatOptions,
+  type SeatStyle,
+  type BedOptions,
+  type BedSize,
+  type ShelfOptions,
+  type ShelfStock,
+  type ChestOptions,
+  type CandleOptions,
+  type CandleStyle,
+  type RugOptions,
+  type RugShape,
+} from './props/furniture';
 export { createBunting, type BuntingOptions } from './props/bunting';
 export { createFountain, type FountainOptions } from './props/fountain';
 export {

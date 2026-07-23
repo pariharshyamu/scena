@@ -34,6 +34,15 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createBunting({ seed, span, flags })` | festive pennants on a catenary cord between two poles, fluttering on the flag cloth-wave; **self-animating** |
 | `createFountain({ seed, figure })` | tiered stone basin with animated `createWater` pools, a spouting centre statue and falling water; **self-animating** |
 | `createCart({ seed, style, cargo })` | spoked-wheel `'cart'` (with shafts) or `'wagon'`, loaded with `'crates'`/`'barrels'`/`'sacks'`/`'hay'` |
+| `createTable({ seed, style })` | `'round'` pedestal / long `'trestle'` / small `'desk'` |
+| `createSeat({ seed, style })` | slat-back `'chair'` / long `'bench'` / three-legged `'stool'` |
+| `createBed({ seed, size })` | post bed with quilt & pillow: `'single'` / `'double'` / stacked `'bunk'` |
+| `createShelf({ seed, stock })` | tall shelf lined with seeded `'books'` / `'pottery'` / `'food'` / `'empty'` |
+| `createChest({ seed, open })` | banded storage chest; `open` tilts the lid |
+| `createCandle({ seed, style, light })` | `'single'` / standing `'candelabra'` / hanging `'chandelier'`; flickering glow free, `light: true` adds the real `PointLight` |
+| `createRug({ seed, shape })` | woven `'round'` / `'square'` / `'runner'`; walk-through (`obstacleRadius` 0) |
+
+The last seven are the **cottage furniture set** — meant for a [`createRoom` interior](settlement.md#interiors-createroom), though nothing stops a market square from having a bench. Candles follow the lamp rule (glow is free, real lights are a budget) and their flames flicker on their own; a chandelier's origin is its ceiling hook, so position it at ceiling height and it hangs.
 
 Two prop behaviors worth knowing:
 

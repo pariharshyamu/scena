@@ -1,5 +1,17 @@
 import { Clock, Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
-import { createInteriorLight, createRoom, PALETTES } from 'scena3d';
+import {
+  createBed,
+  createCandle,
+  createChest,
+  createInteriorLight,
+  createRoom,
+  createRug,
+  createSeat,
+  createShelf,
+  createTable,
+  PALETTES,
+  type Prop,
+} from 'scena3d';
 
 const params = new URLSearchParams(location.search);
 const pinned = params.get('t') !== null ? Number(params.get('t')) : null;
@@ -33,6 +45,23 @@ const room = createRoom(
   { seed: 11, palette }
 );
 scene.add(room.group);
+
+// Furnish it: the cottage set, placed by hand (furnishRoom automates this).
+const place = (prop: Prop, x: number, z: number, rotate = 0): void => {
+  prop.object.position.set(x, 0, z);
+  prop.object.rotation.y = rotate;
+  room.group.add(prop.object);
+};
+place(createTable({ seed: 21, style: 'trestle', palette }), 0.2, 0.1, 0.12);
+place(createSeat({ seed: 22, style: 'chair', palette }), 0.2, 1.2, Math.PI);
+place(createSeat({ seed: 23, style: 'stool', palette }), -1.1, 0.2, 0);
+place(createBed({ seed: 24, size: 'single', palette }), -2.2, -2.4, Math.PI / 2);
+place(createChest({ seed: 25, palette }), -0.4, -3.0, 0);
+place(createShelf({ seed: 26, stock: 'books', palette }), 2.6, -3.6, 0);
+place(createRug({ seed: 27, shape: 'runner', palette }), 0.4, -2.5, 0);
+const candle = createCandle({ seed: 28, style: 'single', palette });
+candle.object.position.set(0.5, 0.78, 0.1); // on the table
+room.group.add(candle.object);
 
 // Daylight: a fake day cycle the demo drives, swinging the sun east → west.
 const cycle = { sunElevation: 1, timeOfDay: 0.5 };
