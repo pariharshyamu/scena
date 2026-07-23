@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — rain & snow</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; color: #1a2430;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.4); max-width: 34em;
+      }
+      code { background: rgba(0,0,0,0.14); padding: 0 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — rain &amp; snow</strong><br />
+      GPU-driven precipitation that follows the camera: thousands of drops or
+      flakes are positioned entirely in the vertex shader, so it's one draw call
+      and no per-particle work. Rain falls as slanted streaks, snow as soft
+      drifting flakes — both leaning along the WindField. And the snow
+      <b>settles</b>: the roofs and ground whiten as it falls, reusing the
+      surface cap. Try <code>?type=rain</code>.
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

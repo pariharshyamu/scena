@@ -684,6 +684,9 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = vertexPatch(shader.vertexShader);
     shader.fragmentShader = fragmentPatch(shader.fragmentShader);
+    // Keep the live shader so weather can drive uniforms after compilation —
+    // the object three actually uploads from, not just our pre-compile copy.
+    (material.userData as { scenaShader?: typeof shader }).scenaShader = shader;
   };
   // All surface materials inject identical source (uniforms carry the
   // differences), so one cache key groups them — and, crucially, keeps them
@@ -691,6 +694,10 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   // params but no injection. three still appends its own feature key, so
   // flat/smooth/instanced variants stay separate programs.
   material.customProgramCacheKey = () => 'scena-surface-v1';
+
+  // Expose the live uniforms so weather can drive them after the fact — e.g.
+  // snow settling ramps uSurfCap, rain darkens/glosses via the same handles.
+  (material.userData as { scenaSurface?: typeof uniforms }).scenaSurface = uniforms;
 
   return material;
 }

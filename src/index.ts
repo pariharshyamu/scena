@@ -96,6 +96,13 @@ export {
   type Wind,
   type WindOptions,
 } from './environment/wind';
+export {
+  createPrecipitation,
+  type Precipitation,
+  type PrecipitationOptions,
+  type PrecipitationType,
+  type AccumulateOptions,
+} from './environment/precipitation';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
 
 // Generators

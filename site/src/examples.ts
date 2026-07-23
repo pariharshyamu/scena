@@ -142,6 +142,56 @@ game.start();`,
   },
 
   {
+    id: 'weather',
+    title: 'Rain & snow',
+    group: 'Worldbuilding',
+    code: `// GPU-driven precipitation: every drop is placed in the vertex shader
+// and the cloud follows the camera, so thousands of particles cost one draw
+// call. Rain slants along the wind; snow drifts AND settles — the roofs and
+// ground whiten as it falls, reusing the surface cap. Try type = 'rain'.
+import { createPrecipitation, createWindField, createHouse, createTree,
+         createSurface, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, Color, Fog, DirectionalLight, AmbientLight } from 'three';
+
+const type = 'snow';                              // ← change to 'rain'
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+const sky = type === 'snow' ? 0xb0bac2 : 0x9aa6ae;
+scene.background = new Color(sky);
+scene.fog = new Fog(sky, type === 'snow' ? 45 : 28, type === 'snow' ? 115 : 85);
+scene.add(new DirectionalLight(0xf2f4f7, 1.4), new AmbientLight(sky, 0.75));
+const ground = new Mesh(new PlaneGeometry(200, 200), createSurface('dirt', { color: 0x6f6a4a }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+[[-4, -2, 0.3], [3.5, -3, -0.5], [5, 3, 2.4], [-5, 3.5, -0.8], [0, 5, Math.PI]]
+  .forEach(([x, z, ry], i) => {
+    const h = createHouse({ seed: 10 + i, palette });
+    h.object.position.set(x, 0, z); h.object.rotation.y = ry; scene.add(h.object);
+  });
+for (let i = 0; i < 5; i++) {
+  const tree = createTree({ seed: 30 + i, palette });
+  const a = (i / 5) * Math.PI * 2;
+  tree.object.position.set(Math.cos(a) * 11, 0, Math.sin(a) * 11); scene.add(tree.object);
+}
+
+const wind = createWindField({ direction: 20, strength: type === 'snow' ? 0.5 : 0.9 });
+const weather = type === 'snow'
+  ? createPrecipitation({ type, wind, count: 2600, size: 6, opacity: 0.62 })
+  : createPrecipitation({ type, wind });
+scene.add(weather.object);
+if (type === 'snow') weather.accumulate(scene, { max: 0.8, rate: 0.35, capUp: 0.3 });
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.sin(a) * 13, 5.5, 14);
+  game.camera.lookAt(0, 1.4, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',
