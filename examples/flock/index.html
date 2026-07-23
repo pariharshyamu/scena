@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SCENA — flocks & schools</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; }
+      #hud { position: fixed; top: 12px; left: 12px; color: #eef2f7;
+        font: 14px/1.5 system-ui, sans-serif; user-select: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6); max-width: 34em; }
+      code { background: rgba(255,255,255,0.12); padding: 0 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <strong>SCENA — flocks &amp; schools</strong><br />
+      A boid simulation (separation, alignment, cohesion, wander) steers every
+      creature, and the whole flock draws as one InstancedMesh whose wings beat
+      in the vertex shader from a per-instance phase — so no two flap alike.
+      The birds wheel around the tower; try <code>?type=fish</code> for a school
+      swimming past underwater.
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

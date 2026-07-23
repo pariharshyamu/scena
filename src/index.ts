@@ -104,6 +104,7 @@ export {
   type AccumulateOptions,
 } from './environment/precipitation';
 export { createOcean, type Ocean, type OceanOptions } from './environment/ocean';
+export { createFlock, type Flock, type FlockOptions, type FlockType } from './environment/flock';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
 
 // Generators

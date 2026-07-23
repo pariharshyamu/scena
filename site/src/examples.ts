@@ -250,6 +250,49 @@ game.start();`,
   },
 
   {
+    id: 'flock',
+    title: 'Flocks & schools',
+    group: 'Worldbuilding',
+    code: `// A boid flock — separation, alignment, cohesion + wander — drawn as one
+// InstancedMesh whose wings beat in the vertex shader from a per-instance
+// phase (no two flap alike). Pass 'circle' and the birds wheel around a
+// point. positions[] is live, so gameplay can read the flock.
+import { createFlock, createTower, createTree, createSurface,
+         createLightingRig, applyFog, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, Color } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xaecbe0);
+scene.add(createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(240, 240), createSurface('dirt', { color: palette.grassLow }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+scene.add(createTower({ seed: 3, height: 9, palette }).object);
+const wood = scatter({
+  seed: 4, area: { min: { x: -50, z: -50 }, max: { x: 50, z: 50 } },
+  density: 0.03, minSpacing: 3,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), variants: 5 }],
+  mask: (x, z) => Math.hypot(x, z) > 9,
+});
+scene.add(wood.group);
+
+// Crows wheeling around the watchtower — try type:'fish' for a school.
+const flock = createFlock({ type: 'birds', count: 70, center: [0, 14, 0], bounds: [20, 6, 20], circle: 15, seed: 7 });
+scene.add(flock.object);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.04;
+  game.camera.position.set(Math.sin(a) * 26, 9, Math.cos(a) * 26);
+  game.camera.lookAt(0, 12, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',
