@@ -510,6 +510,49 @@ game.start();`,
   },
 
   {
+    id: 'trees',
+    title: 'Tree species',
+    group: 'Worldbuilding',
+    code: `// Six seeded species from one createTree — pine, oak, cypress, birch, cedar,
+// maple — each with its own silhouette, colour, wind response and steering
+// footprint. Scatter the whole set for a varied wood; all sway in one wind.
+import { createTree, createWindField, createLightingRig, createSurface,
+         applyFog, applyWind, scatter, TREE_SPECIES, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color, Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xbcd6e6);
+scene.add(createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(200, 200), createSurface('dirt', { color: palette.grassLow }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+const wind = createWindField({ direction: 40, strength: 0.32, gust: 0.6 });
+
+// A mixed wood: every species scattered together, all bound to one wind.
+const wood = scatter({
+  seed: 5, area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
+  density: 0.03, minSpacing: 3,
+  items: TREE_SPECIES.map((species) => ({
+    create: (r) => createTree({ species, seed: r.int(1, 1e9), palette }),
+    variants: 4,
+  })),
+});
+scene.add(wood.group);
+applyWind(wood.group, { field: wind, height: 5, stiffness: 2, anchor: 0.8 });
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.sin(a) * 44, 14, Math.cos(a) * 26);
+  game.camera.lookAt(0, 4, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',

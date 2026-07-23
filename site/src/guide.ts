@@ -27,6 +27,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   wind: 'living',
   'paths-one-curve-three-jobs': 'path',
   'the-prop-catalogue': 'props',
+  'tree-species': 'trees',
   palettes: 'palettes',
   'market-stalls-statues': 'market',
   'flags-banners-waving': 'banners',

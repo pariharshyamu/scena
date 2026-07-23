@@ -15,7 +15,7 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 
 | Generator | Notes |
 |---|---|
-| `createTree({ seed, style, height })` | `'pine'` cone-stacks or `'oak'` blob canopies |
+| `createTree({ seed, species, height })` | six species — see [Tree species](#tree-species) |
 | `createRock({ seed, size })` | welded-jitter icosahedron, flattened base |
 | `createBush({ seed })` | low foliage clumps |
 | `createGrassTuft({ seed })` | crossed blades; `obstacleRadius` 0 (walk-through) |
@@ -39,6 +39,34 @@ Two prop behaviors worth knowing:
 
 - **Lights are a budget.** Lamps and torches only create real `PointLight`s when asked (`light: true`, `torchLights: n`) — glowing emissive bulbs are free, real lights are not.
 - **Houses plug into the day cycle.** Window materials are emissive at the intensity `createDayCycle` scans for, so passing a house in the cycle's `lamps` list makes its windows ignite at dusk. No extra API.
+
+## Tree species
+
+`createTree` builds six seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
+
+| `species` | Silhouette | In the wind | `obstacleRadius` |
+|---|---|---|---|
+| `pine` | stacked cones | medium | 0.5 |
+| `oak` | blob canopy on a forked trunk | medium | 0.6 |
+| `cypress` | tall narrow flame, deep green | barely moves (stiff) | 0.35 |
+| `birch` | slender, high crown, pale banded bark | light & whippy | 0.32 |
+| `cedar` | broad flat horizontal tiers | stiff | 0.75 |
+| `maple` | full rounded dome | medium | 0.65 |
+
+```js
+import { createTree, TREE_SPECIES, PALETTES } from 'scena3d';
+
+const avenue = createTree({ species: 'cypress', seed: 7 });     // for a formal row
+const blaze  = createTree({ species: 'maple', palette: PALETTES.autumn }); // goes orange
+```
+
+Three things make the species system safe to adopt:
+
+- **Existing forests are untouched.** With no `species`, `createTree` still returns the familiar seeded pine/oak mix — new species are strictly opt-in. (The old `style` option is kept as an alias.)
+- **Palettes still theme them.** Each species tints *from* the palette — a `cypress` is a deep version of the palette's green, a `maple` under `PALETTES.autumn` blazes orange — so a whole wood restyles by swapping one palette.
+- **They mix in `scatter` and steer in GAMA.** Pass several species as `items` and a wood grows varied in one call; each carries its own `obstacleRadius`, so a narrow cypress and a broad cedar present honest footprints to agent steering.
+
+`TREE_SPECIES` is the list of all species — handy for scattering the full set or building a picker. Only the canopy sways in the [wind](wind.md); the trunk stays planted, and a `cypress` holds nearly still while a `birch` whips — that's the per-species stiffness at work.
 
 ## Palettes
 
