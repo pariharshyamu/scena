@@ -32,6 +32,8 @@ The result carries the full gameplay handshake:
 
 `createHouse`, `createTower`, `createWell` and `createRuin` are ordinary props if you want to compose your own settlement — see [Props & palettes](./props.md). Houses have a buried stone foundation, so sloped ground never shows a gap under a wall.
 
+Each house picks its **wall** (plaster, brick or ashlar) and **roof** (clay tile, wooden shingle or straw thatch) from its seed, so a street varies on its own; pass `wall` / `roof` to fix a style. Ruins come up **mossy** by default (green reclaiming the up-facing stone — pass `mossy: false` to keep them bare), and the well wears a little moss on its rim. All of it is the [surface system](./surfaces.md) doing the work — no textures.
+
 ## Kits: ASCII architecture
 
 For interiors, forts and dungeons, draw the floor plan as text:

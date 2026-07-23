@@ -38,14 +38,25 @@ function prismGeometry(width: number, height: number, depth: number): BufferGeom
   return geometry;
 }
 
+export type WallStyle = 'plaster' | 'brick' | 'ashlar';
+export type RoofStyle = 'tile' | 'shingle' | 'thatch';
+
 export interface HouseOptions {
   seed?: number;
   /** Footprint width (gable side). Default seeded 3.2–4.2. */
   width?: number;
   depth?: number;
   wallHeight?: number;
+  /** Wall surface. Default seeded (mostly plaster, some brick / ashlar). */
+  wall?: WallStyle;
+  /** Roof surface. Default seeded (tile, wooden shingle or straw thatch). */
+  roof?: RoofStyle;
   palette?: Palette;
 }
+
+// Seed-weighted so a row of houses varies without any caller doing the work.
+const WALL_STYLES: WallStyle[] = ['plaster', 'plaster', 'plaster', 'brick', 'ashlar'];
+const ROOF_STYLES: RoofStyle[] = ['tile', 'tile', 'shingle', 'thatch'];
 
 /**
  * A cottage: plastered walls, gabled roof, door, chimney and emissive
@@ -63,11 +74,19 @@ export function createHouse(options: HouseOptions = {}): Prop {
   const group = new Group();
   group.name = 'house';
   const seed = options.seed ?? 1;
-  // Procedural surfaces: plastered walls, ridged clay-tile roof, weathered
-  // stone foundation, planked door — all detail generated in-shader.
-  const wall = createSurface('plaster', { color: palette.wall, seed });
+  // Procedural surfaces: walls (plaster / brick / ashlar), roof (clay tile /
+  // wooden shingle / straw thatch), weathered stone foundation, planked door —
+  // all detail generated in-shader. Style is seeded, so a street of houses
+  // varies on its own.
+  const wallStyle = options.wall ?? rng.pick(WALL_STYLES);
+  const roofStyle = options.roof ?? rng.pick(ROOF_STYLES);
+  const wallColor =
+    wallStyle === 'brick' ? 0x9e4a34 : wallStyle === 'ashlar' ? palette.rock[0] : palette.wall;
+  const wall = createSurface(wallStyle, { color: wallColor, seed });
   wall.color.offsetHSL(0, 0, rng.range(-0.03, 0.03));
-  const roof = createSurface('tile', { color: palette.roof, seed: seed + 7 });
+  const roofColor =
+    roofStyle === 'thatch' ? 0xb39a5c : roofStyle === 'shingle' ? palette.woodDark : palette.roof;
+  const roof = createSurface(roofStyle, { color: roofColor, seed: seed + 7 });
   roof.color.offsetHSL(0, 0, rng.range(-0.04, 0.04));
   const stone = createSurface('stone', { color: palette.rock[0], seed: seed + 13 });
   const wood = createSurface('plank', { color: palette.woodDark, seed: seed + 21 });
@@ -198,7 +217,14 @@ export function createWell(options: WellOptions = {}): Prop {
   const group = new Group();
   group.name = 'well';
   const seed = options.seed ?? 1;
-  const stone = createSurface('stone', { color: rng.pick(palette.rock), seed });
+  // A little moss on the old rim, thin (high capUp) so only the very tops take.
+  const stone = createSurface('stone', {
+    color: rng.pick(palette.rock),
+    seed,
+    cap: 0.4,
+    capColor: 0x445a2e,
+    capUp: 0.5,
+  });
   const wood = createSurface('wood', { color: palette.woodDark, seed: seed + 5 });
   const roof = createSurface('tile', { color: palette.roof, seed: seed + 11 });
 
@@ -241,6 +267,8 @@ export interface RuinOptions {
   seed?: number;
   /** Footprint width. Default seeded 3.5–5. */
   size?: number;
+  /** Moss reclaiming the up-facing stone. Default true. */
+  mossy?: boolean;
   palette?: Palette;
 }
 
@@ -256,7 +284,13 @@ export function createRuin(options: RuinOptions = {}): Prop {
 
   const group = new Group();
   group.name = 'ruin';
-  const stone = createSurface('stone', { color: rng.pick(palette.rock), seed: options.seed ?? 1 });
+  // Abandoned stone, reclaimed by moss on the up-facing tops and shoulders.
+  const mossy = options.mossy ?? true;
+  const stone = createSurface('stone', {
+    color: rng.pick(palette.rock),
+    seed: options.seed ?? 1,
+    ...(mossy ? { cap: 0.6, capColor: 0x415a2a, capUp: 0.3, capSharp: 0.32 } : {}),
+  });
   stone.color.offsetHSL(0, 0, rng.range(-0.04, 0.02));
 
   const thickness = 0.35;

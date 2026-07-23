@@ -43,6 +43,8 @@ export {
   type TowerOptions,
   type WellOptions,
   type RuinOptions,
+  type WallStyle,
+  type RoofStyle,
 } from './props/building';
 export { createStall, type StallOptions, type StallGoods } from './props/stall';
 export {
