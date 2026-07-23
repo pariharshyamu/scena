@@ -77,6 +77,18 @@ scene.add(villa.object);
 
 The handshake is all there: `obstacleRadius` for steering, `entry` (a walk-to point outside the door) for agents, and `panes` — every glass material, all `nightGlow`, so listing the villa in `createDayCycle`'s `lamps` lights the house window-by-window at dusk. Pair with `createGate` on the drive and the whole street runs on one cycle.
 
+## Towers: createHighrise
+
+`createHighrise({ floors })` builds a multi-storey tower whose cost does **not** scale with height: windows, mullion frames and floor bands are `InstancedMesh`es, so a 26-floor tower draws the same handful of calls as a 6-floor one. Facades come `'grid'` (punched windows in render) or `'curtain'` (full glazing); below is a double-height glazed lobby with a steel canopy, above a parapet roof with the plant room.
+
+```js
+const tower = createHighrise({ seed: 11, floors: 22, palette: PALETTES.urban });
+scene.add(tower.object);
+cycle = createDayCycle({ ..., lamps: [tower.object] });   // and at dusk…
+```
+
+The night trick: the windows are split into two seeded sets by `occupancy` — *occupied* panes use `nightGlow` glass, the rest stay dark — so a day cycle ignites the classic random lit-window skyline for free. `litCount` / `windowCount` report the split; `obstacleRadius` covers the footprint.
+
 ## Interiors: createRoom
 
 `createRoom` is `assembleKit` gone indoors — the same grid, the same map characters, and the same `Kit`-shaped gameplay data (`obstacles`, `spawns`, `floorAt`), plus everything a room needs to feel like a room: plastered walls over floorboards (or flagstones, `floor: 'stone'`), a beamed ceiling, and three new cell types:

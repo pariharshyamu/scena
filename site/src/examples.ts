@@ -1264,6 +1264,56 @@ game.start();`,
   },
 
   {
+    id: 'skyline',
+    title: 'Downtown skyline',
+    group: 'Settlement',
+    code: `// createHighrise: a multi-storey tower whose cost does NOT scale
+// with height — windows, frames and floor bands are InstancedMeshes, so
+// 26 floors draw like 6. Occupied windows (a seeded occupancy mask) are
+// nightGlow glass: set timeOfDay to 0.95 and the skyline lights itself.
+import { createHighrise, createSky, createSurface, createLightingRig,
+         applyFog, createDayCycle, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.urban;
+const game = new Game();
+const scene = game.world.scene;
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+const plaza = new Mesh(new PlaneGeometry(300, 300), createSurface('concrete'));
+plaza.rotation.x = -Math.PI / 2;
+scene.add(plaza);
+
+const towers = [
+  { seed: 11, floors: 22, x: 0, z: -30 },
+  { seed: 23, floors: 15, x: -26, z: -18 },
+  { seed: 31, floors: 10, x: 24, z: -16 },
+  { seed: 44, floors: 17, x: -12, z: -48 },
+  { seed: 57, floors: 8, x: 22, z: -42 },
+].map(({ seed, floors, x, z }) => {
+  const tower = createHighrise({ seed, floors, palette });
+  tower.object.position.set(x, 0, z);
+  scene.add(tower.object);
+  return tower;
+});
+console.log('windows:', towers.reduce((a, t) => a + t.windowCount, 0),
+  '· lit tonight:', towers.reduce((a, t) => a + t.litCount, 0));
+
+const cycle = createDayCycle({ sky, rig, scene,
+  lamps: towers.map((t) => t.object),
+  palette, dayLength: 60, timeOfDay: 0.45 });
+game.onUpdate((t) => {
+  cycle.update(t.delta);
+  game.camera.position.set(Math.sin(t.elapsed * 0.04) * 60, 24, 75);
+  game.camera.lookAt(0, 18, -28);
+});
+game.start();`,
+  },
+
+  {
     id: 'bungalow',
     title: 'Modern bungalows',
     group: 'Settlement',

@@ -75,6 +75,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'createvillage': 'village',
   'kits-ascii-architecture': 'kit',
   'modern-bungalows-createbungalow': 'bungalow',
+  'towers-createhighrise': 'skyline',
   'interiors-createroom': 'interior',
   'daylight-createinteriorlight': 'interior',
   'furnishing-furnishroom': 'interior',
