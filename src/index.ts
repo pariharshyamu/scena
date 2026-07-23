@@ -16,6 +16,7 @@ export {
   type SurfaceParams,
   type SurfaceOptions,
 } from './materials/surface';
+export { createGlass, type GlassOptions } from './materials/glass';
 
 // Text — stylised lettering carved from an embedded vector font (no textures,
 // no font files, no loaders); label any prop, in the browser or a Node test.

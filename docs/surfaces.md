@@ -120,6 +120,41 @@ createSurface('stone', { glow: 2.5, glowColor: 0xff5a1e, glowThreshold: 0.3 }); 
 
 Because glow lives outside `material.emissive`, every surface — including `lava` — still reports a **black emissive**, so nothing here trips the day-cycle's lamp handling.
 
+## Modern & machined
+
+Thirteen Tier-4 presets take the same shader into the present day — for bungalows, towers and everything `createRoom` builds when it grows up:
+
+| Preset | Reads as |
+|---|---|
+| `concrete` | fair-faced grey with **shutter-panel joint lines** (the tiling grid, dialed way down) |
+| `paint` | modern render — almost featureless on purpose; colour it anything |
+| `marble` | near-white slab with dark warped **veins** (the grain machinery at very low frequency), glossy |
+| `terrazzo` | a cement field packed with tiny per-cell chips, a share in the accent tint |
+| `steel` | brushed stainless: fine directional streaks, cool, semi-gloss |
+| `chrome` | near-mirror trim (stylized — the lighting rig does the selling) |
+| `paintedMetal` | powder-coat for gates, frames and railings — colour from the palette |
+| `corten` | the even architectural oxide bloom, calmer than `rust` |
+| `teak` | oiled decking/furniture wood under a varnish sheen |
+| `porcelain` | large-format slabs, hairline grout, offset courses |
+| `mosaic` | tiny gridded tesserae with **accent-tint chips** — pools, feature walls |
+| `parquet` | narrow varnished planks in alternating **±45° chevron bands** |
+| `patternedTile` | cream cement tiles each stamped with a **ring-and-dot motif** in the tint |
+
+Three small pattern controls power the new looks, and — like everything here — they're plain uniforms you can turn on for *any* kind: `tileTint` (fraction of cells painted solid tint — mosaic chips), `chevron` (shear alternate column bands ±45° — herringbone/chevron lays), and `motif` (a per-cell ring + dot painted in the tint — patterned cement tiles).
+
+### Glass: createGlass
+
+Architectural glass is its own material, not a preset — `createGlass()` returns a transparent `MeshStandardMaterial` with two tricks patched in: **fresnel opacity** (see-through face-on, mirror-like edge-on, exactly how glass reads in life) and a **built-in procedural sky reflection** sampled from the reflected view ray — an environment map's worth of glassiness with zero setup.
+
+```js
+const clear   = createGlass();                        // cool clear
+const bronze  = createGlass({ tint: 0xc8a878 });      // bronze facade glass
+const bath    = createGlass({ frosted: true });       // milky translucent
+const window_ = createGlass({ nightGlow: true });     // ignites at dusk
+```
+
+`nightGlow` follows the house-window convention: the emissive sits at the intensity `createDayCycle` scans for, so listing the pane's building in the cycle's `lamps` makes the glass burn warm at night — the lit-window skyline, free. Try `?t=0.95` in the **Modern materials** playground.
+
 ## Adopted by the props
 
 `createHouse`, `createTower`, `createWell`, `createRuin`, `createRock` and `createCrate` are built on surfaces out of the box — plastered walls, tiled roofs, stone foundations, planked doors, grained crates. Their emissive windows are left as ordinary materials so the day-night cycle still lights them at dusk. Try the **Procedural surfaces** playground example to see the whole preset palette beside the props that use them.

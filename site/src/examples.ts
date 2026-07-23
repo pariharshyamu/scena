@@ -822,6 +822,78 @@ game.start();`,
   },
 
   {
+    id: 'modern',
+    title: 'Modern materials & glass',
+    group: 'Props',
+    code: `// The Tier-4 surfaces: fair-faced concrete with shutter joints, marble,
+// terrazzo, brushed steel, chrome, powder-coat, corten, teak, porcelain,
+// mosaic with accent chips, chevron parquet and patterned cement tiles —
+// plus createGlass: fresnel panes with a built-in sky reflection that the
+// day cycle ignites warm at dusk. Change timeOfDay to 0.95 for night.
+import { createSurface, createGlass, createSky, createLightingRig, applyFog,
+         createDayCycle, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, Group, BoxGeometry, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'clear', palette);
+
+const ground = new Mesh(new PlaneGeometry(90, 60), createSurface('concrete'));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// Wall panels — one per machined kind.
+const walls = ['concrete', 'paint', 'marble', 'steel', 'chrome',
+               'paintedMetal', 'corten', 'teak', 'porcelain', 'mosaic'];
+walls.forEach((kind, i) => {
+  const panel = new Mesh(new BoxGeometry(2.6, 3.2, 0.3),
+    createSurface(kind, { seed: 10 + i }));
+  panel.position.set(-14.85 + i * 3.3, 1.6, -6);
+  scene.add(panel);
+});
+
+// Floor slabs — the pattern kinds laid flat.
+['marble', 'terrazzo', 'parquet', 'patternedTile', 'mosaic'].forEach((kind, i) => {
+  const slab = new Mesh(new BoxGeometry(4.4, 0.12, 4.4),
+    createSurface(kind, { seed: 30 + i }));
+  slab.position.set(-9.6 + i * 4.8, 0.06, 0.5);
+  scene.add(slab);
+});
+
+// A glass pavilion: clear, bronze and frosted panes that glow at night.
+const pavilion = new Group();
+const frame = createSurface('paintedMetal', { color: 0x2c3238 });
+[createGlass({ nightGlow: true }),
+ createGlass({ tint: 0xc8a878, nightGlow: true }),
+ createGlass({ frosted: true, nightGlow: true })].forEach((glass, i) => {
+  const pane = new Mesh(new BoxGeometry(2.2, 2.6, 0.05), glass);
+  pane.position.set(-2.6 + i * 2.6, 1.5, 0);
+  pavilion.add(pane);
+  [-1.15, 1.15].forEach((dx) => {
+    const post = new Mesh(new BoxGeometry(0.12, 2.8, 0.12), frame);
+    post.position.set(-2.6 + i * 2.6 + dx, 1.4, 0);
+    pavilion.add(post);
+  });
+});
+pavilion.position.set(1.5, 0, 5.5);
+scene.add(pavilion);
+
+const cycle = createDayCycle({ sky, rig, scene, lamps: [pavilion], palette,
+  dayLength: 40, timeOfDay: 0.42 });
+game.onUpdate((t) => {
+  cycle.update(t.delta);
+  game.camera.position.set(Math.sin(t.elapsed * 0.06) * 10, 3.4, 13);
+  game.camera.lookAt(0, 1.4, -2);
+});
+game.start();`,
+  },
+
+  {
     id: 'market',
     title: 'A market & its statues',
     group: 'Props',

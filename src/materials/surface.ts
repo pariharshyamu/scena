@@ -59,7 +59,21 @@ export type SurfaceKind =
   | 'snow'
   | 'moss'
   | 'lava'
-  | 'crystal';
+  | 'crystal'
+  // Tier 4 — modern & machined
+  | 'concrete'
+  | 'paint'
+  | 'marble'
+  | 'terrazzo'
+  | 'steel'
+  | 'chrome'
+  | 'paintedMetal'
+  | 'corten'
+  | 'teak'
+  | 'porcelain'
+  | 'mosaic'
+  | 'parquet'
+  | 'patternedTile';
 
 export interface SurfaceParams {
   /**
@@ -114,6 +128,12 @@ export interface SurfaceParams {
   mortarColor?: number;
   /** Groove relief strength for the joints (normal perturbation). */
   tileRelief?: number;
+  /** Fraction of cells painted solid `tint` (mosaic accent chips, 0–1). */
+  tileTint?: number;
+  /** 1 = shear alternate column bands ±45° — chevron/herringbone parquet. */
+  chevron?: number;
+  /** Per-cell ring + dot motif painted in `tint` (patterned cement tiles). */
+  motif?: number;
 
   // --- snow / moss cap (settles on up-facing faces; `cap: 0` disables it) ---
   /** Cap strength (0 off, 1 full) — snow, moss, dust on the tops. */
@@ -397,6 +417,121 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
     glow: 1.5, glowColor: 0x6fd6ff, glowThreshold: 0.72,
   },
+
+  // --- Tier 4: modern & machined ----------------------------------------
+  // Fair-faced concrete: near-even grey with fine mottle and shutter-panel
+  // joint lines (the tiling grid, dialed way down) — the modern wall.
+  concrete: {
+    baseColor: 0xb5b3ac,
+    roughness: 0.88, metalness: 0, scale: 3.0, albedoVar: 0.08, tint: 0x8a887f,
+    tintAmount: 0.08, ao: 0.12, bump: 0.06, roughVar: 0.08, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    tile: 1, tileW: 1.2, tileH: 0.6, mortar: 0.006, bond: 0, round: 0,
+    tileJitter: 0.05, mortarColor: 0x9a9891, tileRelief: 0.03,
+  },
+  // Modern painted render: almost flat, just enough micro-variation to be a
+  // material at all. Colour it anything; satin sheen.
+  paint: {
+    baseColor: 0xdedbd2,
+    roughness: 0.6, metalness: 0, scale: 6.0, albedoVar: 0.04, tint: 0xb8b4a8,
+    tintAmount: 0.05, ao: 0.05, bump: 0.02, roughVar: 0.05, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Polished marble: near-white slab, dark warped veins (the grain rings at a
+  // very low frequency), glossy — lobby floors and counters.
+  marble: {
+    baseColor: 0xe8e6e0,
+    roughness: 0.22, metalness: 0, scale: 1.6, albedoVar: 0.08, tint: 0x7a8494,
+    tintAmount: 0.12, ao: 0.08, bump: 0.04, roughVar: 0.08, grain: 0.5,
+    grainScale: 0.7, grainAxis: V(0.35, 1, 0.2), flat: false,
+  },
+  // Terrazzo: a cement field packed with tiny per-cell chips, a share of them
+  // in the accent tint — the classic speckled floor.
+  terrazzo: {
+    baseColor: 0xd8d2c6,
+    roughness: 0.35, metalness: 0, scale: 10.0, albedoVar: 0.1, tint: 0x6a604f,
+    tintAmount: 0.04, ao: 0.06, bump: 0.03, roughVar: 0.08, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    tile: 1, tileW: 0.045, tileH: 0.045, mortar: 0.01, bond: 0, round: 1,
+    tileJitter: 0.35, mortarColor: 0xcfc9bd, tileRelief: 0.02, tileTint: 0.18,
+  },
+  // Brushed stainless steel: fine directional streaks (the grain machinery
+  // pointed at metal), cool and semi-gloss — railings, kick plates.
+  steel: {
+    baseColor: 0xaeb4bc,
+    roughness: 0.38, metalness: 0.92, scale: 8.0, albedoVar: 0.06, tint: 0x6a707a,
+    tintAmount: 0.08, ao: 0.06, bump: 0.03, roughVar: 0.18, grain: 0.3,
+    grainScale: 26.0, grainAxis: V(1, 0, 0), flat: false,
+  },
+  // Chrome: near-mirror metal — fittings and trim. (Stylized: no envmap, the
+  // lighting rig does the selling.)
+  chrome: {
+    baseColor: 0xc9ced4,
+    roughness: 0.08, metalness: 1.0, scale: 5.0, albedoVar: 0.04, tint: 0x8a9098,
+    tintAmount: 0.05, ao: 0.04, bump: 0.01, roughVar: 0.05, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Powder-coated metal: coloured semi-gloss with a whisper of orange peel —
+  // gates, frames, railings. Colour it from the palette.
+  paintedMetal: {
+    baseColor: 0x44505c,
+    roughness: 0.42, metalness: 0.35, scale: 14.0, albedoVar: 0.04, tint: 0x222a30,
+    tintAmount: 0.06, ao: 0.06, bump: 0.04, roughVar: 0.08, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Corten weathering steel: the even architectural oxide bloom, warmer and
+  // calmer than 'rust' — feature walls and planters.
+  corten: {
+    baseColor: 0x9a5a34,
+    roughness: 0.82, metalness: 0.18, scale: 3.2, albedoVar: 0.16, tint: 0x5a2e16,
+    tintAmount: 0.22, ao: 0.16, bump: 0.1, roughVar: 0.18, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+  },
+  // Oiled teak: warm decking/furniture wood under a varnish sheen.
+  teak: {
+    baseColor: 0x8a5c36,
+    roughness: 0.3, metalness: 0, scale: 6.0, albedoVar: 0.08, tint: 0x3c2614,
+    tintAmount: 0.12, ao: 0.1, bump: 0.05, roughVar: 0.08, grain: 0.45,
+    grainScale: 4.5, grainAxis: V(1, 0, 0), flat: false,
+  },
+  // Large-format porcelain: big glossy slabs, hairline grout, offset courses.
+  porcelain: {
+    baseColor: 0xd9d6cf,
+    roughness: 0.18, metalness: 0, scale: 3.0, albedoVar: 0.05, tint: 0x9a968c,
+    tintAmount: 0.06, ao: 0.08, bump: 0.03, roughVar: 0.06, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    tile: 1, tileW: 1.2, tileH: 0.6, mortar: 0.005, bond: 0.5, round: 0,
+    tileJitter: 0.06, mortarColor: 0xb0aca2, tileRelief: 0.03,
+  },
+  // Glass mosaic: tiny gridded tesserae, strong per-chip variation, a share of
+  // accent-tint chips, pale grout — pools and feature walls.
+  mosaic: {
+    baseColor: 0x3f7fae,
+    roughness: 0.25, metalness: 0, scale: 8.0, albedoVar: 0.08, tint: 0x1d4e74,
+    tintAmount: 0.05, ao: 0.08, bump: 0.04, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    tile: 1, tileW: 0.055, tileH: 0.055, mortar: 0.006, bond: 0, round: 0,
+    tileJitter: 0.3, mortarColor: 0xd8d4c8, tileRelief: 0.05, tileTint: 0.3,
+  },
+  // Chevron parquet: narrow varnished planks laid in alternating ±45° bands.
+  parquet: {
+    baseColor: 0x9a6b40,
+    roughness: 0.32, metalness: 0, scale: 6.0, albedoVar: 0.07, tint: 0x4a2f18,
+    tintAmount: 0.1, ao: 0.08, bump: 0.04, roughVar: 0.08, grain: 0.3,
+    grainScale: 7.0, grainAxis: V(1, 0, 0), flat: false,
+    tile: 1, tileW: 0.5, tileH: 0.09, mortar: 0.006, bond: 0, round: 0,
+    tileJitter: 0.14, mortarColor: 0x5a3b22, tileRelief: 0.04, chevron: 1,
+  },
+  // Patterned cement tiles: a cream field, each tile stamped with a ring-and-
+  // dot motif in the tint colour — verandas, courtyards, feature floors.
+  patternedTile: {
+    baseColor: 0xdcd7c9,
+    roughness: 0.3, metalness: 0, scale: 3.0, albedoVar: 0.05, tint: 0x365f74,
+    tintAmount: 0.04, ao: 0.08, bump: 0.03, roughVar: 0.06, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    tile: 1, tileW: 0.33, tileH: 0.33, mortar: 0.008, bond: 0, round: 0,
+    tileJitter: 0.05, mortarColor: 0xa9a396, tileRelief: 0.035, motif: 0.9,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -437,6 +572,9 @@ uniform float uSurfTileRound;
 uniform float uSurfTileJitter;
 uniform vec3  uSurfMortarColor;
 uniform float uSurfTileRelief;
+uniform float uSurfTileTint;
+uniform float uSurfTileChevron;
+uniform float uSurfTileMotif;
 uniform float uSurfCap;
 uniform vec3  uSurfCapColor;
 uniform float uSurfCapUp;
@@ -498,6 +636,13 @@ vec4 scenaTile(highp vec3 wp, vec3 wn){
   else uv = wp.xy;
   uv += uSurfSeed.xy;
   highp vec2 ts = max(uSurfTileSize, vec2(1e-3));
+  // Chevron parquet: shear alternate column bands ±45° (about each band's own
+  // centre, so the offset stays small and mediump-safe far from the origin).
+  if (uSurfTileChevron > 0.5) {
+    highp float band = floor(uv.x / ts.x);
+    highp float local = uv.x - (band + 0.5) * ts.x;
+    uv.y += (mod(band, 2.0) * 2.0 - 1.0) * local;
+  }
   highp float row = floor(uv.y / ts.y);
   highp float bond = mod(row, 2.0) * uSurfTileBond * 0.5;
   highp float cxf = uv.x / ts.x + bond;
@@ -579,6 +724,14 @@ function fragmentPatch(src: string): string {
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint, uSurfTintAmount * (1.0 - scenaLow));
       // grain darkening (no-op when uSurfGrain == 0)
       diffuseColor.rgb *= 1.0 - uSurfGrain * scenaG * 0.5;
+      // accent cells (mosaic chips) painted solid tint — a no-op at 0
+      float scenaAccent = uSurfTile * uSurfTileTint;
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint, step(scenaT.y, scenaAccent) * uSurfTile);
+      // per-cell ring + dot motif (patterned cement tiles) — a no-op at 0
+      float scenaMotifM = smoothstep(0.40, 0.47, scenaT.w) - smoothstep(0.60, 0.68, scenaT.w)
+        + smoothstep(0.86, 0.93, scenaT.w);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint,
+        clamp(scenaMotifM, 0.0, 1.0) * uSurfTileMotif * uSurfTile);
       // recessed mortar joint: to the mortar colour, shadowed in the groove
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfMortarColor, scenaMortar);
       diffuseColor.rgb *= 1.0 - 0.35 * scenaMortar;
@@ -668,6 +821,9 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
     uSurfTileJitter: { value: p.tileJitter ?? 0.12 },
     uSurfMortarColor: { value: new Color(p.mortarColor ?? 0x3a3a3a) },
     uSurfTileRelief: { value: p.tileRelief ?? 0.06 },
+    uSurfTileTint: { value: p.tileTint ?? 0 },
+    uSurfTileChevron: { value: p.chevron ?? 0 },
+    uSurfTileMotif: { value: p.motif ?? 0 },
     // Snow/moss cap (uSurfCap 0 disables it).
     uSurfCap: { value: p.cap ?? 0 },
     uSurfCapColor: { value: new Color(p.capColor ?? 0xf2f6fa) },
@@ -693,7 +849,7 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   // from colliding with a plain MeshStandardMaterial that has matching base
   // params but no injection. three still appends its own feature key, so
   // flat/smooth/instanced variants stay separate programs.
-  material.customProgramCacheKey = () => 'scena-surface-v1';
+  material.customProgramCacheKey = () => 'scena-surface-v2';
 
   // Expose the live uniforms so weather can drive them after the fact — e.g.
   // snow settling ramps uSurfCap, rain darkens/glosses via the same handles.

@@ -195,7 +195,7 @@ describe('props adopt surfaces', () => {
       const mat = (o as Mesh).material;
       if (mat instanceof MeshStandardMaterial && typeof mat.onBeforeCompile === 'function') {
         // Distinguish surface materials (custom key) from plain ones.
-        if (mat.customProgramCacheKey() === 'scena-surface-v1') n++;
+        if (mat.customProgramCacheKey() === 'scena-surface-v2') n++;
       }
     });
     return n;

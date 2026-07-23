@@ -60,7 +60,7 @@ describe('createWindField', () => {
     expect(shader.vertexShader).toContain('uWindDir');
     expect(shader.vertexShader).toContain('vSurfWorldPos');
     // Cache key nests both, so it can't collide with surface-only or plain+wind.
-    expect(surf.customProgramCacheKey()).toBe('scena-surface-v1|scena-wind-v1');
+    expect(surf.customProgramCacheKey()).toBe('scena-surface-v2|scena-wind-v1');
     expect(surf.customProgramCacheKey()).not.toBe(new MeshStandardMaterial().customProgramCacheKey());
   });
 

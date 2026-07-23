@@ -67,6 +67,8 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   presets: 'surfaces',
   'why-it-stays-cheap-and-correct': 'surfaces',
   'adopted-by-the-props': 'surfaces',
+  'modern-machined': 'modern',
+  'glass-createglass': 'modern',
   'scatter-in-one-call': 'forest',
   'lod-tiles': 'lod',
   'billboard-impostors-for-giant-forests': 'giants',
