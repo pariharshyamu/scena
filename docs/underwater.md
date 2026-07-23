@@ -33,6 +33,30 @@ createCaustics({ intensity: 0.55, scale: 0.42, speed: 0.7 }).apply(seabed);
 
 > **A mobile note:** caustics read world-space coordinates, so — exactly like the [surface noise](surfaces.md) — the pattern is computed in `highp` to keep it from swimming on mobile `mediump`. SwiftShader (what the headless captures run on) ignores the qualifier, so this can only be confirmed on a real device.
 
+## Bubbles
+
+`createBubbles` sends streams of bubbles rising from the seabed — a vent, a wreck, a diver. Each bubble **wanders** a little and **swells as it rises** (the pressure drops), then **pops** near the top; they're drawn as hollow bright-rimmed points and the columns are anchored to fixed world **vents**, not the camera. Like the rain, every bubble's position is computed in the vertex shader from a seed and the clock, so it's **one draw call** with no per-particle CPU work.
+
+```js
+const bubbles = createBubbles({ columns: 7, area: 14, floor: seabedY, rise: 11 });
+scene.add(bubbles.object);
+// …or pin the vents exactly: createBubbles({ sources: [[3, -2], [8, 4]] })
+```
+
+## Water grade
+
+The single biggest "this is deep water" cue is **colour**. Real water absorbs light by wavelength — red dies first, then green, leaving blue — so distant and deep things go blue-green and dark. `createWaterGrade` **patches a `MeshStandardMaterial`** and applies **per-channel Beer–Lambert extinction** toward the water colour, driven by **view distance** *and* **depth below the surface**. It's physically flavoured, not a flat fog: two things the same distance away grade differently if one is deeper.
+
+It's the same material-patch pattern as [caustics](#caustics) and the [wind field](wind.md) — `bind(material)` composes (surface + caustics + grade is one distinct program), `apply(target)` grades everything under an object:
+
+```js
+const grade = createWaterGrade({ surface: 0, color: 0x0e3a49, density: 0.03, redShift: 0.7 });
+grade.apply(seabed);        // sand, rocks, kelp all sink into the deep
+grade.bind(fish.object.material);
+```
+
+Bind it to the seabed, the props *and* the fish, and the whole reef falls away into the blue with distance instead of staying flatly lit. (Like the caustics and the [surface noise](surfaces.md), the depth term reads world-space coordinates, so it's computed in `highp` to keep steady on mobile.)
+
 ## Putting it together
 
-Drop the seabed under an [ocean](ocean.md), stream god rays down from `ocean.level`, project caustics onto the floor, and swim a `type: 'fish'` [flock](flock.md) through the shafts — that's a reef. Every piece is one draw call and self-animating, so the whole scene is a handful of objects and no per-frame wiring.
+Drop the seabed under an [ocean](ocean.md), stream god rays down from `ocean.level`, project caustics onto the floor, rise bubble columns from the rocks, grade the whole scene into the deep, and swim a `type: 'fish'` [flock](flock.md) through the shafts — that's a reef. Every piece is one draw call and self-animating (or a static material patch), so the whole scene is a handful of objects and no per-frame wiring.

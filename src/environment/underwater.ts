@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   Color,
   Mesh,
+  Points,
   ShaderMaterial,
   Sphere,
   Vector3,
@@ -395,4 +396,318 @@ export function createCaustics(options: CausticsOptions = {}): Caustics {
   };
 
   return caustics;
+}
+
+// ======================================================================
+//  Bubble columns — streams of bubbles rising from the seabed
+// ======================================================================
+
+export interface BubbleOptions {
+  /** Total bubbles across all columns. Default 240. */
+  count?: number;
+  /** Number of vent points bubbles rise from (ignored if `sources` is given). Default 6. */
+  columns?: number;
+  /** Explicit vent positions in local XZ; otherwise `columns` are scattered in `area`. */
+  sources?: Array<[number, number]>;
+  /** Radius (or [x, z]) the vents scatter across when `sources` is omitted. Default 16. */
+  area?: number | [number, number];
+  /** Seabed Y the bubbles rise from. Default 0. */
+  floor?: number;
+  /** How far they rise before popping, metres. Default 8. */
+  rise?: number;
+  /** Rise speed, metres/s. Default 1.2. */
+  speed?: number;
+  /** Bubble size in px. Default 8. */
+  size?: number;
+  /** Lateral wander, metres. Default 0.35. */
+  wobble?: number;
+  /** Bubble colour. Default 0xcfeaf0. */
+  color?: number;
+  /** Opacity. Default 0.4. */
+  opacity?: number;
+  seed?: number;
+}
+
+export interface Bubbles {
+  /** The bubble points — add it to the scene, position it at the seabed. Self-animates. */
+  object: Points;
+  material: ShaderMaterial;
+  /** Advance manually instead of self-driving (for deterministic loops). */
+  update(dt: number): void;
+}
+
+const BUBBLE_VERT = /* glsl */ `
+uniform float uTime;
+uniform float uSpeed;
+uniform float uRise;
+uniform float uFloor;
+uniform float uSize;
+uniform float uWobble;
+uniform float uOpacity;
+attribute float aPhase;
+attribute float aWobble;
+attribute float aScale;
+varying float vAlpha;
+void main() {
+  float prog = fract(aPhase + uTime * uSpeed / uRise);
+  float y = uFloor + prog * uRise;
+  float w = uWobble * prog;                       // wander grows as it rises
+  float x = position.x + sin(uTime * 1.5 + aWobble) * w;
+  float z = position.z + cos(uTime * 1.2 + aWobble * 1.7) * w;
+  vec4 mv = viewMatrix * modelMatrix * vec4(x, y, z, 1.0);
+  gl_Position = projectionMatrix * mv;
+  float grow = (0.55 + prog * 0.7) * aScale;       // bubbles swell as pressure drops
+  gl_PointSize = clamp(uSize * grow * (300.0 / max(-mv.z, 1.0)), 1.0, 22.0);
+  // Fade in off the vent, pop near the top.
+  vAlpha = uOpacity * smoothstep(0.0, 0.06, prog) * (1.0 - smoothstep(0.82, 1.0, prog));
+}
+`;
+
+const BUBBLE_FRAG = /* glsl */ `
+uniform vec3 uColor;
+varying float vAlpha;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  if (d > 0.5) discard;
+  // A hollow bubble: bright rim, faint fill.
+  float body = 1.0 - smoothstep(0.34, 0.5, d);
+  float rim = smoothstep(0.3, 0.44, d) * (1.0 - smoothstep(0.44, 0.5, d));
+  float a = (body * 0.22 + rim * 0.95) * vAlpha;
+  if (a <= 0.0) discard;
+  gl_FragColor = vec4(uColor, a);
+}
+`;
+
+function toRadius(a: number | [number, number] | undefined): [number, number] {
+  if (a === undefined) return [16, 16];
+  return typeof a === 'number' ? [a, a] : a;
+}
+
+/**
+ * Streams of bubbles rising from the seabed — from a vent, a wreck, a diver.
+ * Bubbles wander a little and swell as they rise (pressure drops), then pop near
+ * the top; the columns are anchored to fixed world vents, not the camera. Every
+ * bubble's position is computed in the vertex shader from a seed and the clock,
+ * so it's one draw call and no per-particle CPU work. It self-animates.
+ *
+ * ```ts
+ * const bubbles = createBubbles({ columns: 6, area: 14, rise: 9 });
+ * bubbles.object.position.y = seabedY;
+ * scene.add(bubbles.object);
+ * ```
+ */
+export function createBubbles(options: BubbleOptions = {}): Bubbles {
+  const count = options.count ?? 240;
+  const columns = options.columns ?? 6;
+  const rng = new Rng(options.seed ?? 1);
+  const [ax, az] = toRadius(options.area);
+
+  // Vent positions: given, or scattered over the area disc.
+  const vents: Array<[number, number]> =
+    options.sources ??
+    Array.from({ length: columns }, () => {
+      const r = Math.sqrt(rng.next());
+      const a = rng.next() * Math.PI * 2;
+      return [Math.cos(a) * r * ax, Math.sin(a) * r * az] as [number, number];
+    });
+
+  const pos = new Float32Array(count * 3);
+  const phase = new Float32Array(count);
+  const wobble = new Float32Array(count);
+  const scale = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const v = vents[i % vents.length];
+    // Jitter each bubble a touch off its vent so a column has width.
+    pos[i * 3] = v[0] + rng.range(-0.3, 0.3);
+    pos[i * 3 + 1] = 0;
+    pos[i * 3 + 2] = v[1] + rng.range(-0.3, 0.3);
+    phase[i] = rng.next();
+    wobble[i] = rng.range(0, Math.PI * 2);
+    scale[i] = rng.range(0.6, 1.4);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(pos, 3));
+  geometry.setAttribute('aPhase', new BufferAttribute(phase, 1));
+  geometry.setAttribute('aWobble', new BufferAttribute(wobble, 1));
+  geometry.setAttribute('aScale', new BufferAttribute(scale, 1));
+  geometry.boundingSphere = new Sphere(new Vector3(0, (options.rise ?? 8) * 0.5, 0), Math.max(ax, az) + (options.rise ?? 8));
+
+  const material = new ShaderMaterial({
+    vertexShader: BUBBLE_VERT,
+    fragmentShader: BUBBLE_FRAG,
+    transparent: true,
+    depthWrite: false,
+    uniforms: {
+      uTime: { value: 0 },
+      uSpeed: { value: options.speed ?? 1.2 },
+      uRise: { value: options.rise ?? 8 },
+      uFloor: { value: options.floor ?? 0 },
+      uSize: { value: options.size ?? 8 },
+      uWobble: { value: options.wobble ?? 0.35 },
+      uOpacity: { value: options.opacity ?? 0.4 },
+      uColor: { value: new Color(options.color ?? 0xcfeaf0) },
+    },
+  });
+
+  const object = new Points(geometry, material);
+  object.name = 'bubbles';
+  object.frustumCulled = false;
+
+  let manual = false;
+  object.onBeforeRender = () => {
+    if (!manual) material.uniforms.uTime.value = nowSeconds();
+  };
+
+  return {
+    object,
+    material,
+    update(dt) {
+      manual = true;
+      material.uniforms.uTime.value += dt;
+    },
+  };
+}
+
+// ======================================================================
+//  Water grade — depth/distance colour extinction (the underwater look)
+// ======================================================================
+
+export interface WaterGradeOptions {
+  /** World Y of the water surface — depth is measured down from here. Default 0. */
+  surface?: number;
+  /** The colour everything grades toward with distance & depth. Default 0x0e3a49. */
+  color?: number;
+  /** Extinction per metre of view distance. Default 0.022. */
+  density?: number;
+  /** Extra extinction per metre of depth below the surface. Default 0.03. */
+  depthDensity?: number;
+  /** How much faster warm light (red, then green) is absorbed than blue, 0–1. Default 0.6. */
+  redShift?: number;
+}
+
+export interface WaterGrade {
+  /** The shared shader uniforms. */
+  readonly uniforms: Record<string, { value: unknown }>;
+  /** Every material patched so far. */
+  materials: Material[];
+  /** Set the base extinction density. */
+  setDensity(value: number): WaterGrade;
+  /** Grade a material by depth & distance. Composes with surfaces; idempotent per material. */
+  bind(material: Material): WaterGrade;
+  /** Grade every material under `target`. */
+  apply(target: Object3D): WaterGrade;
+}
+
+const GRADE_COMMON = /* glsl */ `
+varying highp vec3 vWaterWorld;
+`;
+
+/**
+ * The underwater colour grade — the tint that makes a scene read as *deep*.
+ * Real water absorbs light by wavelength (red first, then green, leaving blue),
+ * so distant and deep things go blue-green and dark. This patches a
+ * `MeshStandardMaterial` and applies **per-channel Beer–Lambert extinction**
+ * toward the water colour, driven by view distance and depth below the surface
+ * — physically flavoured, not a flat fog. Bind it to the seabed, rocks, kelp
+ * and fish and the whole world sinks into the blue. Composes with SCENA
+ * surfaces and [caustics](#caustics).
+ *
+ * ```ts
+ * const grade = createWaterGrade({ surface: 0, density: 0.03 });
+ * grade.apply(reef);   // everything fades into the deep with distance & depth
+ * ```
+ */
+export function createWaterGrade(options: WaterGradeOptions = {}): WaterGrade {
+  const uniforms = {
+    uWaterSurface: { value: options.surface ?? 0 },
+    uWaterColor: { value: new Color(options.color ?? 0x0e3a49) },
+    uWaterDensity: { value: options.density ?? 0.022 },
+    uWaterDepth: { value: options.depthDensity ?? 0.03 },
+    uWaterRedShift: { value: options.redShift ?? 0.6 },
+  };
+
+  const patched: Material[] = [];
+
+  const grade: WaterGrade = {
+    uniforms,
+    materials: patched,
+
+    setDensity(value) {
+      uniforms.uWaterDensity.value = Math.max(0, value);
+      return grade;
+    },
+
+    bind(material) {
+      const data = (material.userData ??= {}) as { __scenaWaterGrade?: boolean };
+      if (data.__scenaWaterGrade) return grade;
+      data.__scenaWaterGrade = true;
+
+      const prevCompile = material.onBeforeCompile;
+      const baseKey = material.customProgramCacheKey ? material.customProgramCacheKey() : '';
+      material.onBeforeCompile = function (shader: PatchableShader, renderer: unknown) {
+        if (prevCompile) (prevCompile as (s: PatchableShader, r: unknown) => void).call(this, shader, renderer);
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\n' + GRADE_COMMON)
+          .replace(
+            '#include <begin_vertex>',
+            `#include <begin_vertex>
+             {
+               mat4 scenaGWM = modelMatrix;
+               #ifdef USE_INSTANCING
+                 scenaGWM = modelMatrix * instanceMatrix;
+               #endif
+               vWaterWorld = (scenaGWM * vec4(transformed, 1.0)).xyz;
+             }`
+          );
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            `#include <common>\n${GRADE_COMMON}
+             uniform highp float uWaterSurface;
+             uniform vec3 uWaterColor;
+             uniform float uWaterDensity;
+             uniform float uWaterDepth;
+             uniform float uWaterRedShift;`
+          )
+          .replace(
+            '#include <fog_fragment>',
+            `{
+               // Beer–Lambert extinction: warm light dies first, so distance and
+               // depth pull everything toward the deep-water colour.
+               highp float dist = length(vViewPosition);
+               highp float depth = max(uWaterSurface - vWaterWorld.y, 0.0);
+               highp float d = dist * uWaterDensity + depth * uWaterDepth;
+               vec3 sigma = vec3(1.0 + uWaterRedShift, 1.0 + uWaterRedShift * 0.4, 1.0);
+               vec3 trans = exp(-sigma * d);
+               gl_FragColor.rgb = mix(uWaterColor, gl_FragColor.rgb, clamp(trans, 0.0, 1.0));
+             }
+             #include <fog_fragment>`
+          );
+      };
+      material.customProgramCacheKey = () => baseKey + '|scena-watergrade-v1';
+      material.needsUpdate = true;
+      patched.push(material);
+      return grade;
+    },
+
+    apply(target) {
+      const seen = new Set<Material>();
+      target.traverse((o) => {
+        if (!(o instanceof Mesh)) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          if (m && !seen.has(m)) {
+            seen.add(m);
+            grade.bind(m);
+          }
+        }
+      });
+      return grade;
+    },
+  };
+
+  return grade;
 }

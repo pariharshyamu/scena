@@ -14,6 +14,8 @@ import {
 import {
   createGodRays,
   createCaustics,
+  createBubbles,
+  createWaterGrade,
   createFlock,
   createRock,
   createSurface,
@@ -61,13 +63,23 @@ scene.add(seabed);
 const caustics = createCaustics({ intensity: 0.55, scale: 0.42, speed: 0.7 });
 caustics.apply(seabed);
 
+// Colour grade: everything fades into the deep with distance & depth (red goes
+// first), so the reef sinks into the blue instead of staying flatly lit.
+const grade = createWaterGrade({ surface: 6, color: 0x0e3a49, density: 0.03, depthDensity: 0.05, redShift: 0.7 });
+grade.apply(seabed);
+
 // God rays streaming down from the surface above.
 const rays = createGodRays({ count: 24, height: 26, width: 1.6, spread: 20, tilt: 22, opacity: 0.16, seed: 4 });
 rays.object.position.y = 6; // the (unseen) surface, well above the bed
 scene.add(rays.object);
 
-// A school drifting through the shafts.
+// Bubble columns rising from vents among the rocks.
+const bubbles = createBubbles({ count: 300, columns: 7, area: 14, floor: SEABED, rise: 11, seed: 6 });
+scene.add(bubbles.object);
+
+// A school drifting through the shafts (also graded into the deep).
 const fish = createFlock({ type: 'fish', count: 90, center: [0, -1.5, 0], bounds: [14, 3, 14], seed: 9 });
+grade.apply(fish.object);
 scene.add(fish.object);
 
 const focus = new Vector3(0, -2, 0);
@@ -90,6 +102,8 @@ frame();
     glError: gl.getError(),
     rayTime: +(rays.material.uniforms.uTime.value as number).toFixed(2),
     causticTime: +(caustics.uniforms.uCausticTime.value as number).toFixed(2),
+    bubbleTime: +(bubbles.material.uniforms.uTime.value as number).toFixed(2),
+    graded: grade.materials.length,
     fish0: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)],
   };
 };

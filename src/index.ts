@@ -114,10 +114,16 @@ export {
 export {
   createGodRays,
   createCaustics,
+  createBubbles,
+  createWaterGrade,
   type GodRays,
   type GodRaysOptions,
   type Caustics,
   type CausticsOptions,
+  type Bubbles,
+  type BubbleOptions,
+  type WaterGrade,
+  type WaterGradeOptions,
 } from './environment/underwater';
 export { createFlock, type Flock, type FlockOptions, type FlockType } from './environment/flock';
 export { createHerd, type Herd, type HerdOptions, type HerdType } from './environment/herd';

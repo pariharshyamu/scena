@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Mesh, MeshStandardMaterial, PlaneGeometry, ShaderLib } from 'three';
-import { createGodRays, createCaustics } from '../src/environment/underwater';
+import { Mesh, MeshStandardMaterial, PlaneGeometry, Points, ShaderLib } from 'three';
+import { createGodRays, createCaustics, createBubbles, createWaterGrade } from '../src/environment/underwater';
 import { createSurface } from '../src/materials/surface';
 
 interface Shader {
@@ -85,5 +85,83 @@ describe('createCaustics', () => {
     const before = caustics.uniforms.uCausticTime.value as number;
     caustics.update(0.5);
     expect(caustics.uniforms.uCausticTime.value).toBeGreaterThan(before);
+  });
+});
+
+describe('createBubbles', () => {
+  it('builds a Points cloud of bubbles with a rise rig', () => {
+    const bubbles = createBubbles({ count: 120, columns: 5, seed: 3 });
+    expect(bubbles.object).toBeInstanceOf(Points);
+    expect(bubbles.object.frustumCulled).toBe(false);
+    expect(bubbles.object.geometry.getAttribute('position').count).toBe(120);
+    expect(bubbles.object.geometry.getAttribute('aPhase').count).toBe(120);
+    expect(bubbles.object.geometry.getAttribute('aScale')).toBeDefined();
+    expect(bubbles.material.transparent).toBe(true);
+    expect(bubbles.material.depthWrite).toBe(false);
+  });
+
+  it('rise & pop live in the vertex shader, and it advances', () => {
+    const bubbles = createBubbles({ count: 30 });
+    expect(bubbles.material.vertexShader).toContain('uRise');
+    expect(bubbles.material.vertexShader).toContain('gl_PointSize');
+    const before = bubbles.material.uniforms.uTime.value as number;
+    bubbles.update(1);
+    expect(bubbles.material.uniforms.uTime.value).toBeGreaterThan(before);
+  });
+
+  it('honours explicit vent sources (columns anchored in world XZ)', () => {
+    const bubbles = createBubbles({ count: 4, sources: [[5, -3]], seed: 1 });
+    const p = bubbles.object.geometry.getAttribute('position');
+    // Every bubble sits near the single vent (± the small jitter).
+    for (let i = 0; i < p.count; i++) {
+      expect(Math.abs(p.getX(i) - 5)).toBeLessThan(0.5);
+      expect(Math.abs(p.getZ(i) + 3)).toBeLessThan(0.5);
+    }
+  });
+});
+
+describe('createWaterGrade', () => {
+  function compileStd(mat: MeshStandardMaterial): Shader {
+    const shader: Shader = {
+      uniforms: {},
+      vertexShader: ShaderLib.standard.vertexShader,
+      fragmentShader: ShaderLib.standard.fragmentShader,
+    };
+    (mat.onBeforeCompile as (s: Shader, r: unknown) => void)(shader, null);
+    return shader;
+  }
+
+  it('patches a material with per-channel extinction toward the water colour', () => {
+    const mat = new MeshStandardMaterial();
+    const grade = createWaterGrade({ density: 0.03 });
+    grade.bind(mat);
+    const shader = compileStd(mat);
+    expect(shader.vertexShader).toContain('vWaterWorld'); // world pos for depth
+    expect(shader.fragmentShader).toContain('exp(-sigma'); // Beer-Lambert extinction
+    expect(shader.fragmentShader).toContain('uWaterColor');
+    expect(shader.uniforms.uWaterDensity.value).toBeCloseTo(0.03);
+    expect(mat.customProgramCacheKey().endsWith('|scena-watergrade-v1')).toBe(true);
+  });
+
+  it('composes with a surface (and even caustics) as distinct programs', () => {
+    const mat = createSurface('sand');
+    const baseKey = mat.customProgramCacheKey();
+    createCaustics().bind(mat);
+    createWaterGrade().bind(mat);
+    expect(mat.customProgramCacheKey()).toBe(baseKey + '|scena-caustics-v1|scena-watergrade-v1');
+    const shader = compileStd(mat);
+    expect(shader.vertexShader).toContain('vSurfWorldPos'); // surface
+    expect(shader.fragmentShader).toContain('scenaCaustics'); // caustics
+    expect(shader.fragmentShader).toContain('exp(-sigma'); // grade
+  });
+
+  it('bind is idempotent and apply grades every material under a target', () => {
+    const mat = new MeshStandardMaterial();
+    const grade = createWaterGrade();
+    grade.bind(mat).bind(mat);
+    expect(grade.materials).toHaveLength(1);
+    const seabed = new Mesh(new PlaneGeometry(4, 4), createSurface('sand'));
+    createWaterGrade().apply(seabed);
+    expect((seabed.material as MeshStandardMaterial).customProgramCacheKey().endsWith('|scena-watergrade-v1')).toBe(true);
   });
 });

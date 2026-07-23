@@ -366,13 +366,13 @@ game.start();`,
 
   {
     id: 'underwater',
-    title: 'God rays & caustics',
+    title: 'God rays, caustics & bubbles',
     group: 'Worldbuilding',
-    code: `// Below the surface: volumetric god rays fall as crossed additive shafts,
-// and caustics — a shifting net of light — are added to the seabed's emissive
-// (so they glow through any lighting). A school of fish drifts through.
-import { createGodRays, createCaustics, createFlock, createRock,
-         createSurface, PALETTES } from 'scena3d';
+    code: `// A reef: god rays fall as crossed additive shafts, caustics dance on the
+// seabed, bubble columns rise from vents, and a colour grade fades everything
+// into the deep (red absorbed first) with distance & depth. Fish drift through.
+import { createGodRays, createCaustics, createBubbles, createWaterGrade,
+         createFlock, createRock, createSurface, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Color, Fog, Group, Mesh, PlaneGeometry, DirectionalLight, AmbientLight } from 'three';
 
@@ -396,12 +396,16 @@ for (let i = 0; i < 12; i++) {
 }
 scene.add(seabed);
 
-// Caustics onto the sand + rocks; god rays streaming down from above.
+// Caustics + colour grade on the seabed; god rays and bubbles above it.
 createCaustics({ intensity: 0.55, scale: 0.42, speed: 0.7 }).apply(seabed);
+const grade = createWaterGrade({ surface: 6, color: 0x0e3a49, density: 0.03, depthDensity: 0.05, redShift: 0.7 });
+grade.apply(seabed);
 const rays = createGodRays({ count: 24, height: 26, width: 1.6, spread: 20, tilt: 22, opacity: 0.16, seed: 4 });
 rays.object.position.y = 6; scene.add(rays.object);
+scene.add(createBubbles({ count: 300, columns: 7, area: 14, floor: SEABED, rise: 11, seed: 6 }).object);
 
 const fish = createFlock({ type: 'fish', count: 90, center: [0, -1.5, 0], bounds: [14, 3, 14], seed: 9 });
+grade.apply(fish.object);
 scene.add(fish.object);
 
 game.onUpdate((t) => {
