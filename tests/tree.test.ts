@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Group, Mesh } from 'three';
-import { createTree, TREE_SPECIES, type TreeSpecies } from '../src/props/tree';
+import { createTree, treeBiome, TREE_BIOMES, TREE_SPECIES, type TreeSpecies } from '../src/props/tree';
+import { Rng } from '../src/core/random';
 import { createWindField } from '../src/environment/wind';
 
 function meshCount(g: Group): number {
@@ -92,6 +93,46 @@ describe('createTree species', () => {
       createTree({ species, seed: 4, wind });
       expect(wind.materials.length).toBe(before + 1); // canopy sways, trunk (+ birch bands) planted
       expect(wind.materials[wind.materials.length - 1].customProgramCacheKey()).toContain('scena-wind-v1');
+    }
+  });
+
+  it('giants are big and their footprint scales with height', () => {
+    // A sequoia towers over a garden tree, and its steering footprint scales.
+    const small = createTree({ species: 'sequoia', seed: 2, height: 22 });
+    const tall = createTree({ species: 'sequoia', seed: 2, height: 32 });
+    expect(tall.obstacleRadius).toBeGreaterThan(small.obstacleRadius); // height-scaled
+    // And a giant's footprint dwarfs an oak's.
+    expect(createTree({ species: 'sequoia' }).obstacleRadius).toBeGreaterThan(
+      createTree({ species: 'oak' }).obstacleRadius
+    );
+    // A banyan drops aerial roots — more meshes than a plain oak of any seed.
+    let banyanMeshes = 0;
+    createTree({ species: 'banyan', seed: 3 }).object.traverse((o) => {
+      if (o instanceof Mesh) banyanMeshes++;
+    });
+    expect(banyanMeshes).toBeGreaterThan(8);
+  });
+});
+
+describe('treeBiome', () => {
+  it('returns weighted scatter items that build the biome species', () => {
+    const items = treeBiome('tropical', { variants: 3 });
+    expect(items.length).toBe(TREE_BIOMES.tropical.length);
+    for (const item of items) {
+      expect(item.variants).toBe(3);
+      expect(item.weight).toBeGreaterThan(0);
+      const prop = item.create(new Rng(1));
+      expect(prop.object.name.startsWith('tree-')).toBe(true);
+    }
+    // The mix is exactly the biome's species.
+    const built = new Set(items.map((it) => it.create(new Rng(9)).object.name.replace('tree-', '')));
+    expect(built).toEqual(new Set(TREE_BIOMES.tropical.map((m) => m.species)));
+  });
+
+  it('every giant appears in some biome (they are reachable via presets)', () => {
+    const inBiomes = new Set(Object.values(TREE_BIOMES).flatMap((mix) => mix.map((m) => m.species)));
+    for (const giant of ['sequoia', 'banyan', 'baobab', 'acacia'] as TreeSpecies[]) {
+      expect(inBiomes.has(giant)).toBe(true);
     }
   });
 });

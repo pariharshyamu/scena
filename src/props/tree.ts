@@ -22,7 +22,11 @@ export type TreeSpecies =
   | 'maple'
   | 'sakura'
   | 'palm'
-  | 'willow';
+  | 'willow'
+  | 'sequoia'
+  | 'banyan'
+  | 'baobab'
+  | 'acacia';
 
 /** The season a tree wears. Currently shapes `sakura` (bloom / green / warm / bare). */
 export type TreeSeason = 'spring' | 'summer' | 'autumn' | 'winter';
@@ -38,6 +42,10 @@ export const TREE_SPECIES: readonly TreeSpecies[] = [
   'sakura',
   'palm',
   'willow',
+  'sequoia',
+  'banyan',
+  'baobab',
+  'acacia',
 ];
 
 export interface TreeOptions {
@@ -157,6 +165,58 @@ function branches(group: Group, material: MeshStandardMaterial, rng: Rng, trunkT
   }
 }
 
+/** A massive trunk that flares into buttress roots at the base — a sequoia. */
+function buttressTrunk(group: Group, material: MeshStandardMaterial, rng: Rng, height: number, baseR: number, topR: number): void {
+  const trunk = new Mesh(new CylinderGeometry(topR, baseR, height, 9), material);
+  trunk.position.y = height / 2;
+  group.add(trunk);
+  const flares = 6;
+  for (let i = 0; i < flares; i++) {
+    const a = (i / flares) * Math.PI * 2;
+    const wedge = new Mesh(new ConeGeometry(baseR * 0.5, height * 0.16, 4), material);
+    wedge.position.set(Math.cos(a) * baseR * 0.65, height * 0.05, Math.sin(a) * baseR * 0.65);
+    wedge.rotation.set(-Math.sin(a) * 0.35, 0, Math.cos(a) * 0.35);
+    wedge.scale.z = 0.5;
+    group.add(wedge);
+  }
+}
+
+/** A fat, bulging bottle trunk tapering to a narrow top — a baobab. Returns the crown height. */
+function bottleTrunk(group: Group, material: MeshStandardMaterial, rng: Rng, height: number, baseR: number): number {
+  const trunkH = height * 0.68;
+  // Two stacked cylinders: a fat barrel, then a quick taper — the bottle bulge.
+  const belly = new Mesh(new CylinderGeometry(baseR * 0.62, baseR, trunkH * 0.66, 8), material);
+  belly.position.y = trunkH * 0.33;
+  group.add(belly);
+  const neck = new Mesh(new CylinderGeometry(baseR * 0.28, baseR * 0.62, trunkH * 0.34, 8), material);
+  neck.position.y = trunkH * 0.66 + trunkH * 0.17;
+  group.add(neck);
+  // A few stubby top branches.
+  const arms = rng.int(3, 5);
+  for (let i = 0; i < arms; i++) {
+    const a = (i / arms) * Math.PI * 2 + rng.range(-0.2, 0.2);
+    const arm = new Mesh(new CylinderGeometry(0.05, 0.11, height * 0.22, 5), material);
+    arm.position.set(Math.cos(a) * baseR * 0.3, trunkH + height * 0.06, Math.sin(a) * baseR * 0.3);
+    arm.rotation.set(-Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9);
+    group.add(arm);
+  }
+  return trunkH + height * 0.12;
+}
+
+/** Aerial prop-roots dropping from the crown to the ground — a banyan. */
+function aerialRoots(group: Group, material: MeshStandardMaterial, rng: Rng, cy: number, radius: number, count: number): void {
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + rng.range(-0.2, 0.2);
+    const rr = radius * rng.range(0.45, 1.0);
+    const h = cy - 0.02;
+    const root = new Mesh(new CylinderGeometry(rng.range(0.04, 0.08), rng.range(0.07, 0.13), h, 5), material);
+    root.position.set(Math.cos(a) * rr, h / 2, Math.sin(a) * rr);
+    root.rotation.z = rng.range(-0.06, 0.06);
+    root.rotation.x = rng.range(-0.06, 0.06);
+    group.add(root);
+  }
+}
+
 /**
  * A species recipe: the height band, its wind response (how stiffly it sways),
  * its steering footprint, and how to build it. `build` returns the single
@@ -168,8 +228,8 @@ interface Recipe {
   stiffness: number;
   /** Fraction of height below which nothing sways (keeps the trunk still). */
   anchorFrac: number;
-  /** Steering footprint radius (the GAMA handshake). */
-  obstacleRadius: number;
+  /** Steering footprint radius (the GAMA handshake) — a number, or scaled from height for giants. */
+  obstacleRadius: number | ((height: number) => number);
   build(group: Group, rng: Rng, palette: Palette, height: number, season?: TreeSeason): MeshStandardMaterial;
 }
 
@@ -484,6 +544,128 @@ const SPECIES: Record<TreeSpecies, Recipe> = {
       return foliageMaterial;
     },
   },
+
+  // A colossus — a thick buttressed redwood trunk carrying a high conical crown.
+  // Towers over an ordinary wood; place it sparingly.
+  sequoia: {
+    heightRange: [22, 32],
+    stiffness: 4,
+    anchorFrac: 0.5,
+    obstacleRadius: (h) => h * 0.06,
+    build(group, rng, palette, height) {
+      const barkMaterial = mat(0x8a4b32); // redwood bark
+      const foliageMaterial = mat(tint(rng.pick(palette.foliage), 0x1f4a34, 0.5)); // deep green
+      const baseR = height * 0.075;
+      buttressTrunk(group, barkMaterial, rng, height * 0.55, baseR, baseR * 0.4);
+
+      // A tall conical crown of stacked cones over the upper trunk.
+      const tiers = rng.int(5, 7);
+      let y = height * 0.42;
+      let radius = height * rng.range(0.16, 0.2);
+      const tierH = (height - y) / tiers + 0.4;
+      for (let i = 0; i < tiers; i++) {
+        const cone = new Mesh(new ConeGeometry(radius, tierH * 1.4, 8), foliageMaterial);
+        cone.position.y = y + tierH * 0.55;
+        cone.rotation.y = rng.range(0, Math.PI);
+        group.add(cone);
+        y += tierH * 0.82;
+        radius *= 0.74;
+      }
+      return foliageMaterial;
+    },
+  },
+
+  // A vast crown resting on a stout trunk and a curtain of aerial prop-roots —
+  // a whole grove from one tree.
+  banyan: {
+    heightRange: [5, 8],
+    stiffness: 3,
+    anchorFrac: 0.3,
+    obstacleRadius: (h) => h * 0.3,
+    build(group, rng, palette, height) {
+      const barkMaterial = mat(tint(palette.trunk, 0x4a3320, 0.3));
+      const foliageMaterial = mat(tint(rng.pick(palette.foliage), 0x1d5a3a, 0.35));
+      const trunkH = height * 0.4;
+      const trunk = new Mesh(new CylinderGeometry(height * 0.09, height * 0.15, trunkH, 8), barkMaterial);
+      trunk.position.y = trunkH / 2;
+      group.add(trunk);
+
+      const crownBase = trunkH + height * 0.2;
+      const R = height * rng.range(0.5, 0.62); // very wide
+      const center = new Mesh(new IcosahedronGeometry(R, 1), foliageMaterial);
+      center.position.y = crownBase;
+      center.scale.y = 0.62;
+      group.add(center);
+      const ring = rng.int(6, 9);
+      for (let i = 0; i < ring; i++) {
+        const a = (i / ring) * Math.PI * 2 + rng.range(-0.15, 0.15);
+        const r = R * rng.range(0.45, 0.65);
+        const blob = new Mesh(new IcosahedronGeometry(r, 0), foliageMaterial);
+        blob.position.set(Math.cos(a) * R * 0.85, crownBase - R * 0.12 + rng.range(-0.1, 0.15), Math.sin(a) * R * 0.85);
+        blob.scale.y = 0.7;
+        group.add(blob);
+      }
+      // Aerial roots drop from the crown to the ground.
+      aerialRoots(group, barkMaterial, rng, crownBase - R * 0.3, R * 0.7, rng.int(7, 11));
+      return foliageMaterial;
+    },
+  },
+
+  // A fat bottle trunk under a sparse, high crown — the upside-down savanna tree.
+  baobab: {
+    heightRange: [5, 8],
+    stiffness: 3.5,
+    anchorFrac: 0.55,
+    obstacleRadius: (h) => h * 0.16,
+    build(group, rng, palette, height) {
+      const barkMaterial = mat(tint(palette.trunk, 0x8f8272, 0.5)); // pale grey-brown bark
+      const foliageMaterial = mat(tint(rng.pick(palette.foliage), 0x6f8a3a, 0.3));
+      const crownY = bottleTrunk(group, barkMaterial, rng, height, height * 0.19);
+
+      // Sparse tufts of foliage at the branch tips.
+      const tufts = rng.int(4, 6);
+      for (let i = 0; i < tufts; i++) {
+        const a = (i / tufts) * Math.PI * 2 + rng.range(-0.3, 0.3);
+        const r = height * rng.range(0.12, 0.18);
+        const tuft = new Mesh(new IcosahedronGeometry(r, 0), foliageMaterial);
+        tuft.position.set(Math.cos(a) * height * 0.22, crownY + rng.range(0, height * 0.1), Math.sin(a) * height * 0.22);
+        tuft.scale.y = 0.7;
+        group.add(tuft);
+      }
+      return foliageMaterial;
+    },
+  },
+
+  // A thin trunk under a broad, flat-topped umbrella — the acacia of the savanna.
+  acacia: {
+    heightRange: [4, 6],
+    stiffness: 2.5,
+    anchorFrac: 0.4,
+    obstacleRadius: 0.5,
+    build(group, rng, palette, height) {
+      const barkMaterial = mat(tint(palette.trunk, 0x6a5030, 0.3));
+      const foliageMaterial = mat(tint(rng.pick(palette.foliage), 0x8fa04a, 0.35)); // dusty savanna green
+      const trunkH = height * 0.62;
+      const trunk = new Mesh(new CylinderGeometry(0.06, 0.13, trunkH, 6), barkMaterial);
+      trunk.position.y = trunkH / 2;
+      trunk.rotation.z = rng.range(-0.05, 0.05);
+      group.add(trunk);
+
+      // The umbrella: a wide, very flat canopy of overlapping plates.
+      const crownBase = trunkH + height * 0.08;
+      const R = height * rng.range(0.5, 0.6);
+      const plates = rng.int(3, 4);
+      for (let i = 0; i < plates; i++) {
+        const r = R * (1 - i * 0.16);
+        const plate = new Mesh(new IcosahedronGeometry(r, 0), foliageMaterial);
+        plate.position.set(rng.jitter(0, R * 0.12), crownBase + i * height * 0.05, rng.jitter(0, R * 0.12));
+        plate.scale.y = 0.22; // very flat umbrella
+        plate.rotation.y = rng.range(0, Math.PI);
+        group.add(plate);
+      }
+      return foliageMaterial;
+    },
+  },
 };
 
 /**
@@ -528,5 +710,62 @@ export function createTree(options: TreeOptions = {}): Prop {
     options.wind.attach(group);
   }
 
-  return { object: group, obstacleRadius: recipe.obstacleRadius };
+  const obstacleRadius =
+    typeof recipe.obstacleRadius === 'function' ? recipe.obstacleRadius(height) : recipe.obstacleRadius;
+  return { object: group, obstacleRadius };
+}
+
+// --- biomes: a weighted species mix for scattering a wood in one call --------
+
+export type TreeBiome =
+  | 'temperate'
+  | 'boreal'
+  | 'mediterranean'
+  | 'tropical'
+  | 'savanna'
+  | 'redwood'
+  | 'grove'
+  | 'wetland';
+
+/** The species mix (and relative frequency) each biome scatters. */
+export const TREE_BIOMES: Record<TreeBiome, ReadonlyArray<{ species: TreeSpecies; weight: number }>> = {
+  temperate: [{ species: 'oak', weight: 4 }, { species: 'pine', weight: 3 }, { species: 'birch', weight: 2 }, { species: 'maple', weight: 2 }],
+  boreal: [{ species: 'pine', weight: 5 }, { species: 'cedar', weight: 2 }, { species: 'birch', weight: 2 }],
+  mediterranean: [{ species: 'cypress', weight: 3 }, { species: 'oak', weight: 3 }, { species: 'pine', weight: 2 }],
+  tropical: [{ species: 'palm', weight: 5 }, { species: 'banyan', weight: 1 }],
+  savanna: [{ species: 'acacia', weight: 4 }, { species: 'baobab', weight: 1 }],
+  redwood: [{ species: 'sequoia', weight: 1 }, { species: 'pine', weight: 4 }, { species: 'cedar', weight: 2 }],
+  grove: [{ species: 'sakura', weight: 1 }],
+  wetland: [{ species: 'willow', weight: 3 }, { species: 'birch', weight: 2 }],
+};
+
+export interface TreeBiomeOptions {
+  palette?: Palette;
+  season?: TreeSeason;
+  /** Visual variants generated per species. Default 4. */
+  variants?: number;
+}
+
+/**
+ * The species mix for a biome, ready to drop into `scatter({ items })` — so a
+ * whole wood takes on a character in one word. A `redwood` stand towers with
+ * sequoias over pines; a `tropical` shore is palms and the odd banyan; a
+ * `savanna` is acacias and a baobab. Each species keeps its own silhouette,
+ * wind response and (height-scaled) steering footprint.
+ *
+ * ```ts
+ * scatter({ items: treeBiome('tropical', { palette }), area, density: 0.02 });
+ * ```
+ */
+export function treeBiome(biome: TreeBiome, options: TreeBiomeOptions = {}): Array<{
+  create: (rng: Rng) => Prop;
+  weight: number;
+  variants: number;
+}> {
+  return TREE_BIOMES[biome].map(({ species, weight }) => ({
+    create: (rng: Rng) =>
+      createTree({ species, seed: rng.int(1, 1e9), palette: options.palette, season: options.season }),
+    weight,
+    variants: options.variants ?? 4,
+  }));
 }

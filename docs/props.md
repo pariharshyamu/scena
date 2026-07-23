@@ -42,7 +42,7 @@ Two prop behaviors worth knowing:
 
 ## Tree species
 
-`createTree` builds nine seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
+`createTree` builds thirteen seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
 
 | `species` | Silhouette | In the wind | `obstacleRadius` |
 |---|---|---|---|
@@ -55,6 +55,12 @@ Two prop behaviors worth knowing:
 | `sakura` | wide blossom umbrella | springy | 0.7 |
 | `palm` | curved bare stem, drooping fronds | whippy fronds | 0.4 |
 | `willow` | rounded crown, veil of swaying strands | very whippy | 0.7 |
+| `sequoia` | colossal buttressed redwood + high conical crown | near-rigid | height × 0.06 |
+| `banyan` | vast crown on a curtain of aerial prop-roots | stiff | height × 0.3 |
+| `baobab` | fat bottle trunk, sparse high crown | stiff | height × 0.16 |
+| `acacia` | thin trunk, broad flat umbrella | medium | 0.5 |
+
+The four **giants** (`sequoia`, `banyan`, `baobab`, `acacia`) are big and few — a sequoia stands `22–32` units tall and towers over an ordinary wood — so their **`obstacleRadius` scales with height**, giving agent steering an honest footprint. Place them sparingly; the [scatter LOD tiles](scatter.md) cull them at distance like anything else.
 
 ```js
 import { createTree, TREE_SPECIES, PALETTES } from 'scena3d';
@@ -74,6 +80,28 @@ For falling **blossom or leaves**, the [precipitation](precipitation.md) system 
 import { createPrecipitation } from 'scena3d';
 scene.add(createPrecipitation({ type: 'petal', wind }).object);   // or tint it autumn-orange for leaf-fall
 ```
+
+### Biomes
+
+`treeBiome(name, options)` returns a **weighted species mix** ready to drop into `scatter({ items })`, so a whole wood takes on a character in one word:
+
+```js
+import { scatter, treeBiome } from 'scena3d';
+scatter({ items: treeBiome('tropical', { palette }), area, density: 0.02 });
+```
+
+| `TreeBiome` | Mix |
+|---|---|
+| `temperate` | oak, pine, birch, maple |
+| `boreal` | pine, cedar, birch |
+| `mediterranean` | cypress, oak, pine |
+| `tropical` | palm, banyan |
+| `savanna` | acacia, baobab |
+| `redwood` | sequoia towering over pine & cedar |
+| `grove` | sakura |
+| `wetland` | willow, birch |
+
+`TREE_BIOMES` is the raw table (each biome's `{ species, weight }[]`), and `TREE_SPECIES` lists every species — either is a good base for a custom mix or a picker.
 
 Three things make the species system safe to adopt:
 

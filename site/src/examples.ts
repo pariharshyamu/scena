@@ -513,11 +513,12 @@ game.start();`,
     id: 'trees',
     title: 'Tree species',
     group: 'Worldbuilding',
-    code: `// Nine seeded species from one createTree — pine, oak, cypress, birch, cedar,
-// maple, sakura, palm, willow — each with its own silhouette, colour, wind
-// response and footprint. Scatter the set for a varied wood; blossom drifts down.
+    code: `// Thirteen seeded species from one createTree — pine, oak, cypress, birch,
+// cedar, maple, sakura, palm, willow, plus the giants sequoia, banyan, baobab,
+// acacia. treeBiome() picks a weighted mix by biome; blossom drifts down.
+// (Try treeBiome('tropical') / 'savanna' / 'redwood' for the giants.)
 import { createTree, createPrecipitation, createWindField, createLightingRig,
-         createSurface, applyFog, applyWind, scatter, TREE_SPECIES, PALETTES } from 'scena3d';
+         createSurface, applyFog, applyWind, scatter, treeBiome, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Color, Mesh, PlaneGeometry } from 'three';
 
@@ -532,14 +533,15 @@ ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 const wind = createWindField({ direction: 40, strength: 0.32, gust: 0.6 });
 
-// A mixed wood: every species scattered together, all bound to one wind.
+// A temperate wood + a few blossom and palm for variety, all bound to one wind.
 const wood = scatter({
   seed: 5, area: { min: { x: -40, z: -40 }, max: { x: 40, z: 40 } },
   density: 0.03, minSpacing: 3,
-  items: TREE_SPECIES.map((species) => ({
-    create: (r) => createTree({ species, seed: r.int(1, 1e9), palette }),
-    variants: 4,
-  })),
+  items: [
+    ...treeBiome('temperate', { palette }),
+    { create: (r) => createTree({ species: 'sakura', seed: r.int(1, 1e9), palette }), weight: 1 },
+    { create: (r) => createTree({ species: 'willow', seed: r.int(1, 1e9), palette }), weight: 1 },
+  ],
 });
 scene.add(wood.group);
 applyWind(wood.group, { field: wind, height: 5, stiffness: 2, anchor: 0.8 });
