@@ -412,8 +412,13 @@ export interface SurfaceOptions extends Partial<SurfaceParams> {
 // ---- GLSL --------------------------------------------------------------
 
 const NOISE_GLSL = /* glsl */ `
-varying vec3 vSurfWorldPos;
-varying vec3 vSurfWorldNormal;
+// World-space coordinates get large (props far from the origin, plus the seed
+// offset), and mobile GPUs default the fragment stage to mediump — where
+// fract() of a big number loses precision and the noise/grain visibly swims.
+// Force highp on the world varyings and the noise maths so it stays put.
+varying highp vec3 vSurfWorldPos;
+varying highp vec3 vSurfWorldNormal;
+uniform highp vec3 uSurfSeed;
 uniform float uSurfScale;
 uniform float uSurfAlbedoVar;
 uniform vec3  uSurfTint;
@@ -424,9 +429,8 @@ uniform float uSurfRoughVar;
 uniform float uSurfGrain;
 uniform float uSurfGrainScale;
 uniform vec3  uSurfGrainAxis;
-uniform vec3  uSurfSeed;
 uniform float uSurfTile;
-uniform vec2  uSurfTileSize;
+uniform highp vec2 uSurfTileSize;
 uniform float uSurfMortar;
 uniform float uSurfTileBond;
 uniform float uSurfTileRound;
@@ -442,13 +446,13 @@ uniform float uSurfGlow;
 uniform vec3  uSurfGlowColor;
 uniform float uSurfGlowThresh;
 
-float scenaHash13(vec3 p){
+float scenaHash13(highp vec3 p){
   p = fract(p * 0.1031);
   p += dot(p, p.yzx + 33.33);
   return fract((p.x + p.y) * p.z);
 }
-float scenaVNoise(vec3 x){
-  vec3 i = floor(x); vec3 f = fract(x);
+float scenaVNoise(highp vec3 x){
+  highp vec3 i = floor(x); highp vec3 f = fract(x);
   f = f * f * (3.0 - 2.0 * f);
   float n000 = scenaHash13(i + vec3(0.0,0.0,0.0));
   float n100 = scenaHash13(i + vec3(1.0,0.0,0.0));
@@ -461,24 +465,24 @@ float scenaVNoise(vec3 x){
   return mix(mix(mix(n000,n100,f.x), mix(n010,n110,f.x), f.y),
              mix(mix(n001,n101,f.x), mix(n011,n111,f.x), f.y), f.z);
 }
-float scenaFbm(vec3 p){
+float scenaFbm(highp vec3 p){
   float a = 0.5, s = 0.0;
   for (int i = 0; i < 4; i++){ s += a * scenaVNoise(p); p *= 2.02; a *= 0.5; }
   return s;
 }
 // Triplanar fbm: blend three axis-projected samples by the world normal, so
 // box faces need no UVs and adjacent boxes share one continuous field.
-float scenaTri(vec3 wp, vec3 wn, float scale){
-  vec3 p = wp * scale + uSurfSeed;
+float scenaTri(highp vec3 wp, vec3 wn, float scale){
+  highp vec3 p = wp * scale + uSurfSeed;
   vec3 w = abs(normalize(wn)); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z + 1e-4);
   return scenaFbm(p.yzx) * w.x + scenaFbm(p.zxy) * w.y + scenaFbm(p.xyz) * w.z;
 }
 // Concentric grain rings around the grain axis, warped by noise.
-float scenaGrain(vec3 wp){
-  vec3 ax = normalize(uSurfGrainAxis);
-  float along = dot(wp, ax);
-  vec3 perp = wp - ax * along;
-  float rings = length(perp) * uSurfGrainScale + scenaFbm(wp * uSurfGrainScale * 0.4) * 2.0;
+float scenaGrain(highp vec3 wp){
+  highp vec3 ax = normalize(uSurfGrainAxis);
+  highp float along = dot(wp, ax);
+  highp vec3 perp = wp - ax * along;
+  highp float rings = length(perp) * uSurfGrainScale + scenaFbm(wp * uSurfGrainScale * 0.4) * 2.0;
   return abs(fract(rings) - 0.5) * 2.0; // triangle wave 0..1
 }
 // A masonry grid on the dominant-axis face (so box walls/floors/roofs get a
@@ -486,21 +490,21 @@ float scenaGrain(vec3 wp){
 // and per-cell jitter. Returns: x = mortar mask (1 in the joint), y = per-cell
 // hash (0..1), z = surface height (tile face high → joint low), w = the domed
 // stone height for cobbles.
-vec4 scenaTile(vec3 wp, vec3 wn){
+vec4 scenaTile(highp vec3 wp, vec3 wn){
   vec3 an = abs(normalize(wn));
-  vec2 uv;
+  highp vec2 uv;
   if (an.x >= an.y && an.x >= an.z) uv = wp.zy;
   else if (an.y >= an.x && an.y >= an.z) uv = wp.xz;
   else uv = wp.xy;
   uv += uSurfSeed.xy;
-  vec2 ts = max(uSurfTileSize, vec2(1e-3));
-  float row = floor(uv.y / ts.y);
-  float bond = mod(row, 2.0) * uSurfTileBond * 0.5;
-  float cxf = uv.x / ts.x + bond;
-  float col = floor(cxf);
-  vec2 cell = vec2(col, row);
-  float fx = fract(cxf);
-  float fy = fract(uv.y / ts.y);
+  highp vec2 ts = max(uSurfTileSize, vec2(1e-3));
+  highp float row = floor(uv.y / ts.y);
+  highp float bond = mod(row, 2.0) * uSurfTileBond * 0.5;
+  highp float cxf = uv.x / ts.x + bond;
+  highp float col = floor(cxf);
+  highp vec2 cell = vec2(col, row);
+  highp float fx = fract(cxf);
+  highp float fy = fract(uv.y / ts.y);
   // Distance to the nearest cell edge, in world units → mortar band.
   float ex = min(fx, 1.0 - fx) * ts.x;
   float ey = min(fy, 1.0 - fy) * ts.y;
@@ -527,7 +531,7 @@ function vertexPatch(src: string): string {
   return src
     .replace(
       '#include <common>',
-      '#include <common>\nvarying vec3 vSurfWorldPos;\nvarying vec3 vSurfWorldNormal;'
+      '#include <common>\nvarying highp vec3 vSurfWorldPos;\nvarying highp vec3 vSurfWorldNormal;'
     )
     .replace(
       '#include <begin_vertex>',
