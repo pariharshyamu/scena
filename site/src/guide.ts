@@ -74,6 +74,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'billboard-impostors-for-giant-forests': 'giants',
   'createvillage': 'village',
   'kits-ascii-architecture': 'kit',
+  'modern-bungalows-createbungalow': 'bungalow',
   'interiors-createroom': 'interior',
   'daylight-createinteriorlight': 'interior',
   'furnishing-furnishroom': 'interior',

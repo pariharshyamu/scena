@@ -1264,6 +1264,67 @@ game.start();`,
   },
 
   {
+    id: 'bungalow',
+    title: 'Modern bungalows',
+    group: 'Settlement',
+    code: `// createBungalow masses a seeded modern villa from the Tier-4
+// materials: a cantilevered concrete upper box over a rendered ground
+// floor, floor-to-ceiling glazing, teak or stone accents, a balcony
+// railing, entry canopy and corten planter. All glazing is nightGlow —
+// set timeOfDay to 0.95 and the street lights itself window by window.
+import { createBungalow, createGate, createTree, createSky, createSurface,
+         createLightingRig, applyFog, createDayCycle, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.urban;
+const game = new Game();
+const scene = game.world.scene;
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+const court = new Mesh(new PlaneGeometry(140, 140), createSurface('concrete'));
+court.rotation.x = -Math.PI / 2;
+scene.add(court);
+
+const villas = [
+  { seed: 11, x: -16, z: -14, ry: 0.25 },
+  { seed: 23, x: 4, z: -18, ry: -0.1 },
+  { seed: 37, x: 20, z: -6, ry: -0.7 },
+  { seed: 45, x: -22, z: 6, ry: 0.9 },
+].map(({ seed, x, z, ry }) => {
+  const villa = createBungalow({ seed, palette });
+  villa.object.position.set(x, 0, z);
+  villa.object.rotation.y = ry;
+  scene.add(villa.object);
+  return villa;
+});
+
+const gate = createGate({ style: 'slat', width: 3, seed: 60, palette });
+gate.object.position.set(-12, 0, -6);
+gate.object.rotation.y = 0.25;
+scene.add(gate.object);
+
+[[-4, -8], [14, 2], [-14, 12]].forEach(([x, z], i) => {
+  const tree = createTree({ species: 'maple', seed: 70 + i, height: 5.2, palette });
+  tree.object.position.set(x, 0, z);
+  scene.add(tree.object);
+});
+
+const cycle = createDayCycle({ sky, rig, scene,
+  lamps: [...villas.map((v) => v.object), gate.object],
+  palette, dayLength: 70, timeOfDay: 0.42 });
+game.onUpdate((t) => {
+  cycle.update(t.delta);
+  gate.setOpen(0.5 + 0.5 * Math.sin(t.elapsed * 0.3));
+  game.camera.position.set(Math.sin(t.elapsed * 0.05) * 26, 7.5, 26);
+  game.camera.lookAt(-2, 2.2, -6);
+});
+game.start();`,
+  },
+
+  {
     id: 'interior',
     title: 'A cottage interior',
     group: 'Settlement',

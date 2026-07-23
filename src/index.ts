@@ -178,6 +178,7 @@ export { createPath, type WorldPath, type PathOptions } from './environment/path
 
 // Generators
 export { createVillage, type Village, type VillageOptions } from './generators/village';
+export { createBungalow, type Bungalow, type BungalowOptions } from './generators/bungalow';
 
 // Kits
 export { KIT_UNIT, assembleKit, type Kit, type KitOptions } from './kits/kit';

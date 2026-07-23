@@ -66,6 +66,17 @@ However large the map, walls and floors render as **two `InstancedMesh`es**. The
 
 Kits and villages compose: a village for the exterior, a kit for the keep on the hill, one obstacle list feeding the same agents.
 
+## Modern bungalows: createBungalow
+
+The Tier-4 materials composed into architecture. `createBungalow({ seed })` masses a seeded modern villa — a rendered ground box under a **cantilevered concrete upper box**, floor-to-ceiling glazing on the garden face, a teak-slat or stone accent, a balcony behind a glass or laser-cut railing, flat parapet roofs, an entry canopy on steel posts, a corten planter by the door. Every seed masses differently (cantilever side, accent style, glazing rhythm); the `urban` palette themes the street.
+
+```js
+const villa = createBungalow({ seed: 23, palette: PALETTES.urban });
+scene.add(villa.object);
+```
+
+The handshake is all there: `obstacleRadius` for steering, `entry` (a walk-to point outside the door) for agents, and `panes` — every glass material, all `nightGlow`, so listing the villa in `createDayCycle`'s `lamps` lights the house window-by-window at dusk. Pair with `createGate` on the drive and the whole street runs on one cycle.
+
 ## Interiors: createRoom
 
 `createRoom` is `assembleKit` gone indoors — the same grid, the same map characters, and the same `Kit`-shaped gameplay data (`obstacles`, `spawns`, `floorAt`), plus everything a room needs to feel like a room: plastered walls over floorboards (or flagstones, `floor: 'stone'`), a beamed ceiling, and three new cell types:

@@ -28,7 +28,7 @@ export interface Palette {
   roof: number;
 }
 
-export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> = {
+export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter' | 'urban', Palette> = {
   meadow: {
     foliage: [0x2f9e57, 0x37b26a, 0x2a8f4f, 0x45b878],
     trunk: 0x6b4a33,
@@ -112,6 +112,29 @@ export const PALETTES: Record<'meadow' | 'autumn' | 'dusk' | 'winter', Palette> 
     path: 0x8b8378,
     wall: 0xd2c9bb,
     roof: 0x6b4638,
+  },
+  // Modern district: warm-white render, charcoal trim, teak accents, clipped
+  // green — for bungalows, towers and the Tier-4 surfaces.
+  urban: {
+    foliage: [0x4a8f56, 0x5aa065, 0x3f7f4b, 0x6aae74],
+    trunk: 0x5d4a38,
+    rock: [0x9a9a96, 0x85857f, 0xaaaaa4],
+    wood: 0x8a5c36, // teak
+    woodDark: 0x54402c,
+    metal: 0x2f353c, // charcoal powder-coat
+    lampGlow: 0xffe0a8,
+    grassLow: 0x5a9a5e,
+    grassHigh: 0x7aae6e,
+    cliff: 0x8a8a84,
+    peak: 0xe8ecef,
+    skyTop: 0x4a7ec2,
+    skyBottom: 0xcfe0ec,
+    fog: 0xc8d4dd,
+    water: 0x3f7fae,
+    sand: 0xc9bfa8,
+    path: 0xb0aca2, // pale concrete
+    wall: 0xe8e2d6, // warm-white render
+    roof: 0x3a3d42, // charcoal fascia
   },
 };
 
