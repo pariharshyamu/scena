@@ -47,6 +47,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'one-controller-every-piece': 'weathersys',
   'custom-states': 'weathersys',
   'reading-it': 'weathersys',
+  'seasons-turning-a-whole-wood': 'seasons',
   'gerstner-swell-not-a-sine-plane': 'ocean',
   'the-shore-handshake': 'ocean',
   'buoyancy-heightat': 'ocean',

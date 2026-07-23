@@ -246,6 +246,54 @@ game.start();`,
   },
 
   {
+    id: 'seasons',
+    title: 'Season controller',
+    group: 'Worldbuilding',
+    code: `// createSeasons is the weather controller's counterpart for the trees: it
+// cross-fades a whole wood between spring, summer, autumn and winter by
+// re-grading the canopy albedo in the shader — no geometry rebuilt, trunks
+// untouched. It composes with the wind, so trees sway *and* turn. Auto-cycling.
+import { createSeasons, createWindField, createTerrain, createTree,
+         createLightingRig, applyWind, applyFog, scatter, treeBiome, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xbcd6e6);
+const rig = createLightingRig('golden-hour'); scene.add(rig.group);
+applyFog(scene, 'haze', palette);
+
+const terrain = createTerrain({ seed: 5, size: 100, amplitude: 3.5, valleyFlatness: 0.7, palette });
+scene.add(terrain.mesh);
+
+const wind = createWindField({ direction: 40, strength: 0.3, gust: 0.6 });
+const wood = scatter({
+  seed: 6, area: { min: { x: -44, z: -44 }, max: { x: 44, z: 44 } },
+  surface: terrain.heightAt, density: 0.03, minSpacing: 3.4,
+  items: treeBiome('temperate', { palette, variants: 5 }),
+  mask: (x, z) => Math.hypot(x, z) > 6,
+});
+scene.add(wood.group);
+applyWind(wood.group, { field: wind, height: 5, stiffness: 2, anchor: 0.8 });
+
+// One controller re-grades every tagged canopy; only the leaves turn.
+const seasons = createSeasons({ initial: 'summer' });
+seasons.apply(wood.group);
+const CYCLE = ['spring', 'summer', 'autumn', 'winter'];
+let si = 1;
+setInterval(() => { si = (si + 1) % CYCLE.length; seasons.set(CYCLE[si], { fade: 3.5 }); }, 5000);
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.04;
+  game.camera.position.set(Math.sin(a) * 32, 12, Math.cos(a) * 32);
+  game.camera.lookAt(0, 4, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'ocean',
     title: 'Sea waves',
     group: 'Worldbuilding',

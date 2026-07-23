@@ -122,6 +122,13 @@ export {
   type WeatherStateParams,
 } from './environment/weather';
 export {
+  createSeasons,
+  type Seasons,
+  type SeasonsOptions,
+  type Season,
+  type SeasonGrade,
+} from './environment/seasons';
+export {
   createGodRays,
   createCaustics,
   createBubbles,

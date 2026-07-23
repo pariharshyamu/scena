@@ -697,6 +697,9 @@ export function createTree(options: TreeOptions = {}): Prop {
   const group = new Group();
   group.name = `tree-${species}`;
   const foliageMaterial = recipe.build(group, rng, palette, height, options.season);
+  // Tag the canopy material so a Seasons controller can find and re-grade it
+  // (spring→autumn→winter) while leaving the trunk planted and unchanged.
+  (foliageMaterial.userData ??= {}).scenaFoliage = true;
 
   // Only the canopy sways — the trunk material is left unbound, so it stays
   // planted. (For a scattered forest, prefer applyWind(forest.group), which
