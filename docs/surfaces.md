@@ -54,6 +54,10 @@ From one triplanar fractal-noise field per fragment: fine albedo mottle, low-fre
 | `ashlar` | large squared blocks — tight joints, castle walls |
 | `floortile` | aligned square flags — dark grout, halls & plazas |
 | `shingle` | overlapping wooden shingles — grain, deep shadow lines |
+| `snow` | fresh snow over cold rock — white on the up-faces, stone on the sides |
+| `moss` | moss creeping over a boulder — green growth on the tops |
+| `lava` | cooling basalt — molten glow up through the cracks |
+| `crystal` | glowing faceted mineral — lit from within |
 
 Every preset also carries a **`baseColor`**, so `createSurface('sand')` looks like sand with no colour passed. A caller's `color` always wins:
 
@@ -94,6 +98,27 @@ createSurface('sandstone', {
   mortarColor: 0x8a8578,
 });
 ```
+
+## Snow, moss & glow
+
+Two more opt-in modifiers ride the same shader, both reusing noise it already sampled (so they cost almost nothing when off):
+
+**Cap** — snow, moss or dust that settles on the **up-facing** faces. The mask comes from the world normal's `y`, with its edge broken up by the surface noise so it never draws a clean line, and it sits *over* everything else (it covers the mortar of a tiled roof too). `snow` and `moss` are the presets, but you can cap anything:
+
+```js
+createSurface('tile', { cap: 0.9, capColor: 0xf4f8fc, capUp: 0.2 }); // snow on a roof
+createSurface('ashlar', { cap: 0.6, capColor: 0x40592a });           // a mossy wall
+```
+
+`capUp` controls how up-facing a face must be before the cap takes (low = down the shoulders too, high = only dead-level tops); `capRough` sets how matte the capped area reads.
+
+**Glow** — emissive light drawn **straight into the radiance**, not via `material.emissive`. That's deliberate: the day/night cycle scales `emissiveIntensity`, so a normal emissive would dim at dusk — the glow ignores it and burns constant, like real lava. `glowThreshold` decides how much emits: low keeps it to the deep cracks (`lava`), high lights most of the surface (`crystal`).
+
+```js
+createSurface('stone', { glow: 2.5, glowColor: 0xff5a1e, glowThreshold: 0.3 }); // glowing cracks
+```
+
+Because glow lives outside `material.emissive`, every surface — including `lava` — still reports a **black emissive**, so nothing here trips the day-cycle's lamp handling.
 
 ## Adopted by the props
 

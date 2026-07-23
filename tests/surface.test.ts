@@ -155,11 +155,36 @@ describe('createSurface', () => {
     expect((tiled.uniforms.uSurfTileSize.value as { x: number }).x).toBe(0.6);
   });
 
-  it('stays dayCycle-safe: emissive is black, so intensity dimming is a no-op', () => {
-    // dayCycle modulates emissiveIntensity on every material it sees; a
-    // surface must not accidentally glow at night.
-    const mat = createSurface('tile', { color: 0xa8563e });
-    expect(mat.emissive.equals(new Color(0, 0, 0))).toBe(true);
+  it('adds cap + glow uniforms; snow/moss cap, lava/crystal glow, others off', () => {
+    const shader = compilePatched(createSurface('snow'));
+    for (const u of ['uSurfCap', 'uSurfCapColor', 'uSurfCapUp', 'uSurfGlow', 'uSurfGlowColor', 'uSurfGlowThresh']) {
+      expect(shader.uniforms[u], u).toBeDefined();
+    }
+    expect(SURFACE_PRESETS.snow.cap).toBeGreaterThan(0);
+    expect(SURFACE_PRESETS.moss.cap).toBeGreaterThan(0);
+    expect(SURFACE_PRESETS.lava.glow).toBeGreaterThan(0);
+    expect(SURFACE_PRESETS.crystal.glow).toBeGreaterThan(0);
+    // A plain stone has neither.
+    expect(compilePatched(createSurface('stone')).uniforms.uSurfCap.value).toBe(0);
+    expect(compilePatched(createSurface('stone')).uniforms.uSurfGlow.value).toBe(0);
+    // The features are wired into the fragment shader.
+    expect(shader.fragmentShader).toContain('scenaCapMask');
+    expect(shader.fragmentShader).toContain('totalEmissiveRadiance += uSurfGlowColor');
+  });
+
+  it('cap & glow are opt-in on any surface via overrides', () => {
+    const snowyRoof = compilePatched(createSurface('tile', { cap: 0.9, capColor: 0xffffff }));
+    expect(snowyRoof.uniforms.uSurfCap.value).toBe(0.9);
+    const glowStone = compilePatched(createSurface('stone', { glow: 2, glowColor: 0xff5a1e }));
+    expect(glowStone.uniforms.uSurfGlow.value).toBe(2);
+  });
+
+  it('stays dayCycle-safe: emissive is black even for glowing lava', () => {
+    // dayCycle modulates emissiveIntensity on every material it sees; a surface
+    // must not accidentally glow at night — and lava's glow lives outside
+    // material.emissive, so even it reports black and the cycle can't dim it.
+    expect(createSurface('tile', { color: 0xa8563e }).emissive.equals(new Color(0, 0, 0))).toBe(true);
+    expect(createSurface('lava').emissive.equals(new Color(0, 0, 0))).toBe(true);
   });
 });
 

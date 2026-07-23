@@ -181,15 +181,16 @@ game.start();`,
     title: 'Procedural surfaces',
     group: 'Props',
     code: `// Why SCENA props can out-look a downloaded GLTF at a fraction of the
-// bytes: createSurface patches a MeshStandardMaterial with triplanar noise,
-// so weathered stone, sand, bark, canvas, terracotta, bronze and 17 more are
-// generated in the shader — no textures fetched, every prop unique, and each
-// preset carries its own colour. Full PBR lighting, fog and shadows survive
-// because it stays a standard material.
+// bytes: createSurface patches a MeshStandardMaterial with triplanar noise —
+// 32 presets from stone and sand to brick, snow-capped rock and glowing lava,
+// all generated in the shader. No textures fetched, every prop unique, each
+// preset carries its own colour, and full PBR lighting, fog and shadows
+// survive because it stays a standard material.
 import { createSurface, SURFACE_PRESETS, createHouse, createWell, createRock,
          createSky, createLightingRig, applyFog, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
-import { Mesh, BoxGeometry, SphereGeometry, PlaneGeometry, MeshStandardMaterial } from 'three';
+import { Mesh, BoxGeometry, SphereGeometry, PlaneGeometry, MeshStandardMaterial,
+         IcosahedronGeometry, ConeGeometry } from 'three';
 
 const palette = PALETTES.meadow;
 const game = new Game();
@@ -232,6 +233,19 @@ scene.add(wall);
 const cobbles = new Mesh(new BoxGeometry(8, 0.3, 4), createSurface('cobblestone', { seed: 6 }));
 cobbles.position.set(0, 0.15, -9.8);
 scene.add(cobbles);
+
+// Tier-3 cap & glow: a snow-capped crag, a mossy boulder, a lava chunk with
+// molten cracks and a glowing crystal. Snow settles on the up-faces; the glow
+// is additive, so it reads day or night.
+const snowy = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('snow', { seed: 3 }));
+snowy.position.set(-6, 1, 8);
+const mossy = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('moss', { seed: 8 }));
+mossy.position.set(-2.5, 1, 8);
+const lavaRock = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('lava', { seed: 5 }));
+lavaRock.position.set(1, 1, 8);
+const crystal = new Mesh(new ConeGeometry(0.5, 1.8, 5), createSurface('crystal', { seed: 9 }));
+crystal.position.set(4.2, 0.9, 8);
+scene.add(snowy, mossy, lavaRock, crystal);
 
 ${orbit(20, 11, 0.05)}
 game.start();`,

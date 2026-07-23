@@ -2,9 +2,11 @@ import {
   AmbientLight,
   BoxGeometry,
   Color,
+  ConeGeometry,
   DirectionalLight,
   Fog,
   Group,
+  IcosahedronGeometry,
   Mesh,
   PerspectiveCamera,
   Scene,
@@ -101,6 +103,26 @@ built.add(floor);
 built.position.set(0, 0, -12);
 scene.add(built);
 
+// Tier-3 cap & glow on real geometry: a snow-capped crag, a mossy boulder,
+// a lava chunk with molten cracks and a glowing crystal cluster. Snow settles
+// on the up-faces; the lava/crystal glow is additive, so it reads day or night.
+const wild = new Group();
+const snowy = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('snow', { seed: 3 }));
+snowy.position.set(-4.5, 1.0, 0);
+const mossy = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('moss', { seed: 8 }));
+mossy.position.set(-1.7, 1.0, 0);
+const lavaRock = new Mesh(new IcosahedronGeometry(1.1, 1), createSurface('lava', { seed: 5 }));
+lavaRock.position.set(1.2, 1.0, 0);
+wild.add(snowy, mossy, lavaRock);
+for (let i = 0; i < 5; i++) {
+  const shard = new Mesh(new ConeGeometry(0.28, 1.1 + (i % 3) * 0.4, 5), createSurface('crystal', { seed: 9 + i }));
+  shard.position.set(4.0 + Math.cos(i * 1.7) * 0.4, 0.55 + (i % 3) * 0.2, Math.sin(i * 1.7) * 0.4);
+  shard.rotation.z = (i - 2) * 0.18;
+  wild.add(shard);
+}
+wild.position.set(0, 0, 7);
+scene.add(wild);
+
 const view = new URLSearchParams(location.search).get('view');
 
 // A slow orbit so relief catches the light from many angles.
@@ -113,6 +135,9 @@ function frame(): void {
   } else if (view === 'built') {
     camera.position.set(Math.sin(t * 0.4) * 5, 2.4, -6);
     camera.lookAt(0, 1.4, -12);
+  } else if (view === 'wild') {
+    camera.position.set(Math.sin(t * 0.4) * 5, 2.2, 12);
+    camera.lookAt(0, 1, 7);
   } else {
     camera.position.set(Math.sin(t) * 17, 7, 12 + Math.cos(t) * 4);
     camera.lookAt(0, 1, -2);

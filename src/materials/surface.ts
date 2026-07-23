@@ -54,7 +54,12 @@ export type SurfaceKind =
   | 'cobblestone'
   | 'ashlar'
   | 'floortile'
-  | 'shingle';
+  | 'shingle'
+  // Tier 3 — cap & glow
+  | 'snow'
+  | 'moss'
+  | 'lava'
+  | 'crystal';
 
 export interface SurfaceParams {
   /**
@@ -109,6 +114,26 @@ export interface SurfaceParams {
   mortarColor?: number;
   /** Groove relief strength for the joints (normal perturbation). */
   tileRelief?: number;
+
+  // --- snow / moss cap (settles on up-facing faces; `cap: 0` disables it) ---
+  /** Cap strength (0 off, 1 full) — snow, moss, dust on the tops. */
+  cap?: number;
+  /** Cap colour, as a hex int (white snow, green moss…). */
+  capColor?: number;
+  /** How up-facing a face must be before the cap takes (0 everywhere … 1 only dead-level tops). */
+  capUp?: number;
+  /** Softness of the cap edge (bigger = more gradual). */
+  capSharp?: number;
+  /** Roughness inside the capped area (fresh snow reads matte/bright). */
+  capRough?: number;
+
+  // --- emissive glow (opt-in; `glow: 0` — the default — keeps it dark) ---
+  /** Glow strength added straight to emissive radiance (lava, crystal, runes). */
+  glow?: number;
+  /** Glow colour, as a hex int. */
+  glowColor?: number;
+  /** How much of the surface glows: low = only the deep cracks, high = most of it. */
+  glowThreshold?: number;
 }
 
 const V = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
@@ -334,6 +359,44 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     tile: 1, tileW: 0.2, tileH: 0.13, mortar: 0.012, bond: 1, round: 0,
     tileJitter: 0.2, mortarColor: 0x241811, tileRelief: 0.09,
   },
+
+  // --- Tier 3: cap & glow -----------------------------------------------
+  // Snow settled on cold rock: white on every up-facing face, grey stone on
+  // the sides, its edge broken by the noise. Cap works on any surface.
+  snow: {
+    baseColor: 0x9aa0a8,
+    roughness: 0.9, metalness: 0, scale: 4.0, albedoVar: 0.14, tint: 0x6a7280,
+    tintAmount: 0.14, ao: 0.2, bump: 0.24, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    cap: 0.95, capColor: 0xf4f8fc, capUp: 0.12, capSharp: 0.32, capRough: 0.9,
+  },
+  // Moss creeping over a boulder: grey stone with green growth on the tops
+  // and shoulders, thicker (lower capUp) than snow.
+  moss: {
+    baseColor: 0x8a8f88,
+    roughness: 0.94, metalness: 0, scale: 3.5, albedoVar: 0.2, tint: 0x4a5240,
+    tintAmount: 0.16, ao: 0.28, bump: 0.34, roughVar: 0.12, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    cap: 0.74, capColor: 0x40592a, capUp: 0.34, capSharp: 0.3, capRough: 0.96,
+  },
+  // Cooling lava: dark basalt crust with molten orange glowing up through the
+  // cracks. The glow burns constant, day or night.
+  lava: {
+    baseColor: 0x2a1712,
+    roughness: 0.88, metalness: 0, scale: 3.2, albedoVar: 0.18, tint: 0x120806,
+    tintAmount: 0.26, ao: 0.34, bump: 0.5, roughVar: 0.14, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    glow: 2.6, glowColor: 0xff5a1e, glowThreshold: 0.3,
+  },
+  // Glowing crystal: faceted blue mineral lit from within — most of the face
+  // emits, the deepest cavities darkest.
+  crystal: {
+    baseColor: 0x3a5c8a,
+    roughness: 0.22, metalness: 0, scale: 5.0, albedoVar: 0.14, tint: 0x1a2f52,
+    tintAmount: 0.2, ao: 0.16, bump: 0.3, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    glow: 1.5, glowColor: 0x6fd6ff, glowThreshold: 0.72,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -370,6 +433,14 @@ uniform float uSurfTileRound;
 uniform float uSurfTileJitter;
 uniform vec3  uSurfMortarColor;
 uniform float uSurfTileRelief;
+uniform float uSurfCap;
+uniform vec3  uSurfCapColor;
+uniform float uSurfCapUp;
+uniform float uSurfCapSharp;
+uniform float uSurfCapRough;
+uniform float uSurfGlow;
+uniform vec3  uSurfGlowColor;
+uniform float uSurfGlowThresh;
 
 float scenaHash13(vec3 p){
   p = fract(p * 0.1031);
@@ -443,6 +514,13 @@ vec4 scenaTile(vec3 wp, vec3 wn){
   float h = scenaHash13(vec3(cell + vec2(3.1, 7.3), 5.0));
   return vec4(mortar, h, height, dome);
 }
+// Snow / moss cap: settles on up-facing surfaces, its edge broken up by the
+// noise the shader already sampled (no extra noise cost). Returns 0..1.
+float scenaCapMask(vec3 wn, float breakup){
+  float up = normalize(wn).y * 0.5 + 0.5;      // 0 (down) .. 1 (up)
+  float s = max(uSurfCapSharp, 1e-3);
+  return clamp(smoothstep(uSurfCapUp - s, uSurfCapUp + s, up + (breakup - 0.5) * 0.6), 0.0, 1.0);
+}
 `;
 
 function vertexPatch(src: string): string {
@@ -499,13 +577,17 @@ function fragmentPatch(src: string): string {
       diffuseColor.rgb *= 1.0 - uSurfGrain * scenaG * 0.5;
       // recessed mortar joint: to the mortar colour, shadowed in the groove
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfMortarColor, scenaMortar);
-      diffuseColor.rgb *= 1.0 - 0.35 * scenaMortar;`
+      diffuseColor.rgb *= 1.0 - 0.35 * scenaMortar;
+      // snow / moss cap settling on the up-facing faces (over the mortar too)
+      float scenaCapM = scenaCapMask(vSurfWorldNormal, scenaN) * uSurfCap;
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfCapColor, scenaCapM);`
     )
     .replace(
       '#include <roughnessmap_fragment>',
       `#include <roughnessmap_fragment>
       roughnessFactor = clamp(roughnessFactor + (scenaN - 0.5) * uSurfRoughVar + uSurfGrain * scenaG * 0.12
-        + scenaMortar * 0.25 + (scenaT.y - 0.5) * uSurfTileJitter * 0.3 * uSurfTile, 0.04, 1.0);`
+        + scenaMortar * 0.25 + (scenaT.y - 0.5) * uSurfTileJitter * 0.3 * uSurfTile, 0.04, 1.0);
+      roughnessFactor = mix(roughnessFactor, uSurfCapRough, scenaCapM);`
     )
     .replace(
       '#include <normal_fragment_maps>',
@@ -522,6 +604,18 @@ function fragmentPatch(src: string): string {
         float det = dot(sX, R1);
         vec3 grad = sign(det) * (dFdx(scenaH) * R1 + dFdy(scenaH) * R2);
         normal = normalize(abs(det) * sN - uSurfBump * grad);
+      }`
+    )
+    .replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      {
+        // Procedural glow (lava cracks, crystal): drawn straight into the
+        // emissive radiance, NOT via material.emissive — so it burns constant
+        // and the day/night cycle (which scales emissiveIntensity) can't dim
+        // it. A no-op when uSurfGlow == 0. Glow fills the low-noise areas.
+        float scenaGlow = smoothstep(uSurfGlowThresh + 0.16, uSurfGlowThresh - 0.16, scenaLow) * uSurfGlow;
+        totalEmissiveRadiance += uSurfGlowColor * scenaGlow;
       }`
     );
 }
@@ -570,6 +664,16 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
     uSurfTileJitter: { value: p.tileJitter ?? 0.12 },
     uSurfMortarColor: { value: new Color(p.mortarColor ?? 0x3a3a3a) },
     uSurfTileRelief: { value: p.tileRelief ?? 0.06 },
+    // Snow/moss cap (uSurfCap 0 disables it).
+    uSurfCap: { value: p.cap ?? 0 },
+    uSurfCapColor: { value: new Color(p.capColor ?? 0xf2f6fa) },
+    uSurfCapUp: { value: p.capUp ?? 0.5 },
+    uSurfCapSharp: { value: p.capSharp ?? 0.28 },
+    uSurfCapRough: { value: p.capRough ?? 0.88 },
+    // Emissive glow (uSurfGlow 0 keeps it dark, day-cycle-safe).
+    uSurfGlow: { value: p.glow ?? 0 },
+    uSurfGlowColor: { value: new Color(p.glowColor ?? 0xff6a2a) },
+    uSurfGlowThresh: { value: p.glowThreshold ?? 0.45 },
   };
 
   material.onBeforeCompile = (shader) => {
