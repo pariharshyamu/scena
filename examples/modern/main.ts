@@ -10,9 +10,15 @@ import {
 } from 'three';
 import {
   applyFog,
+  createCladding,
   createDayCycle,
+  createGate,
   createGlass,
   createLightingRig,
+  createModernWindow,
+  createPergola,
+  createPlanter,
+  createRailing,
   createSky,
   createSurface,
   PALETTES,
@@ -92,6 +98,36 @@ pavilion.add(header);
 pavilion.position.set(1.5, 0, 5.5);
 scene.add(pavilion);
 
+// ---- the component strip: railings, gate, cladding, pergola -------------
+(['bars', 'cable', 'glass', 'panel'] as const).forEach((style, i) => {
+  const railing = createRailing({ style, length: 3.4, seed: 40 + i });
+  railing.object.position.set(-12.5 + i * 3.8, 0, 9.5);
+  scene.add(railing.object);
+});
+const gate = createGate({ style: 'slat', width: 3, open: 0.35, seed: 44, palette });
+gate.object.position.set(6.5, 0, 9.8);
+scene.add(gate.object);
+const win = createModernWindow({ style: 'sliding', width: 2.2, seed: 45 });
+win.object.position.set(12, 0, 6);
+scene.add(win.object);
+const cladA = createCladding({ style: 'slats', width: 2.6, seed: 46 });
+cladA.object.position.set(-16.5, 0, 2);
+cladA.object.rotation.y = 0.6;
+scene.add(cladA.object);
+const cladB = createCladding({ style: 'stone', width: 2.6, seed: 47 });
+cladB.object.position.set(-16.9, 0, 5.4);
+cladB.object.rotation.y = 0.6;
+scene.add(cladB.object);
+const pergola = createPergola({ seed: 48 });
+pergola.object.position.set(9.5, 0, 1.5);
+scene.add(pergola.object);
+[[-1.4, 0], [1.4, 0]].forEach(([dx, dz], i) => {
+  const planter = createPlanter({ seed: 50 + i, palette });
+  planter.object.position.set(9.5 + dx, 0, 1.5 + dz);
+  planter.object.rotation.y = Math.PI / 2;
+  scene.add(planter.object);
+});
+
 // The day cycle owns sun/sky/fog and adopts the glass as dusk-lit windows.
 const cycle = createDayCycle({
   sky, rig, scene,
@@ -106,8 +142,9 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
   if (!fixedT) cycle.update(dt);
   const e = clock.elapsedTime;
-  camera.position.set(Math.sin(e * 0.06) * 10, 3.4, 13 + Math.cos(e * 0.06) * 2);
-  camera.lookAt(0, 1.4, -2);
+  gate.setOpen(0.5 + 0.5 * Math.sin(e * 0.4)); // the gate swings on its own
+  camera.position.set(Math.sin(e * 0.06) * 12, 5.2, 16.5);
+  camera.lookAt(-1, 1.2, 0);
   renderer.render(scene, camera);
 });
 
@@ -128,6 +165,8 @@ window.modernDebug = (t?: number) => {
     floorSlabs: FLOOR_KINDS.length,
     paneOpacities: panes.map((p) => +p.opacity.toFixed(2)),
     paneEmissive: panes.map((p) => +p.emissiveIntensity.toFixed(2)),
+    slidingPane: win.pane.transparent,
+    railings: 4,
     drawCalls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
   };

@@ -45,6 +45,14 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createOven({ seed })` | baker's stone dome oven, ember-lit mouth, peel leaning on it; **self-animating** |
 | `createLoom({ seed })` | weaver's upright loom: warp threads, palette-dyed cloth on the frame |
 | `createCounter({ seed })` | taverner's bar: paneled base, foot rail, mugs & jug on top |
+| `createRailing({ seed, style, length })` | modern railing run: vertical `'bars'` / horizontal `'cable'` / frameless `'glass'` / laser-cut `'panel'` |
+| `createModernWindow({ seed, style, mullions })` | framed glazing, `'fixed'` grid or `'sliding'` leaves; exposes its `pane` for the day cycle |
+| `createGate({ seed, style, open, sliding })` | driveway gate between concrete pillars: `'slat'` / `'bars'` / `'panel'`; `setOpen(0..1)` swings or slides it |
+| `createCladding({ seed, style })` | facade accent: teak `'slats'`, angled `'louvers'`, or a `'stone'` feature panel |
+| `createPergola({ seed })` | teak posts, doubled beams, rafter slats; walk-through |
+| `createPlanter({ seed, length })` | corten trough with low greenery |
+
+The modern set (railing through planter) is themed by the [Tier-4 surfaces](surfaces.md#modern-machined) — brushed steel, powder-coat, teak, corten, concrete and `createGlass`. Window panes default to `nightGlow`, so a building listed in the day cycle's `lamps` lights its glazing at dusk; gate pillar lamps follow the same budget rule as street lamps.
 
 The last seven are the **cottage furniture set** — meant for a [`createRoom` interior](settlement.md#interiors-createroom), though nothing stops a market square from having a bench. Candles follow the lamp rule (glow is free, real lights are a budget) and their flames flicker on their own; a chandelier's origin is its ceiling hook, so position it at ceiling height and it hangs.
 

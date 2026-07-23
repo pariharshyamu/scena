@@ -208,6 +208,26 @@ export {
   createCounter,
   type WorkshopOptions,
 } from './props/workshop';
+export {
+  createRailing,
+  createModernWindow,
+  createGate,
+  createCladding,
+  createPergola,
+  createPlanter,
+  type RailingOptions,
+  type RailingStyle,
+  type ModernWindowOptions,
+  type ModernWindowStyle,
+  type ModernWindowProp,
+  type GateOptions,
+  type GateStyle,
+  type GateProp,
+  type CladdingOptions,
+  type CladdingStyle,
+  type PergolaOptions,
+  type PlanterOptions,
+} from './props/modern';
 
 // Scene assembly
 export {

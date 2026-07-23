@@ -831,7 +831,8 @@ game.start();`,
 // plus createGlass: fresnel panes with a built-in sky reflection that the
 // day cycle ignites warm at dusk. Change timeOfDay to 0.95 for night.
 import { createSurface, createGlass, createSky, createLightingRig, applyFog,
-         createDayCycle, PALETTES } from 'scena3d';
+         createDayCycle, createRailing, createGate, createPergola, createPlanter,
+         PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Mesh, Group, BoxGeometry, PlaneGeometry } from 'three';
 
@@ -883,12 +884,33 @@ const frame = createSurface('paintedMetal', { color: 0x2c3238 });
 pavilion.position.set(1.5, 0, 5.5);
 scene.add(pavilion);
 
-const cycle = createDayCycle({ sky, rig, scene, lamps: [pavilion], palette,
+// The component strip: four railing styles, a gate that swings itself,
+// a teak pergola flanked by corten planters.
+['bars', 'cable', 'glass', 'panel'].forEach((style, i) => {
+  const railing = createRailing({ style, length: 3.4, seed: 40 + i });
+  railing.object.position.set(-12.5 + i * 3.8, 0, 9.5);
+  scene.add(railing.object);
+});
+const gate = createGate({ style: 'slat', width: 3, seed: 44, palette });
+gate.object.position.set(6.5, 0, 9.8);
+scene.add(gate.object);
+const pergola = createPergola({ seed: 48 });
+pergola.object.position.set(9.5, 0, 1.5);
+scene.add(pergola.object);
+[-1.4, 1.4].forEach((dx, i) => {
+  const planter = createPlanter({ seed: 50 + i, palette });
+  planter.object.position.set(9.5 + dx, 0, 1.5);
+  planter.object.rotation.y = Math.PI / 2;
+  scene.add(planter.object);
+});
+
+const cycle = createDayCycle({ sky, rig, scene, lamps: [pavilion, gate.object], palette,
   dayLength: 40, timeOfDay: 0.42 });
 game.onUpdate((t) => {
   cycle.update(t.delta);
-  game.camera.position.set(Math.sin(t.elapsed * 0.06) * 10, 3.4, 13);
-  game.camera.lookAt(0, 1.4, -2);
+  gate.setOpen(0.5 + 0.5 * Math.sin(t.elapsed * 0.4));
+  game.camera.position.set(Math.sin(t.elapsed * 0.06) * 12, 5.2, 16.5);
+  game.camera.lookAt(-1, 1.2, 0);
 });
 game.start();`,
   },
