@@ -83,6 +83,65 @@ game.start();`,
   },
 
   {
+    id: 'wind',
+    title: 'Wind & swaying flora',
+    group: 'Worldbuilding',
+    code: `// One WindField makes the whole scene breathe: a wheat field ripples,
+// the trees ringing it lean their canopies, the bushes nod — all from the
+// SAME gust, which travels downwind so nothing sways in lockstep. The bend
+// is a vertex shader (PBR/shadows/fog survive) and it self-animates.
+import { createWindField, applyWind, createTree, createBush, createGrassTuft,
+         createSurface, createSky, createLightingRig, applyFog, scatter, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('golden-hour').group);
+applyFog(scene, 'haze', palette);
+const ground = new Mesh(new PlaneGeometry(180, 180), createSurface('dirt', { color: 0x7c8a52 }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+// One field drives everything — trees, wheat and bushes share the gust.
+const wind = createWindField({ direction: 28, strength: 0.42, gust: 0.75, waveLength: 4, waveSpeed: 2.6 });
+
+// A wheat field — dense golden blades; the tight wave reads as a ripple.
+const wheatPalette = { ...palette, grassHigh: 0xdcc063, grassLow: 0xc2a747,
+  foliage: [0xcbb24a, 0xdcc063, 0xc0a840, 0xd3bd58] };
+const wheat = scatter({
+  seed: 5, area: { min: { x: -13, z: -13 }, max: { x: 13, z: 13 } },
+  density: 3.0, minSpacing: 0.26,
+  items: [{ create: (r) => createGrassTuft({ seed: r.int(1, 1e9), blades: 7, palette: wheatPalette }), variants: 14 }],
+});
+scene.add(wheat.group);
+applyWind(wheat.group, { field: wind, height: 0.5, stiffness: 1.1, anchor: 0.03 });
+
+const trees = scatter({
+  seed: 8, area: { min: { x: -26, z: -26 }, max: { x: 26, z: 26 } },
+  density: 0.04, minSpacing: 3,
+  items: [{ create: (r) => createTree({ seed: r.int(1, 1e9), palette }), variants: 6 }],
+  mask: (x, z) => Math.hypot(x, z) > 17,
+});
+scene.add(trees.group);
+applyWind(trees.group, { field: wind, height: 4, stiffness: 2.4, anchor: 1 });
+
+for (let i = 0; i < 6; i++) {                         // bushes, wind straight from the generator
+  const b = createBush({ seed: 40 + i, wind, palette });
+  const a = (i / 6) * Math.PI * 2;
+  b.object.position.set(Math.cos(a) * 15.5, 0, Math.sin(a) * 15.5);
+  scene.add(b.object);
+}
+
+game.onUpdate((t) => {
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.sin(a) * 15, 4, 17);
+  game.camera.lookAt(0, 0.8, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'lod',
     title: 'Scatter LOD tiles',
     group: 'Worldbuilding',
@@ -638,7 +697,7 @@ const green = scatter({
 });
 scene.add(green.group);
 
-const wind = applyWind(green.group, { strength: 0.08 });
+const wind = applyWind(green.group, { strength: 0.3, height: 3, anchor: 0.3 });
 const cycle = createDayCycle({ sky, rig, scene, palette, dayLength: 24 });
 game.onUpdate((t) => { water.update(t.delta); wind.update(t.delta); cycle.update(t.delta); });
 

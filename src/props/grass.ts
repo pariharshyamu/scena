@@ -1,12 +1,15 @@
 import { ConeGeometry, Group, IcosahedronGeometry, Mesh, MeshStandardMaterial } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
+import type { WindField } from '../environment/wind';
 import type { Prop } from '../core/types';
 
 export interface GrassOptions {
   seed?: number;
   /** Blades per tuft. Default 4–6 by seed. */
   blades?: number;
+  /** A WindField to sway the blades in. */
+  wind?: WindField;
   palette?: Palette;
 }
 
@@ -31,12 +34,16 @@ export function createGrassTuft(options: GrassOptions = {}): Prop {
     blade.rotation.set(rng.range(-0.25, 0.25), rng.range(0, Math.PI), rng.range(-0.25, 0.25));
     group.add(blade);
   }
+  // Whole-blade sway from near the base (soft, stiffness ~1.2).
+  if (options.wind) options.wind.sway(group, { height: 0.5, stiffness: 1.2, anchor: 0.04 });
   return { object: group, obstacleRadius: 0 };
 }
 
 export interface BushOptions {
   seed?: number;
   size?: number;
+  /** A WindField to gently sway the foliage in. */
+  wind?: WindField;
   palette?: Palette;
 }
 
@@ -57,5 +64,7 @@ export function createBush(options: BushOptions = {}): Prop {
     blob.rotation.y = rng.range(0, Math.PI);
     group.add(blob);
   }
+  // Gentle, stiff sway — a bush barely nods.
+  if (options.wind) options.wind.sway(group, { height: size, stiffness: 2.2, anchor: size * 0.25 });
   return { object: group, obstacleRadius: size * 0.6 };
 }

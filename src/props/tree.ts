@@ -8,6 +8,7 @@ import {
 } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
+import type { WindField } from '../environment/wind';
 import type { Prop } from '../core/types';
 
 export interface TreeOptions {
@@ -15,6 +16,8 @@ export interface TreeOptions {
   /** Overall height in world units. Default ~3.5–5 by seed. */
   height?: number;
   style?: 'pine' | 'oak';
+  /** A WindField to sway the canopy in (the trunk stays planted). */
+  wind?: WindField;
   palette?: Palette;
 }
 
@@ -73,6 +76,14 @@ export function createTree(options: TreeOptions = {}): Prop {
       blob.rotation.set(rng.range(0, Math.PI), rng.range(0, Math.PI), 0);
       group.add(blob);
     }
+  }
+
+  // Only the canopy sways — the trunk material is left unbound, so it stays
+  // planted. (For a scattered forest, prefer applyWind(forest.group), which
+  // drives the shared clock from the rendered InstancedMesh.)
+  if (options.wind) {
+    options.wind.bind(foliageMaterial, { height, stiffness: 2.4, anchor: height * 0.22 });
+    options.wind.attach(group);
   }
 
   return { object: group, obstacleRadius: style === 'pine' ? 0.5 : 0.6 };

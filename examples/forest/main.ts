@@ -107,13 +107,10 @@ const grass = scatter({
 });
 scene.add(grass.group);
 
-// --- Wind over everything green.
-const wind = applyWind(forest.group, { strength: 0.05 });
-const grassWind = applyWind(grass.group, { strength: 0.1, anchorHeight: 0 });
-game.onUpdate((t) => {
-  wind.update(t.delta);
-  grassWind.update(t.delta);
-});
+// --- Wind over everything green: one shared field, so canopies and grass
+// lean with the same gust travelling across the whole wood.
+const wind = applyWind(forest.group, { strength: 0.3, height: 4, anchor: 1 });
+applyWind(grass.group, { field: wind, height: 0.5, stiffness: 1.2, anchor: 0.03 });
 
 // --- Life (GAMA): wardens patrol THE ROAD (its route is their Path),
 // dodging trees and village buildings via prop obstacle metadata.

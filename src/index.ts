@@ -87,7 +87,15 @@ export {
 } from './environment/lighting';
 export { createWater, aboveWater, type Water, type WaterOptions } from './environment/water';
 export { createDayCycle, type DayCycle, type DayCycleOptions } from './environment/dayCycle';
-export { applyWind, type Wind, type WindOptions } from './environment/wind';
+export {
+  createWindField,
+  applyWind,
+  type WindField,
+  type WindFieldOptions,
+  type SwayOptions,
+  type Wind,
+  type WindOptions,
+} from './environment/wind';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
 
 // Generators
