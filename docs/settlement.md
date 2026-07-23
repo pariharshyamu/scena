@@ -101,3 +101,33 @@ game.onUpdate(() => light.update());                    // dawn: east shafts; du
 Bind a [`createDayCycle`](./environment.md) via `cycle` and the sun swings east to west through the day, shafts dying at dusk exactly as the hearth's flicker takes over; or aim it by hand with `setSun({ elevation, azimuth })`. None of it costs real lights — shafts, pools and dust are a few additive quads, so the only `PointLight`s in a room remain the ones the room budgeted (hearth, torches).
 
 The light rig attaches itself to `room.group` (shafts are room-local), so `setActive(false)` hides it too.
+
+### Furnishing: furnishRoom
+
+`furnishRoom(room, { role })` dresses an interior for a job, using the room's own grid: beds and shelves settle against walls facing inward, tables take the middle (the rug, if the map laid one), seats gather round, and the role's **trade utility** anchors the room. Doorways stay clear, nothing overlaps, and the same seed always furnishes the same way.
+
+| `role` | The room gets |
+|---|---|
+| `cottage` | bed + chest at its foot, round table & seats, stocked shelf, runner rug |
+| `tavern` | bar `createCounter` (mugs and jug on top), trestle + round tables with seats, pottery shelf, wall bench, candelabra |
+| `smithy` | `createForge` (burning coal bed, anvil on a stump, quench barrel), workbench, chest, crate, stool |
+| `bakery` | `createOven` (ember-lit dome, peel leaning on it), counter, food shelf, table |
+| `weaver` | `createLoom` (warp threads, cloth on the frame), stool at it, shelf, chest, rug |
+| `study` | two book walls, desk + chair, candelabra, round rug |
+| `barracks` | up to three beds with foot chests, a center bench |
+
+The forge, oven, loom and counter are ordinary props too (`WorkshopOptions`), if you'd rather compose by hand.
+
+**The payoff is for agents.** `furnishRoom` returns room-local `obstacles` (feed GAMA steering) and `markers` — named points a character can walk to and *use*:
+
+```js
+const tavern = furnishRoom(room, { role: 'tavern', seed: 4 });
+tavern.markers.sit     // one per seat — chairs, stools, bench places
+tavern.markers.sleep   // one per bed deck
+tavern.markers.work    // in front of the forge / oven / loom / counter / desk
+tavern.markers.hearth  // a spot to warm hands at each fireplace
+
+guest.walkTo(room.group.localToWorld(tavern.markers.sit[0].clone()));
+```
+
+That's the bridge to ANIMA: spawn villagers, hand each a marker, and the room is inhabited — drinkers at the benches, the smith at the anvil, someone dozing in the corner bunk.

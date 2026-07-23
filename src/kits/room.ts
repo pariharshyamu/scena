@@ -65,6 +65,10 @@ export interface Room {
   hearths: RoomHearth[];
   /** Centers of '~' rug cells (a woven rug is already laid on each). */
   rugs: Vector3[];
+  /** Centers of 'D' doorway cells — `furnishRoom` keeps them clear. */
+  doors: Vector3[];
+  /** The grid cell size this room was built on. */
+  unit: number;
   /** Is (x, z) over a walkable floor cell? */
   floorAt(x: number, z: number): boolean;
   /** Footprint in world units: { width, depth } centered on the origin. */
@@ -137,6 +141,7 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
   const windows: RoomWindow[] = [];
   const hearths: RoomHearth[] = [];
   const rugs: Vector3[] = [];
+  const doors: Vector3[] = [];
   const floorCells = new Set<string>();
   const lights: PointLight[] = [];
 
@@ -220,6 +225,7 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
       if (row % 2 === 0) beamCells.push({ x, z });
 
       if (cell === 'D') {
+        doors.push(new Vector3(x, 0, z));
         const horizontalRun = cellAt(col - 1, row) === '#' || cellAt(col + 1, row) === '#';
         const lintel = new Mesh(
           new BoxGeometry(
@@ -274,6 +280,8 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
     windows,
     hearths,
     rugs,
+    doors,
+    unit,
     floorAt(x, z) {
       const col = Math.round((x - originX) / unit);
       const row = Math.round((z - originZ) / unit);

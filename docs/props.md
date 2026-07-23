@@ -41,6 +41,10 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createChest({ seed, open })` | banded storage chest; `open` tilts the lid |
 | `createCandle({ seed, style, light })` | `'single'` / standing `'candelabra'` / hanging `'chandelier'`; flickering glow free, `light: true` adds the real `PointLight` |
 | `createRug({ seed, shape })` | woven `'round'` / `'square'` / `'runner'`; walk-through (`obstacleRadius` 0) |
+| `createForge({ seed, light })` | smith's coal forge + anvil on a stump + quench barrel; coals glow & flicker, **self-animating** |
+| `createOven({ seed })` | baker's stone dome oven, ember-lit mouth, peel leaning on it; **self-animating** |
+| `createLoom({ seed })` | weaver's upright loom: warp threads, palette-dyed cloth on the frame |
+| `createCounter({ seed })` | taverner's bar: paneled base, foot rail, mugs & jug on top |
 
 The last seven are the **cottage furniture set** — meant for a [`createRoom` interior](settlement.md#interiors-createroom), though nothing stops a market square from having a bench. Candles follow the lamp rule (glow is free, real lights are a budget) and their flames flicker on their own; a chandelier's origin is its ceiling hook, so position it at ceiling height and it hangs.
 

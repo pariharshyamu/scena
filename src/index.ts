@@ -193,6 +193,20 @@ export {
   type InteriorLightOptions,
   type InteriorSun,
 } from './environment/interiorLight';
+export {
+  furnishRoom,
+  type Furnished,
+  type FurnishOptions,
+  type RoomRole,
+  type RoomMarkers,
+} from './kits/furnish';
+export {
+  createForge,
+  createOven,
+  createLoom,
+  createCounter,
+  type WorkshopOptions,
+} from './props/workshop';
 
 // Scene assembly
 export {

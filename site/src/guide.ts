@@ -74,6 +74,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'kits-ascii-architecture': 'kit',
   'interiors-createroom': 'interior',
   'daylight-createinteriorlight': 'interior',
+  'furnishing-furnishroom': 'interior',
   'buildscene-a-world-from-json': 'manifest',
   'steering-around-props': 'path',
 };

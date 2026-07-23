@@ -1,20 +1,9 @@
 import { Clock, Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
-import {
-  createBed,
-  createCandle,
-  createChest,
-  createInteriorLight,
-  createRoom,
-  createRug,
-  createSeat,
-  createShelf,
-  createTable,
-  PALETTES,
-  type Prop,
-} from 'scena3d';
+import { createInteriorLight, createRoom, furnishRoom, PALETTES, type RoomRole } from 'scena3d';
 
 const params = new URLSearchParams(location.search);
 const pinned = params.get('t') !== null ? Number(params.get('t')) : null;
+const role = (params.get('role') as RoomRole) ?? 'cottage';
 const palette = PALETTES.meadow;
 
 const scene = new Scene();
@@ -31,37 +20,21 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// A one-room cottage: hearth on the north wall, windows east and west, a rug
-// in the middle and the door opening south.
+// A one-room interior: hearth on the north wall, windows east/west and by the
+// door. furnishRoom dresses it for the role in the URL (?role=tavern etc).
 const room = createRoom(
   [
-    '##H####',
-    '#.....#',
-    'W..~..W',
-    '#.....#',
-    '#T.S..#',
-    '##WDW##',
+    '##H######',
+    '#.......#',
+    'W...~...W',
+    '#.......#',
+    '#.......#',
+    '##WDW####',
   ],
   { seed: 11, palette }
 );
 scene.add(room.group);
-
-// Furnish it: the cottage set, placed by hand (furnishRoom automates this).
-const place = (prop: Prop, x: number, z: number, rotate = 0): void => {
-  prop.object.position.set(x, 0, z);
-  prop.object.rotation.y = rotate;
-  room.group.add(prop.object);
-};
-place(createTable({ seed: 21, style: 'trestle', palette }), 0.2, 0.1, 0.12);
-place(createSeat({ seed: 22, style: 'chair', palette }), 0.2, 1.2, Math.PI);
-place(createSeat({ seed: 23, style: 'stool', palette }), -1.1, 0.2, 0);
-place(createBed({ seed: 24, size: 'single', palette }), -2.2, -2.4, Math.PI / 2);
-place(createChest({ seed: 25, palette }), -0.4, -3.0, 0);
-place(createShelf({ seed: 26, stock: 'books', palette }), 2.6, -3.6, 0);
-place(createRug({ seed: 27, shape: 'runner', palette }), 0.4, -2.5, 0);
-const candle = createCandle({ seed: 28, style: 'single', palette });
-candle.object.position.set(0.5, 0.78, 0.1); // on the table
-room.group.add(candle.object);
+const furnished = furnishRoom(room, { role, seed: 6, palette });
 
 // Daylight: a fake day cycle the demo drives, swinging the sun east → west.
 const cycle = { sunElevation: 1, timeOfDay: 0.5 };
@@ -84,8 +57,8 @@ renderer.setAnimationLoop(() => {
     setTime(day);
   }
   const t = clock.elapsedTime;
-  camera.position.set(0.6 + Math.sin(t * 0.13) * 0.5, 1.9, 3.6);
-  camera.lookAt(Math.sin(t * 0.09) * 0.8, 1.15, -3.5);
+  camera.position.set(0.8 + Math.sin(t * 0.13) * 0.6, 2.0, 3.7);
+  camera.lookAt(Math.sin(t * 0.09) * 0.9, 1.1, -3.5);
   renderer.render(scene, camera);
 });
 
@@ -108,6 +81,7 @@ window.interiorDebug = (t?: number) => {
   });
   return {
     glError: gl.getError(),
+    role,
     timeOfDay: cycle.timeOfDay,
     sunElevation: Number(cycle.sunElevation.toFixed(3)),
     windows: room.windows.length,
@@ -117,6 +91,14 @@ window.interiorDebug = (t?: number) => {
     paneIntensity: Number(room.windows[0].pane.emissiveIntensity.toFixed(3)),
     hemisphere: Number(light.hemisphere.intensity.toFixed(3)),
     obstacles: room.obstacles.length,
+    furniture: furnished.props.length,
+    furnitureObstacles: furnished.obstacles.length,
+    markers: {
+      sit: furnished.markers.sit.length,
+      sleep: furnished.markers.sleep.length,
+      work: furnished.markers.work.length,
+      hearth: furnished.markers.hearth.length,
+    },
     drawCalls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
   };

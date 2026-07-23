@@ -1177,12 +1177,14 @@ game.start();`,
 // floorboards under a beamed ceiling, windows that know which way they
 // face, and a burning hearth — while createInteriorLight pours dusty
 // daylight shafts through the sun-facing windows, swinging east to west
-// as the day cycles. Furnished from the cottage set; the only real
-// lights are the hearth's flicker (and the free-glowing candle).
-import { createRoom, createInteriorLight, createTable, createSeat, createBed,
-         createShelf, createChest, createCandle, createRug, PALETTES } from 'scena3d';
+// as the day cycles. furnishRoom then dresses it for a role and returns
+// sit/sleep/work/hearth markers for agents. Try role = 'tavern',
+// 'smithy', 'bakery', 'weaver', 'study' or 'barracks'.
+import { createRoom, createInteriorLight, furnishRoom, PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
 import { Color } from 'three';
+
+const role = 'cottage';
 
 const palette = PALETTES.meadow;
 const game = new Game();
@@ -1190,31 +1192,19 @@ const scene = game.world.scene;
 scene.background = new Color(0x0a0d13);
 
 const room = createRoom([
-  '##H####',
-  '#.....#',
-  'W..~..W',
-  '#.....#',
-  '#T....#',
-  '##WDW##',
+  '##H######',
+  '#.......#',
+  'W...~...W',
+  '#.......#',
+  '#.......#',
+  '##WDW####',
 ], { seed: 11, palette });
 scene.add(room.group);
 
-// Furnish it (furnishRoom will automate this).
-const place = (prop, x, z, ry = 0) => {
-  prop.object.position.set(x, 0, z);
-  prop.object.rotation.y = ry;
-  room.group.add(prop.object);
-};
-place(createTable({ seed: 21, style: 'trestle', palette }), 0.2, 0.1, 0.12);
-place(createSeat({ seed: 22, style: 'chair', palette }), 0.2, 1.2, Math.PI);
-place(createSeat({ seed: 23, style: 'stool', palette }), -1.1, 0.2);
-place(createBed({ seed: 24, size: 'single', palette }), -2.2, -2.4, Math.PI / 2);
-place(createChest({ seed: 25, palette }), -0.4, -3.0);
-place(createShelf({ seed: 26, stock: 'books', palette }), 2.6, -3.6);
-place(createRug({ seed: 27, shape: 'runner', palette }), 0.4, -2.5);
-const candle = createCandle({ seed: 28, palette });
-candle.object.position.set(0.5, 0.78, 0.1);      // on the table
-room.group.add(candle.object);
+const furnished = furnishRoom(room, { role, seed: 6, palette });
+console.log(role, '· furniture:', furnished.props.length,
+  '· markers:', Object.entries(furnished.markers)
+    .map(([k, v]) => k + ':' + v.length).join(' '));
 
 // A little day the demo drives: sun east at dawn, west at dusk.
 const cycle = { sunElevation: 1, timeOfDay: 0.5 };
