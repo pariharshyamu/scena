@@ -65,6 +65,14 @@ export {
   type CarryableOptions,
   type LanternOptions,
 } from './props/carryables';
+export {
+  createChoppingBlock,
+  createOreVein,
+  createCookpot,
+  createSawhorse,
+  type WorkStation,
+  type WorkStationOptions,
+} from './props/workstations';
 export { createFence, type FenceOptions } from './props/fence';
 export { createLamp, type LampOptions } from './props/lamp';
 export { createGrassTuft, createBush, type GrassOptions, type BushOptions } from './props/grass';

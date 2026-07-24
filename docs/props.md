@@ -99,6 +99,20 @@ carry.putDown({ at: cart });   // set it down — or hand to GAMA's throwObject
 
 Four **carry styles** map a thing to a pose: `crate` (hugged to the chest — crates, barrels), `tray` (out at the belly), `shoulder` (hoisted up — sacks), and `side` (hanging from one hand — baskets, lanterns; the free arm keeps swinging). Origins sit at the base so carryables also **place on the ground** like any prop; `grip` offsets the *hold point* into the body so the hands land right — the GRIPS idea again, no runtime IK. The lantern's glass is emissive (free glow; add a real light with the lamp budget). See the **carryables** example — a porter loads a crate onto a cart and hands off a sack.
 
+## Work stations
+
+Stations built to be *worked over time*, producing something. `createChoppingBlock`, `createOreVein`, `createCookpot` and `createSawhorse` are `WorkStation`s: a `work` slot, a held **tool**, a particle burst (chips / sparks+dust / steam / sawdust), a `progress` (0→1) and an `onYield` that fires once per cycle. Drive it each frame:
+
+```ts
+const block = createChoppingBlock();
+attach(rig, 'handRight', block.tool);                            // ANIMA holds the axe
+const swing = loco.overlay(createLoopClip(rig, block.action));   // the chop, layered over idle
+block.onYield = () => stock.add('wood');                         // GAMA counts the logs
+game.onUpdate((t) => block.update(t.delta, working));            // effects + progress + yield
+```
+
+`action` is the ANIMA loop the worker plays — `chop`, `mine`, `saw`, `stir` — layered over the **idle** stance so the loop owns the arms (don't fight it with a held pose). `update(dt, working)` only advances (and throws its burst, and yields) while `working`, so `progress` and the effects gate on the worker actually being there. Wire `onYield` into GAMA's `Stockpile` and a HUD to close the gathering loop. See the **work stations** example — one worker chops, mines, saws and stirs a full round.
+
 ## Tree species
 
 `createTree` builds thirteen seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
