@@ -351,7 +351,7 @@ export function createCookpot(options: WorkStationOptions = {}): WorkStation {
   group.add(steam.mesh);
 
   const core = drive('stir', 1.3, 0.5, () => steam.emit(6), [steam]);
-  return finish(group, 0.5, workSlot('stir', group, 0, 0.62, Math.PI), makeLadle(seed), core);
+  return finish(group, 0.5, workSlot('stir', group, 0, 0.46, Math.PI), makeLadle(seed), core);
 }
 
 /** A sawhorse with a plank being cut, a hand-saw, and falling sawdust. */
