@@ -87,6 +87,18 @@ game.onUpdate((t) => door.update(t.delta));  // eases the joint toward the targe
 
 `state` is the live eased position (0 = closed/rest, 1 = open/actuated); `open` is the boolean target; `set(0.5 | true | false)` drives it to a partial or full target. The shape is **structurally identical to GAMA's `Mechanism`**, so GAMA's `Interactable` (walk-up + press to operate, or an automatic door), `Trigger` (pressure plates) and `linkMechanism` (a lever that raises a portcullis) drive them with no cross-imports. The work stations — lever, valve, drawer, hatch — publish an `operate` slot (ANIMA's floor-level anchor) so a character stands at them; doors and portcullises are pass-through. Pair with ANIMA's `Gesture` + `createReachClip` so the hand and the mechanism move together. See the **manipulables** example: a keeper throws a lever, the linked portcullis rises, an automatic door opens on approach, and a chest is opened.
 
+## Carryables
+
+Manipulables react in place; **carryables** get picked up and hauled. `createCrate`, `createBarrel`, `createBasket`, `createSack` and `createLantern` return a `Carryable` — a `Prop` plus a `carry` style and a hold-point `grip` — structurally identical to ANIMA's `Holdable`, so they drop into `new Carry(rig, loco).pickUp(createBarrel())` with no cross-imports:
+
+```ts
+const carry = new Carry(rig, loco);
+carry.pickUp(createCrate());   // hoisted to the chest, carried while walking
+carry.putDown({ at: cart });   // set it down — or hand to GAMA's throwObject
+```
+
+Four **carry styles** map a thing to a pose: `crate` (hugged to the chest — crates, barrels), `tray` (out at the belly), `shoulder` (hoisted up — sacks), and `side` (hanging from one hand — baskets, lanterns; the free arm keeps swinging). Origins sit at the base so carryables also **place on the ground** like any prop; `grip` offsets the *hold point* into the body so the hands land right — the GRIPS idea again, no runtime IK. The lantern's glass is emissive (free glow; add a real light with the lamp budget). See the **carryables** example — a porter loads a crate onto a cart and hands off a sack.
+
 ## Tree species
 
 `createTree` builds thirteen seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.

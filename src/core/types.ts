@@ -28,6 +28,23 @@ export interface PropSlot {
   loop?: string;
 }
 
+/** How a character holds a carryable — structurally ANIMA's `CarryStyle`. */
+export type CarryStyle = 'crate' | 'tray' | 'shoulder' | 'side';
+
+/**
+ * A prop a character can pick up and carry. Structurally identical to ANIMA's
+ * `Holdable`, so a SCENA crate drops into `new Carry(rig, loco).pickUp(crate)`
+ * with no cross-imports. The object's origin stays at its base (natural for
+ * ground placement); `grip` offsets the *hold point* — where it rides in the
+ * hands — from that origin.
+ */
+export interface Carryable extends Prop {
+  /** The carry pose the holder adopts. */
+  carry: CarryStyle;
+  /** Hold-point offset from the object's origin (metres). */
+  grip?: { x?: number; y?: number; z?: number };
+}
+
 /** What a prop generator returns: the visual plus gameplay metadata. */
 export interface Prop {
   object: Group;

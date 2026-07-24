@@ -6,7 +6,15 @@
 // Core
 export { Rng, valueNoise2, fractalNoise2, hash2 } from './core/random';
 export { PALETTES, DEFAULT_PALETTE, type Palette } from './core/palette';
-export { collectObstacles, createSlot, type Obstacle, type Prop, type PropSlot } from './core/types';
+export {
+  collectObstacles,
+  createSlot,
+  type Obstacle,
+  type Prop,
+  type PropSlot,
+  type Carryable,
+  type CarryStyle,
+} from './core/types';
 
 // Materials
 export {
@@ -49,6 +57,14 @@ export {
 } from './props/impostor';
 export { createRock, type RockOptions } from './props/rock';
 export { createCrate, type CrateOptions } from './props/crate';
+export {
+  createBarrel,
+  createBasket,
+  createSack,
+  createLantern,
+  type CarryableOptions,
+  type LanternOptions,
+} from './props/carryables';
 export { createFence, type FenceOptions } from './props/fence';
 export { createLamp, type LampOptions } from './props/lamp';
 export { createGrassTuft, createBush, type GrassOptions, type BushOptions } from './props/grass';

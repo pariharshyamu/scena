@@ -2,7 +2,7 @@ import { BoxGeometry, Group, Mesh } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
-import type { Prop } from '../core/types';
+import type { Carryable } from '../core/types';
 
 export interface CrateOptions {
   seed?: number;
@@ -12,8 +12,12 @@ export interface CrateOptions {
   palette?: Palette;
 }
 
-/** A wooden crate: panel box with darker edge framing, seeded wear tint. */
-export function createCrate(options: CrateOptions = {}): Prop {
+/**
+ * A wooden crate: panel box with darker edge framing, seeded wear tint. It's
+ * a **carryable** — hand it to ANIMA's `Carry` and a character hoists it to
+ * the chest (`carry: 'crate'`), the hold point offset to the box's centre.
+ */
+export function createCrate(options: CrateOptions = {}): Carryable {
   const rng = new Rng(options.seed ?? 1);
   const palette = options.palette ?? DEFAULT_PALETTE;
   const size = options.size ?? 1;
@@ -53,5 +57,10 @@ export function createCrate(options: CrateOptions = {}): Prop {
   }
   group.rotation.y = rng.range(0, Math.PI / 2);
 
-  return { object: group, obstacleRadius: size * 0.75 };
+  return {
+    object: group,
+    obstacleRadius: size * 0.75,
+    carry: 'crate',
+    grip: { y: -size / 2 }, // origin is the base; hold it at the centre
+  };
 }
