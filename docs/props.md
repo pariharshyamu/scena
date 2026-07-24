@@ -55,6 +55,10 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createGuitar({ seed, color })` | acoustic guitar sized to ANIMA's `GRIPS.guitar` — play it (strum loop) or lean it as décor |
 | `createToilet({ seed })` / `createSink` / `createBathtub` | the ceramic bathroom set; toilet has a `sit` slot, the tub a `soak` slot (the sleep pose, reclined) |
 
+## Vehicles
+
+`createCar`, `createBike`, `createTractor` and `createTruck` are props with **running gear**: `vehicle.update(dt, { speed, steer })` spins every wheel radius-correctly, yaws the front wheels, twirls the steering wheel, cranks the bike's pedals and leans it into turns. GAMA output plugs straight in — speed from `agent.velocity.length()`, steer from the heading change. Each publishes GRIPS-conformant `slots` (`driver`/`passenger` with the `drive`/`sit` poses; the bike's `rider` uses `cycle`), so an ANIMA character drops into the seat and their hands land on the wheel by construction. See the **vehicles** example for the running gear lapping a court.
+
 ## Interaction slots
 
 Props a character can *use* publish **`slots`** — `{ kind, anchor, pose, loop? }`, structurally identical to ANIMA's `InteractionSlot`, so they drop straight into `new Interaction(rig, loco).use(prop.slots[0])` with no cross-imports. Anchors are children of the prop (position the prop, the slot follows), at floor level, `+z` facing, pitched flat for lying poses. Today's slot carriers: **seats** (`sit` — benches seat two), **beds** (`sleep` — doubles and bunks sleep two), the **treadmill** (`run`: snap to the deck and drive `Locomotion` with `treadmill.speed`), the **toilet** (`sit`) and the **bathtub** (`soak`). Build your own with `createSlot(...)`.

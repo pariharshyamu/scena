@@ -226,6 +226,15 @@ export {
   type BathroomOptions,
 } from './props/stations';
 export {
+  createCar,
+  createBike,
+  createTractor,
+  createTruck,
+  type VehicleOptions,
+  type VehicleInput,
+  type VehicleProp,
+} from './props/vehicles';
+export {
   createRailing,
   createModernWindow,
   createGate,
