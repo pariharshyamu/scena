@@ -9,11 +9,13 @@ export { PALETTES, DEFAULT_PALETTE, type Palette } from './core/palette';
 export {
   collectObstacles,
   createSlot,
+  addApproach,
   type Obstacle,
   type Prop,
   type PropSlot,
   type Carryable,
   type CarryStyle,
+  type Gathering,
 } from './core/types';
 
 // Materials
@@ -118,6 +120,20 @@ export {
   type RugOptions,
   type RugShape,
 } from './props/furniture';
+export {
+  createDiningTable,
+  createPicnicTable,
+  createLongBench,
+  createGameTable,
+  createCampCircle,
+  type GatheringOptions,
+  type DiningTableOptions,
+  type PicnicTableOptions,
+  type LongBenchOptions,
+  type GameTableOptions,
+  type CampCircleOptions,
+  type BoardGame,
+} from './props/gatherings';
 export { createBunting, type BuntingOptions } from './props/bunting';
 export { createFountain, type FountainOptions } from './props/fountain';
 export {

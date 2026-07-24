@@ -26,6 +26,13 @@ export interface PropSlot {
   pose: string;
   /** Optional arms loop ('strum', 'hammer', 'knead'). */
   loop?: string;
+  /**
+   * Where a character should *stand* before taking the slot — beside the
+   * chair, not on it. Nobody materialises into a seat: they walk here, turn,
+   * then lower. ANIMA's `Interaction.use(slot, { approach: true })` reads it
+   * to stage the sit; steering agents path to it rather than to the anchor.
+   */
+  approach?: Object3D;
 }
 
 /** How a character holds a carryable — structurally ANIMA's `CarryStyle`. */
@@ -57,6 +64,19 @@ export interface Prop {
   slots?: PropSlot[];
 }
 
+/**
+ * A prop several characters use *together* — a dining table, a bench, a
+ * game board. Beyond the seats it publishes a **focus**: the thing the
+ * occupants attend to. Point every sitter's gaze at it and a row of bodies
+ * becomes a group; without it they are strangers who happen to be adjacent.
+ */
+export interface Gathering extends Prop {
+  /** The places, in a stable order — index 0 is the head of the table. */
+  seats: PropSlot[];
+  /** What the occupants look at: table centre, game board, campfire. */
+  focus: Object3D;
+}
+
 /** Build a slot: an anchor Object3D parented into the prop at (x, y, z). */
 export function createSlot(
   kind: string,
@@ -74,6 +94,38 @@ export function createSlot(
   anchor.rotation.set(rotX, rotY, 0);
   parent.add(anchor);
   return { kind, anchor, pose };
+}
+
+/**
+ * Give a slot its standing-room-before: an approach anchor `distance` metres
+ * from the seat, facing the same way. The character walks here, turns, and
+ * lowers backwards into the slot — which is how sitting actually works.
+ *
+ * `from` picks the side the character comes at it from, and it must be the
+ * side that is *open*. A dining chair is approached from behind (the table
+ * is in front of it); a park bench is approached from the front (the
+ * backrest is behind it). Get this backwards and characters walk through
+ * the furniture to reach their seats.
+ */
+export function addApproach(
+  slot: PropSlot,
+  parent: Group,
+  distance = 0.7,
+  from: 'behind' | 'front' = 'behind'
+): PropSlot {
+  const anchor = new Object3D();
+  anchor.name = `approach:${slot.kind}`;
+  const rotY = slot.anchor.rotation.y;
+  const sign = from === 'front' ? 1 : -1;
+  anchor.position.set(
+    slot.anchor.position.x + Math.sin(rotY) * distance * sign,
+    slot.anchor.position.y,
+    slot.anchor.position.z + Math.cos(rotY) * distance * sign
+  );
+  anchor.rotation.y = rotY;
+  parent.add(anchor);
+  slot.approach = anchor;
+  return slot;
 }
 
 /** Collect world-space obstacles from placed props (call after positioning). */

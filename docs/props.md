@@ -113,6 +113,26 @@ game.onUpdate((t) => block.update(t.delta, working));            // effects + pr
 
 `action` is the ANIMA loop the worker plays — `chop`, `mine`, `saw`, `stir` — layered over the **idle** stance so the loop owns the arms (don't fight it with a held pose). `update(dt, working)` only advances (and throws its burst, and yields) while `working`, so `progress` and the effects gate on the worker actually being there. Wire `onYield` into GAMA's `Stockpile` and a HUD to close the gathering loop. See the **work stations** example — one worker chops, mines, saws and stirs a full round.
 
+## Gatherings
+
+Work stations serve one worker. **Gatherings** serve several people at once — `createDiningTable`, `createPicnicTable`, `createLongBench`, `createGameTable` and `createCampCircle` return a `Gathering`: a `Prop` plus **`seats`** (its slots, in a stable order) and a **`focus`** (what the occupants attend to).
+
+```ts
+const table = createDiningTable({ seats: 6, style: 'round' });
+const seating = new Occupancy(table.seats);       // GAMA decides who sits where
+agent.moveTo(seat.approach ?? seat.anchor);       // walk to the spot BESIDE it
+interaction.use(seat);                            // ANIMA stages the sit
+gaze.target = table.focus;                        // …and the group has a centre
+```
+
+Three details carry more weight here than the geometry does:
+
+- **`focus` is what makes a group a group.** Point every sitter's gaze at it — or hand it to ANIMA's `Conversation` — and a row of adjacent bodies becomes company. Without it they are strangers who happen to be near one another. It is the shared dish, the board, the fire, or (for a bench) the view.
+- **Every seat has an `approach`.** A slot's `approach` anchor stands a pace off the seat, on the side that is *open*: behind a dining chair (the table blocks the front), in front of a park bench (the backrest blocks the rear). Characters walk *there*, then turn and lower — nobody materialises into a chair. `addApproach(slot, parent, distance, from)` adds one to slots of your own; get the side wrong and characters walk through the furniture to reach their seats.
+- **Nothing is square.** Every chair is nudged off its ideal angle and pushed back a different amount, and the seat slot inherits that crookedness, so the sitters land crooked too. One seeded radian of it does more for a dining room than another thousand triangles — real chairs are never quite where they were left.
+
+`createGameTable` takes `game: 'chess' | 'cards' | 'dice'` and always seats exactly two, facing each other across the board (the chess set is laid out mid-game, with losses). `createCampCircle` rings a fire pit with felled logs — gappy and uneven, because a ring of seats never closes — and its `focus` is already aimed where the flames go, so a `createCampfire` at the origin completes it. See the **gatherings** example.
+
 ## Tree species
 
 `createTree` builds thirteen seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.
