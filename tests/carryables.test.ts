@@ -37,6 +37,16 @@ describe('carryables', () => {
     expect(Math.abs(barrel.grip!.y!)).toBeLessThan(box.max.y);
   });
 
+  it('front-hug carryables push the hold point forward so they clear the body', () => {
+    // Without a forward grip the box would ride centred ON the chest and merge
+    // with the torso; grip.z pushes it out in front (roughly half its depth).
+    for (const c of [createCrate({ size: 0.6 }), createBarrel()]) {
+      expect(c.carry).toBe('crate');
+      expect(c.grip!.z).toBeGreaterThan(0.1);
+    }
+    expect(createCrate({ size: 0.6 }).grip!.z).toBeCloseTo(0.3, 5); // half of size
+  });
+
   it('is deterministic per seed', () => {
     const a = createBasket({ seed: 5 });
     const b = createBasket({ seed: 5 });

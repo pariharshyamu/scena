@@ -61,6 +61,9 @@ export function createCrate(options: CrateOptions = {}): Carryable {
     object: group,
     obstacleRadius: size * 0.75,
     carry: 'crate',
-    grip: { y: -size / 2 }, // origin is the base; hold it at the centre
+    // Origin is the base: lift the hold point to the centre (y) and push it
+    // forward by half the depth (z) so the box rides IN FRONT of the chest,
+    // not merged into it.
+    grip: { y: -size / 2, z: size / 2 },
   };
 }

@@ -47,7 +47,7 @@ export function createBarrel(options: CarryableOptions = {}): Carryable {
     hoop.position.y = y;
     group.add(hoop);
   }
-  return { object: group, obstacleRadius: R * 1.1, carry: 'crate', grip: { y: -H / 2 } };
+  return { object: group, obstacleRadius: R * 1.1, carry: 'crate', grip: { y: -H / 2, z: R } };
 }
 
 /** A woven basket with an arched handle — carried at the side, by the handle. */
