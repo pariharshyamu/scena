@@ -6,7 +6,7 @@
 // Core
 export { Rng, valueNoise2, fractalNoise2, hash2 } from './core/random';
 export { PALETTES, DEFAULT_PALETTE, type Palette } from './core/palette';
-export { collectObstacles, type Obstacle, type Prop } from './core/types';
+export { collectObstacles, createSlot, type Obstacle, type Prop, type PropSlot } from './core/types';
 
 // Materials
 export {
@@ -214,6 +214,17 @@ export {
   createCounter,
   type WorkshopOptions,
 } from './props/workshop';
+export {
+  createTreadmill,
+  createGuitar,
+  createToilet,
+  createSink,
+  createBathtub,
+  type TreadmillOptions,
+  type TreadmillProp,
+  type GuitarOptions,
+  type BathroomOptions,
+} from './props/stations';
 export {
   createRailing,
   createModernWindow,

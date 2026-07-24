@@ -12,7 +12,8 @@ import {
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
-import type { Prop } from '../core/types';
+import { createSlot } from '../core/types';
+import type { Prop, PropSlot } from '../core/types';
 
 /**
  * Interior furniture — the cottage set. Every piece follows the Prop
@@ -158,7 +159,12 @@ export function createSeat(options: SeatOptions = {}): Prop {
     }
     radius = 0.3;
   }
-  return { object: group, obstacleRadius: radius };
+  // Sitting places — chairs and stools seat one, benches two.
+  const slots: PropSlot[] =
+    style === 'bench'
+      ? [createSlot('sit', 'sit', group, -0.4, 0, 0), createSlot('sit', 'sit', group, 0.4, 0, 0)]
+      : [createSlot('sit', 'sit', group, 0, 0, 0)];
+  return { object: group, obstacleRadius: radius, slots };
 }
 
 // ---- beds --------------------------------------------------------------
@@ -226,7 +232,17 @@ export function createBed(options: BedOptions = {}): Prop {
       group.add(rung);
     }
   }
-  return { object: group, obstacleRadius: size === 'double' ? 1.25 : 1.1 };
+  // Sleeping places: anchor at the foot end on the mattress, pitched flat
+  // so the body extends toward the headboard (ANIMA's sleep convention).
+  const sleepAt = (x: number, deckY: number): PropSlot =>
+    createSlot('sleep', 'sleep', group, x, deckY + 0.22, l / 2 - 0.3, 0, -Math.PI / 2);
+  const slots: PropSlot[] =
+    size === 'bunk'
+      ? [sleepAt(0, 0.32), sleepAt(0, 1.35)]
+      : size === 'double'
+        ? [sleepAt(-w / 4, 0.32), sleepAt(w / 4, 0.32)]
+        : [sleepAt(0, 0.32)];
+  return { object: group, obstacleRadius: size === 'double' ? 1.25 : 1.1, slots };
 }
 
 // ---- shelves -----------------------------------------------------------

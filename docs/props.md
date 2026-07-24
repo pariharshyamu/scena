@@ -51,6 +51,13 @@ All are seeded (same seed → identical prop), flat-shaded low-poly, and themed 
 | `createCladding({ seed, style })` | facade accent: teak `'slats'`, angled `'louvers'`, or a `'stone'` feature panel |
 | `createPergola({ seed })` | teak posts, doubled beams, rafter slats; walk-through |
 | `createPlanter({ seed, length })` | corten trough with low greenery |
+| `createTreadmill({ seed, speed })` | gym treadmill with a genuinely **marching belt**; `setSpeed` drives it, a `run` slot stands the runner on the deck |
+| `createGuitar({ seed, color })` | acoustic guitar sized to ANIMA's `GRIPS.guitar` — play it (strum loop) or lean it as décor |
+| `createToilet({ seed })` / `createSink` / `createBathtub` | the ceramic bathroom set; toilet has a `sit` slot, the tub a `soak` slot (the sleep pose, reclined) |
+
+## Interaction slots
+
+Props a character can *use* publish **`slots`** — `{ kind, anchor, pose, loop? }`, structurally identical to ANIMA's `InteractionSlot`, so they drop straight into `new Interaction(rig, loco).use(prop.slots[0])` with no cross-imports. Anchors are children of the prop (position the prop, the slot follows), at floor level, `+z` facing, pitched flat for lying poses. Today's slot carriers: **seats** (`sit` — benches seat two), **beds** (`sleep` — doubles and bunks sleep two), the **treadmill** (`run`: snap to the deck and drive `Locomotion` with `treadmill.speed`), the **toilet** (`sit`) and the **bathtub** (`soak`). Build your own with `createSlot(...)`.
 
 The modern set (railing through planter) is themed by the [Tier-4 surfaces](surfaces.md#modern-machined) — brushed steel, powder-coat, teak, corten, concrete and `createGlass`. Window panes default to `nightGlow`, so a building listed in the day cycle's `lamps` lights its glazing at dusk; gate pillar lamps follow the same budget rule as street lamps.
 
