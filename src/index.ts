@@ -235,6 +235,13 @@ export {
   type VehicleProp,
 } from './props/vehicles';
 export {
+  createBoat,
+  createShip,
+  type CraftOptions,
+  type CraftInput,
+  type CraftProp,
+} from './props/watercraft';
+export {
   createRailing,
   createModernWindow,
   createGate,

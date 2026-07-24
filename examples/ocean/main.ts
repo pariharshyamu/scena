@@ -10,6 +10,8 @@ import {
 } from 'three';
 import {
   createOcean,
+  createBoat,
+  createShip,
   createTerrain,
   createSky,
   createLightingRig,
@@ -103,6 +105,17 @@ function makeBoat(): Group {
 }
 const boat = makeBoat();
 scene.add(boat);
+// The 0.38 watercraft, riding the same swell via float(ocean.heightAt).
+const motor = createBoat({ seed: 4 });
+motor.object.position.set(6, 0, 36);
+motor.object.rotation.y = 0.8;
+motor.float((x, z) => ocean.heightAt(x, z));
+scene.add(motor.object);
+const coaster = createShip({ seed: 5 });
+coaster.object.position.set(-16, 0, 26);
+coaster.object.rotation.y = -0.5;
+coaster.float((x, z) => ocean.heightAt(x, z));
+scene.add(coaster.object);
 const bx = 20; // out on the open sea, off the coast
 const bz = 30;
 
@@ -117,6 +130,8 @@ function frame(): void {
   const hZ = ocean.heightAt(bx, bz + 1);
   boat.rotation.z = (ocean.heightAt(bx - 1, bz) - hX) * 0.35;
   boat.rotation.x = (hZ - ocean.heightAt(bx, bz - 1)) * 0.35;
+  motor.update(0.016);
+  coaster.update(0.016);
 
   if (view === 'boat') {
     camera.position.set(bx + Math.sin(t * 0.5) * 5, SEA + 2.2, bz + 7);
@@ -138,5 +153,8 @@ frame();
     glError: gl.getError(),
     boatY: +boat.position.y.toFixed(3),
     waveAt00: +ocean.heightAt(0, 0).toFixed(3),
+    motorY: +motor.object.position.y.toFixed(3),
+    shipY: +coaster.object.position.y.toFixed(3),
+    shipRoll: +coaster.object.rotation.z.toFixed(4),
   };
 };
