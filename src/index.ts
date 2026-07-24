@@ -338,3 +338,13 @@ export {
   type ScatterTile,
   type Placement,
 } from './scatter/scatter';
+export {
+  createLadder,
+  createSaddle,
+  createBridle,
+  type Ladder,
+  type LadderOptions,
+  type LadderStyle,
+  type TackOptions,
+  type TackStyle,
+} from './props/climbing';

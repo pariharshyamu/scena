@@ -217,3 +217,19 @@ PALETTES.winter   // snow grass bands, pale sky
 A `Palette` covers foliage, trunk, rock, wood, metal, lamp glow, grass/cliff/peak terrain bands, sky, fog, water, sand, path, wall and roof colors. Every generator takes `palette`; build a whole scene with one palette and it looks like a matched set. Define your own by satisfying the interface — the type is exported.
 
 Seeding tip: inside `scatter` items you receive a forked `Rng`; use `rng.int(1, 1e9)` as the child seed so variants differ but stay deterministic.
+
+## Ladders & tack
+
+Two props that exist to be *met* by an ANIMA character.
+
+**`createLadder`** publishes `bottom`, `top` and `rungSpacing` — structurally ANIMA's `Climbable`, so it drops into `new Climb(rig, loco).start(ladder)` with no cross-import. `rungSpacing` is the contract that matters: ANIMA drives the body up by exactly that much per half-cycle of the climb loop, so hands land on rungs instead of sliding past them. Three styles: `wooden` (slightly crooked rungs), `steel` (round rails on wall brackets) and `rope` (sagging, uneven).
+
+**`createSaddle`** and **`createBridle`** are built to the fixtures `createQuadruped` already carries:
+
+```js
+const horse = createQuadruped({ coat: 'bay' });          // ANIMA
+horse.saddle.add(createSaddle({ horseHeight: horse.height }).object);
+horse.bones.Head.add(createBridle({ horseHeight: horse.height }).object);
+```
+
+The stirrups hang where the rider's foot goes and the reins run forward to the bit — so ANIMA's ride pose (heels down, hands forward) and the tack meet by construction rather than by fiddling. `english`, `western` (with the horn) and a `bareback` pad.
