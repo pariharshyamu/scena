@@ -74,6 +74,19 @@ Two prop behaviors worth knowing:
 - **Lights are a budget.** Lamps and torches only create real `PointLight`s when asked (`light: true`, `torchLights: n`) — glowing emissive bulbs are free, real lights are not.
 - **Houses plug into the day cycle.** Window materials are emissive at the intensity `createDayCycle` scans for, so passing a house in the cycle's `lamps` list makes its windows ignite at dusk. No extra API.
 
+## Manipulables
+
+Interaction slots let a character *use* a prop; **manipulables** let a prop *react*. `createDoor`, `createDrawer`, `createLever`, `createValve`, `createHatch` and `createPortcullis` carry a **state** you actuate, and animate a joint in response — swing, slide, throw, spin, hinge, rise:
+
+```ts
+const door = createDoor();               // a framed swing door (double: for a gateway)
+door.toggle();                           // flip open ↔ closed
+door.onChange = (open) => chime(open);   // fires when the target flips
+game.onUpdate((t) => door.update(t.delta));  // eases the joint toward the target
+```
+
+`state` is the live eased position (0 = closed/rest, 1 = open/actuated); `open` is the boolean target; `set(0.5 | true | false)` drives it to a partial or full target. The shape is **structurally identical to GAMA's `Mechanism`**, so GAMA's `Interactable` (walk-up + press to operate, or an automatic door), `Trigger` (pressure plates) and `linkMechanism` (a lever that raises a portcullis) drive them with no cross-imports. The work stations — lever, valve, drawer, hatch — publish an `operate` slot (ANIMA's floor-level anchor) so a character stands at them; doors and portcullises are pass-through. Pair with ANIMA's `Gesture` + `createReachClip` so the hand and the mechanism move together. See the **manipulables** example: a keeper throws a lever, the linked portcullis rises, an automatic door opens on approach, and a chest is opened.
+
 ## Tree species
 
 `createTree` builds thirteen seeded species, each with its own silhouette, colour, wind response and steering footprint — all from the same low-poly primitives, so a mixed wood still batches cheaply.

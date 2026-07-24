@@ -261,6 +261,22 @@ export {
   type PergolaOptions,
   type PlanterOptions,
 } from './props/modern';
+export {
+  createDoor,
+  createDrawer,
+  createLever,
+  createValve,
+  createHatch,
+  createPortcullis,
+  type Manipulable,
+  type MechanismOptions,
+  type DoorOptions,
+  type DrawerOptions,
+  type LeverOptions,
+  type ValveOptions,
+  type HatchOptions,
+  type PortcullisOptions,
+} from './props/mechanisms';
 
 // Scene assembly
 export {
