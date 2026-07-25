@@ -276,3 +276,16 @@ The shot list is deliberately uneven — cuts run 0.55–4 s, because a fixed cu
 `createPhone` is portrait — about 19.5:9 the tall way, because a 16:9 landscape panel scaled down reads as a tiny television. `createSmartwatch` is the smallest thing the system draws, and a useful proof that one content shader covers a 55" set and a 40 mm watch face.
 
 A phone is a `Carryable` with a `Screen`. Pick-up, carry, put-down and hand-off already work on it: handing someone your phone to show them a photo needs no new verb, it is `handTo`.
+
+## Terminals
+
+The first props here that a character cannot simply walk up to and use: somebody may already be at it. So besides the usual slot, `createTerminal` publishes a **line** — an anchor at the head of the queue, with the queue running back along its local -z.
+
+```ts
+const atm = createTerminal({ style: 'atm' });
+const at = atm.line.localToWorld(new Vector3(0, 0, -queue.distanceOf(person)));
+```
+
+That pairing is the whole handshake: SCENA says where the line is, GAMA's `Queue` says who is where along it, neither imports the other. `atm`, `kiosk` and `vending`, each with a `Screen` (an ATM defaults to the keypad mode) and a stocked-by-seed cabinet in the vending case.
+
+One thing worth stealing: the casing is **light grey**. It started near-black, which looked fine as a colour swatch and rendered outdoors as a featureless black slab — none of the hood, shelf or slots that say "cash machine" survived. Public machines are pale precisely so they read at a glance from across a concourse.

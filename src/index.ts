@@ -374,3 +374,9 @@ export {
   type ScreenLight,
   type ScreenLightOptions,
 } from './props/electronics';
+export {
+  createTerminal,
+  type Terminal,
+  type TerminalOptions,
+  type TerminalStyle,
+} from './props/terminals';
