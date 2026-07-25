@@ -289,3 +289,11 @@ const at = atm.line.localToWorld(new Vector3(0, 0, -queue.distanceOf(person)));
 That pairing is the whole handshake: SCENA says where the line is, GAMA's `Queue` says who is where along it, neither imports the other. `atm`, `kiosk` and `vending`, each with a `Screen` (an ATM defaults to the keypad mode) and a stocked-by-seed cabinet in the vending case.
 
 One thing worth stealing: the casing is **light grey**. It started near-black, which looked fine as a colour swatch and rendered outdoors as a featureless black slab — none of the hood, shelf or slots that say "cash machine" survived. Public machines are pale precisely so they read at a glance from across a concourse.
+
+## Fixtures and desk sets
+
+`createFixture` builds the small wall things: `switch`, `thermostat`, `doorbell`, `camera`, `sensor`. They are 5–12 cm across, so almost no budget goes on shape — what reads is the **indicator**, one lit pip whose colour says what the device thinks is happening. Every fixture publishes `setIndicator(colour, strength)`, and that is the whole prop at any honest camera distance.
+
+The origin is at the wall face with the device facing +z, so placement is a position and a height. Ones you touch (switch, thermostat, doorbell) carry a slot; a ceiling camera does not, because you do not walk up and press it.
+
+`createDeskSet` is a keyboard, mouse and mug — what a character actually puts their hands on, which the monitors and laptops did not give them. It publishes a `keyboard` anchor at the home row so ANIMA's desk poses aim at something real. The keyboard is never quite square to the desk, because nobody's is.

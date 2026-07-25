@@ -380,3 +380,11 @@ export {
   type TerminalOptions,
   type TerminalStyle,
 } from './props/terminals';
+export {
+  createFixture,
+  createDeskSet,
+  type Fixture,
+  type FixtureOptions,
+  type FixtureStyle,
+  type DeskSet,
+} from './props/fixtures';
