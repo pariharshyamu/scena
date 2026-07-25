@@ -40,6 +40,7 @@ import {
   createShower,
   createTub,
   createPool,
+  createHeatSource,
   createJacuzzi,
   createBasin,
   BASIN_ERAS,
@@ -72,6 +73,8 @@ import {
   type Shower,
   type Tub,
   type Pool,
+  type HeatSource,
+  type HeatEra,
   type Jacuzzi,
   type Basin,
   type PropSurface,
@@ -148,6 +151,7 @@ let tap = 1;
 const showers: Shower[] = [];
 const tubs: Tub[] = [];
 const pools: Pool[] = [];
+const stoves: HeatSource[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -284,6 +288,29 @@ if (view === 'room') {
   lido.disturb(-2, 1, 1.2);
   lido.disturb(3, -1.4, 0.9);
   bathhouse.disturb(-10.6, 7.6, 1.2);
+
+} else if (view === 'heat') {
+  // Four eras of cooking heat side by side, all lit. The point of the row is
+  // that they are not the same object with different textures: one has no
+  // dial at all, one has a single damper, and two have a knob per ring.
+  scene.add(new AmbientLight(0xffffff, 0.42));
+  const heatKey = new DirectionalLight(0xffffff, 0.95);
+  heatKey.position.set(3, 7, 5);
+  scene.add(heatKey);
+  const heatFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x4e4a45, roughness: 0.9 })
+  );
+  heatFloor.rotation.x = -Math.PI / 2;
+  scene.add(heatFloor);
+  const eras: HeatEra[] = ['hearth', 'range', 'gas', 'induction'];
+  eras.forEach((era, i) => {
+    const stove = createHeatSource({ era, seed: i + 3, palette });
+    stove.object.position.set(-3.4 + i * 2.3, 0, 0);
+    stove.setPower(1);
+    scene.add(stove.object);
+    stoves.push(stove);
+  });
 
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
@@ -492,6 +519,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'pool') {
     for (const p of pools) p.update(dt);
   }
+  if (view === 'heat') {
+    for (const st of stoves) st.update(dt);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -513,6 +543,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'pool') {
     camera.position.set(Math.sin(t * 0.08) * 3, 6.0, 12);
     camera.lookAt(0, -0.4, 0);
+  } else if (view === 'heat') {
+    camera.position.set(Math.sin(t * 0.1) * 1.6, 1.75, 4.2);
+    camera.lookAt(0, 0.7, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -563,6 +596,12 @@ declare global {
  * whether it is or not.
  */
 window.galleryStep = (dt: number) => {
+  // Everything that has an update must be listed HERE too, not only in the
+  // animation loop: galleryStep is what the headless runs drive, so a prop
+  // missing from this list reports perfectly plausible numbers for a system
+  // nobody ever stepped.
+  for (const st of stoves) st.update(dt);
+  for (const pl of pools) pl.update(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -690,6 +729,15 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    heat: stoves.map((st) => ({
+      era: st.era,
+      state: st.state,
+      temp: Number(st.temperature.toFixed(2)),
+      fuel: Number(st.fuel.toFixed(2)),
+      burnsFuel: st.burnsFuel,
+      zones: st.zones.map((z) => `${z.kind}:${z.heat.toFixed(2)}`),
+      knobs: st.control ? Number(st.control.object.rotation.z.toFixed(2)) : null,
+    })),
     pool: pools.map((p) => ({
       style: p.style,
       surfaceY: Number(p.surfaceY.toFixed(3)),

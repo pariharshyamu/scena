@@ -447,6 +447,19 @@ export {
   type PoolLadder,
 } from './props/pool';
 export {
+  createHeatSource,
+  createHearth,
+  createRange,
+  createHob,
+  type HeatSource,
+  type HeatOptions,
+  type HeatEra,
+  type HeatState,
+  type HeatZone,
+  type HeatControl,
+  type HeatField,
+} from './props/heat';
+export {
   createBasin,
   createTap,
   createEwer,

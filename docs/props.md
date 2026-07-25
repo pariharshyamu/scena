@@ -599,3 +599,42 @@ Four things, in the order they mattered:
 One shader-plumbing trap worth writing down, because it cost a render cycle and produced *nothing on screen with no error anywhere*: `createSurface` patches `#include <map_fragment>` and then keeps working on `diffuseColor` for another twenty lines — mortar joints, cavity tint, per-cell jitter. Caustics injected at `map_fragment` are painted over by the grout of the very tiles they are supposed to be dancing on. `emissivemap_fragment` is the first hook after all of that, and `diffuseColor` is still in scope.
 
 And a matching trap in the vertex shader: the lining reads a vertex's height **in the pool's space**, so every lined mesh has its transform baked into the geometry and sits at the origin. Position one the ordinary way and the varying carries the *mesh's* own local y — a wall centred on its own middle reports heights either side of zero however deep it is sunk, so the waterline lands halfway up every wall independently.
+
+## Heat: hearth to induction
+
+The era is not a texture. It is **what you have to do to cook**, which is the same thing the basins turned on, and it produces a genuinely different loop at each end:
+
+| Era | Control | The loop |
+|---|---|---|
+| `hearth` | **none** | feed it, and swing the pot nearer or further on the crane |
+| `range` | one damper | feed it; the plates are *graded*, so you move the pan to a cooler one |
+| `gas` | a knob per ring | instant, visible, and gone six seconds after you shut it |
+| `induction` | a knob per ring | instant, **no flame at all**, and still hot long after the light says off |
+
+A medieval fire has no dial, so heat cannot be a number on a device — it has to be a **field in space**:
+
+```ts
+heatAt(x: number, z: number): number   // 0 (cold) … 1, and 0 out of reach
+```
+
+deliberately the same shape as `WaterBody.depthAt`. That one decision is what makes the crane work: swing the hook away from the flames and the pot cools, with nothing special-cased. It also gives the range its character for free — its two hotplates are graded by *where they sit* relative to the firebox rather than being separately controllable, which is exactly the thing you cannot do to a range.
+
+The state machine is `cold → heating → hot → cooling`, the same shape as the shower's and GAMA's `Device` for the third time, because it keeps being the right shape.
+
+### A zone is a place, not a source
+
+The first version gave the hearth's hook its own heat. That is wrong in a way that only shows up when you use it: the hook carries the fire around with it, so **a pot swung out over the flagstones is still boiling**. Emitters (the fire, the rings, the plates) produce heat; zones (the hook, the trivet, the rings) are *places a pot goes* and **sample the field wherever they currently are**. The rings are both, which is why the distinction is easy to miss on a hob and impossible to miss on a hearth.
+
+The matching pair: `temperature` is what the source is doing and `zone.heat` is what the place is getting. Collapse them and swinging the crane out puts the fire itself out.
+
+### Fuel is the era axis made concrete
+
+`feed()` keeps a hearth alive and **does nothing at all to a gas hob** — same call, same signature, and the difference is the whole point. A fire with an empty bunker goes out however wide the damper is open, which is the difference between burning and being switched on.
+
+### Three things the renders caught that the tests could not
+
+- **The gas ring was a bonfire.** Built from the wood-fire flame it came out as a yellow dome a quarter of a metre across, sitting on a worktop. A gas ring is a short blue crown about four centimetres tall, and height — not colour — is how you read how hard it is going.
+- **The hearth fire was twice the height of its own chimney breast.** It read as a house fire rather than something you would hang a pot over.
+- **`steel` renders near-black.** It is a high-metalness preset and there was nothing in the scene for it to reflect — the same trap as the chrome pool ladder. `paintedMetal` was no better: it puts a pitted render finish on what should be a smooth enamelled panel. A modern appliance front has no texture worth simulating, and a plain material is the right answer.
+
+And one trap in the harness rather than the prop: the gallery's headless `galleryStep` keeps its **own** list of things to update, separate from the animation loop. The stoves were missing from it, so the first verification run reported entirely plausible temperatures for a system nobody had ever stepped.
