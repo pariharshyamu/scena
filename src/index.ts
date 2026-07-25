@@ -475,6 +475,27 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createDresser,
+  stock,
+  createUtensil,
+  createCrockery,
+  createKitchenware,
+  DRESSER_KINDS,
+  UTENSIL_STYLES,
+  type Storage,
+  type StorageSpace,
+  type SpaceKind,
+  /** The prop a dresser returns. Named `Storage` because that is what it is. */
+  type DresserKind,
+  type DresserOptions,
+  type DresserDoor,
+  type StockOptions,
+  type UtensilStyle,
+  type UtensilOptions,
+  type CrockeryOptions,
+  type KitchenwareOptions,
+} from './props/dresser';
+export {
   createWashUp,
   createTrough,
   createKitchenSink,

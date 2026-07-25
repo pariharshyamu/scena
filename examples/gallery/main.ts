@@ -46,9 +46,13 @@ import {
   createPrepStation,
   createColdStore,
   createWashUp,
+  createDresser,
+  createKitchenware,
+  stock,
   PREP_KINDS,
   COLD_ERAS,
   SINK_ERAS,
+  DRESSER_KINDS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -90,6 +94,7 @@ import {
   type Basin,
   type ColdStore,
   type WashUp,
+  type Storage,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -169,6 +174,7 @@ const pans: Cookware[] = [];
 const preps: PrepStation[] = [];
 const colds: ColdStore[] = [];
 const washes: WashUp[] = [];
+const dressers: Storage[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -453,6 +459,30 @@ if (view === 'room') {
     washes.push(w);
   });
 
+} else if (view === 'dresser') {
+  // Five kinds of kitchen storage, all stocked. The row is the argument:
+  // three of them display what they hold and two of them hide it, and that
+  // is the difference between furniture and a box on a wall.
+  scene.add(new AmbientLight(0xffffff, 0.5));
+  const dKey = new DirectionalLight(0xffffff, 1.0);
+  dKey.position.set(3, 7, 5);
+  scene.add(dKey);
+  const dFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x4c4741, roughness: 0.9 })
+  );
+  dFloor.rotation.x = -Math.PI / 2;
+  scene.add(dFloor);
+  DRESSER_KINDS.forEach((kind, i) => {
+    const d = createDresser({ kind, seed: i + 2, palette });
+    d.object.position.set(-3.1 + i * 1.6, 0, 0);
+    scene.add(d.object);
+    stock(d, createKitchenware({ count: 26, seed: i + 5, palette }), { seed: i + 5 });
+    // Doors open, because a stocked cupboard photographed shut is a cupboard.
+    for (const door of d.doors) door.set(true);
+    dressers.push(d);
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -677,6 +707,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'sink') {
     for (const w of washes) w.update(dt, true);
   }
+  if (view === 'dresser') {
+    for (const d of dressers) d.update(dt);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -710,6 +743,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'sink') {
     camera.position.set(Math.sin(t * 0.1) * 1.3, 1.45, 3.2);
     camera.lookAt(0, 0.8, 0);
+  } else if (view === 'dresser') {
+    camera.position.set(Math.sin(t * 0.1) * 1.4, 1.55, 4.0);
+    camera.lookAt(0, 1.2, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -742,6 +778,7 @@ declare global {
     galleryStep: (dt: number) => void;
     galleryDoors: (open: number) => void;
     gallerySinks: (fresh: number) => void;
+    galleryShut: (shut: number) => void;
   }
 }
 
@@ -780,6 +817,7 @@ window.galleryStep = (dt: number) => {
   for (const st of preps) st.update(dt, true);
   for (const st of colds) st.update(dt);
   for (const w of washes) w.update(dt, true);
+  for (const d of dressers) d.update(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -793,6 +831,11 @@ window.galleryStep = (dt: number) => {
     basin.fillBy(tap * dt * 0.22);
     basin.update(dt);
   }
+};
+
+/** Shut every dresser door, for the headless run. */
+window.galleryShut = (shut: number) => {
+  for (const d of dressers) for (const door of d.doors) door.set(shut < 0.5);
 };
 
 /** Refill every sink and open the machine, for the headless run. */
@@ -956,6 +999,16 @@ window.galleryDebug = (t?: number) => {
         light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
       };
     }),
+    dressers: dressers.map((d) => ({
+      kind: d.kind,
+      spaces: d.spaces.length,
+      used: d.used,
+      free: d.free,
+      shown: d.shown,
+      doors: d.doors.length,
+      surfaces: d.surfaces.length,
+      byKind: [...new Set(d.spaces.map((sp) => sp.kind))].sort().join(','),
+    })),
     sinks: washes.map((w) => ({
       era: w.era,
       dirty: w.dirty,

@@ -787,3 +787,50 @@ The worktop is a **frame around a hole**: solid below the bowl floor, solid on a
 - **The dishwasher emptied its own rack.** Showing only `dirty` meant that the instant the cycle finished the dishes vanished — the payoff for waiting forty-five seconds was an empty machine. Washed dishes are still in the rack until somebody unloads them.
 
 And one on the suds: a flat white lid on the water is indistinguishable from the water. Foam is a handful of clumps at different heights, and it thins out as the water tires — a bowl still frothing after twelve plates is a bowl nobody has used.
+
+## Dressers, racks and rails — storage that shows what is in it
+
+Every storage prop the library had was a box that opens: a chest, a drawer, a cupboard, a `Manipulable` whose whole job is to hide its contents until somebody operates it. A kitchen is the opposite. The room is arranged so the things you use most are visible and to hand, and a dresser with nothing on it is a bookcase.
+
+So the contribution here is the vertical counterpart to `dress`:
+
+```ts
+dress(table.surfaces[0], things);   // puts things DOWN on a surface
+stock(dresser, things);             // puts things AWAY — on shelves,
+                                    // in grooves, on hooks
+```
+
+`dress` only knows about horizontal surfaces. Half of a kitchen's storage is not one. A `StorageSpace` carries the three distinctions that matter:
+
+| Space | What happens to what goes in it |
+|---|---|
+| `shelf` | sits on it, the way it was built |
+| `groove` | stands **on edge** — a plate rack, a tray slot |
+| `hook` | hangs **by its top** |
+| `drawer` | out of sight whether or not it has a front on it |
+
+### `hidden` is live, and that is the whole track
+
+```ts
+space.hidden   // a getter, not a constant
+```
+
+Shut a cupboard and what is on its shelves stops counting as shown; open one leaf of a two-door pantry and **half** of it comes back. A boolean snapshotted at build time would report a shut pantry forever however often it was opened, and `shown` is what tells you whether a piece is furniture or a box on a wall.
+
+That is also the entire `doors` column of the kind table. A `welsh` dresser and a `wallUnit` hold about the same amount; one of them you look at.
+
+### Three things that fall out for free
+
+- **Nobody hangs plates.** A hook's `width` is the spacing between hooks, and a stack of plates is wider than it — so `stock` fills a pot rail with tools and refuses the crockery without anything having been told about pots or plates.
+- **Utensils are built handle up.** A ladle hangs from its handle with the bowl below, and it stands in a jar the same way up. One model works both hung and put down, and `stock` needs no per-prop hook point: it uses the top of the bounding box.
+- **A single plate and a stack are the same object at different counts** — which is exactly why a rack and a shelf are different *kinds* of space rather than the same one with a flag on it.
+
+### The groove axis, which is not the obvious one
+
+Standing a plate on edge is a quarter turn, and the first version turned it about **x**. That lays each plate *across* the slots like a bridge — and worse, it makes the fit test measure the wrong two numbers, so the rack rejected every plate offered to it and reported an empty rack with no error anywhere.
+
+A rack's slots run front to back and plates go in side by side **along** the rack, so the turn is about **z**: what has to fit the slot width is the plate's *thickness*, and what has to fit the clear height is its *diameter*.
+
+### And the anti-showroom rules, same as `dress`
+
+`stock` leaves gaps on purpose — the default density is 0.72, because a dresser with something in every single space is a shop — and it **shuffles which** spaces get used, since filling front-to-back leaves one empty shelf at the top and reads as an unfinished dresser rather than a used one. Nothing is placed square: hung things get a yaw and a slight lean, because a row of pans all hanging plumb is a display.
