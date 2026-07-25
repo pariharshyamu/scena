@@ -47,12 +47,14 @@ import {
   createColdStore,
   createWashUp,
   createDresser,
+  createIngredient,
   createKitchenware,
   stock,
   PREP_KINDS,
   COLD_ERAS,
   SINK_ERAS,
   DRESSER_KINDS,
+  INGREDIENT_KINDS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -95,6 +97,7 @@ import {
   type ColdStore,
   type WashUp,
   type Storage,
+  type Ingredient,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -175,6 +178,8 @@ const preps: PrepStation[] = [];
 const colds: ColdStore[] = [];
 const washes: WashUp[] = [];
 const dressers: Storage[] = [];
+const foods: Ingredient[] = [];
+let foodChill: ColdStore | null = null;
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -483,6 +488,58 @@ if (view === 'room') {
     dressers.push(d);
   });
 
+} else if (view === 'larder') {
+  // Ten ingredients in two rows on a bench: whole at the back, prepped at
+  // the front, all ageing. And a fridge beside them holding a third set,
+  // which is the whole handshake in one picture — the ones inside keep and
+  // the ones on the bench do not.
+  scene.add(new AmbientLight(0xffffff, 0.55));
+  const iKey = new DirectionalLight(0xffffff, 1.1);
+  iKey.position.set(3, 7, 5);
+  scene.add(iKey);
+  const iFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x4e4a44, roughness: 0.9 })
+  );
+  iFloor.rotation.x = -Math.PI / 2;
+  scene.add(iFloor);
+
+  const benchTop = 0.9;
+  const slab = new Mesh(
+    new BoxGeometry(3.4, 0.07, 0.7),
+    new MeshStandardMaterial({ color: 0x7a736a, roughness: 0.8 })
+  );
+  slab.position.set(-0.6, benchTop - 0.035, 0);
+  scene.add(slab);
+  INGREDIENT_KINDS.forEach((kind, i) => {
+    for (const row of [0, 1]) {
+      const food = createIngredient({ kind, seed: i * 3 + row, palette });
+      // Front row chopped: prepping is what puts a thing on a clock, so the
+      // two rows diverge on their own without anything driving them.
+      if (row === 1) food.prep();
+      food.object.position.set(-2.15 + i * 0.31, benchTop, row === 0 ? -0.16 : 0.16);
+      scene.add(food.object);
+      foods.push(food);
+    }
+  });
+
+  foodChill = createColdStore({ era: 'fridge', seed: 4, ambient: 22, palette });
+  foodChill.object.position.set(2.0, 0, 0);
+  foodChill.door.set(true);
+  scene.add(foodChill.object);
+  colds.push(foodChill);
+  foodChill.object.updateMatrixWorld(true);
+  INGREDIENT_KINDS.slice(0, 4).forEach((kind, i) => {
+    const shelf = foodChill!.shelves[Math.min(i, foodChill!.shelves.length - 1)];
+    // WHOLE, matching the bench's back row exactly. Chopping these as well
+    // would move two variables at once and the picture would prove nothing.
+    const food = createIngredient({ kind, seed: 40 + i, palette });
+    const at = shelf.anchor.getWorldPosition(new Vector3());
+    food.object.position.set(at.x + (i % 2 ? 0.09 : -0.09), at.y, at.z);
+    scene.add(food.object);
+    foods.push(food);
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -710,6 +767,10 @@ renderer.setAnimationLoop(() => {
   if (view === 'dresser') {
     for (const d of dressers) d.update(dt);
   }
+  if (view === 'larder') {
+    for (const st of colds) st.update(dt);
+    for (const f of foods) f.update(dt, foodChill ?? undefined);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -746,6 +807,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'dresser') {
     camera.position.set(Math.sin(t * 0.1) * 1.4, 1.55, 4.0);
     camera.lookAt(0, 1.2, 0);
+  } else if (view === 'larder') {
+    camera.position.set(Math.sin(t * 0.1) * 0.9, 1.42, 2.4);
+    camera.lookAt(-0.3, 0.92, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -818,6 +882,7 @@ window.galleryStep = (dt: number) => {
   for (const st of colds) st.update(dt);
   for (const w of washes) w.update(dt, true);
   for (const d of dressers) d.update(dt);
+  for (const f of foods) f.update(dt, foodChill ?? undefined);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -997,6 +1062,20 @@ window.galleryDebug = (t?: number) => {
         outside: Number(st.chillAt(out.x, out.y, out.z).toFixed(2)),
         keeps: Number(st.keepAt(shelf.x, shelf.y, shelf.z).toFixed(3)),
         light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
+      };
+    }),
+    foods: foods.map((f) => {
+      f.object.updateWorldMatrix(true, false);
+      const at = f.object.getWorldPosition(new Vector3());
+      return {
+        kind: f.kind,
+        form: f.form,
+        state: f.state,
+        fresh: Number(f.freshness.toFixed(3)),
+        life: f.shelfLife === Infinity ? 'inf' : Math.round(f.shelfLife),
+        // Where it is standing decides how fast it is going off — nothing
+        // else was ever told which of these is in the fridge.
+        keeps: foodChill ? Number(foodChill.keepAt(at.x, at.y, at.z).toFixed(3)) : 1,
       };
     }),
     dressers: dressers.map((d) => ({

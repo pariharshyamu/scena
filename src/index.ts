@@ -475,6 +475,16 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createIngredient,
+  keepsFor,
+  INGREDIENT_KINDS,
+  type Ingredient,
+  type IngredientOptions,
+  type IngredientKind,
+  type IngredientForm,
+  type IngredientState,
+} from './props/ingredient';
+export {
   createDresser,
   stock,
   createUtensil,

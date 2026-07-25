@@ -834,3 +834,32 @@ A rack's slots run front to back and plates go in side by side **along** the rac
 ### And the anti-showroom rules, same as `dress`
 
 `stock` leaves gaps on purpose — the default density is 0.72, because a dresser with something in every single space is a shop — and it **shuffles which** spaces get used, since filling front-to-back leaves one empty shelf at the top and reads as an unfinished dresser rather than a used one. Nothing is placed square: hung things get a yaw and a slight lean, because a row of pans all hanging plumb is a display.
+
+## Ingredients — the things the rest of the kitchen is for
+
+This is the prop that closes the loop. The stove published a `HeatField`, the cold store published a `ChillField`, the prep bench yields and the sink consumes — and none of it had anything to act *on*. An ingredient is the subject, and it reads those fields itself, exactly the way `Cookware` does:
+
+```ts
+onion.update(t.delta, fridge);   // samples keepAt at its own position
+```
+
+**Moving it into the fridge is all it takes.** Nothing is told about anything: the ingredient samples the field where it is standing, so a hand carrying it across the kitchen is the entire gameplay wiring. There is a test that walks one from the bench to a shelf and measures the rate change on either side.
+
+### Two axes, and they touch in exactly one place
+
+- **form** — `whole` → `prepped`. What you did to it. One way, and it is the yield of a prep station.
+- **freshness** — 1 down to 0. What time did to it, at a rate the cold store decides.
+
+The rule worth having is where they meet: **prepping something makes it spoil far faster.** A whole onion keeps for weeks and a chopped one keeps for a day, so `prep()` is a commitment rather than a free upgrade — which is the only thing that makes a cook plan the order of anything. `cutFactor` is per-kind and spans 3× to 9×; anything above about 4 and prepping ahead is simply wrong, at 1 it is free and nobody has to think.
+
+`keeps` spans two orders of magnitude for the same reason. A potato and a fish are not the same object with different meshes: one you can leave in a corner for the whole game, and the other is a **timer that started when you picked it up**.
+
+`shelfLife` answers in seconds at the rate it is going off *now* — so it reads `Infinity` in a freezer, and a third of its previous value the moment you chop it.
+
+### And it shows it
+
+The skin desaturates toward a grey-brown, and it **shrinks**, because everything that goes off loses water. A green cabbage that reports itself rotten is worse than no state at all. The cut version is real separate geometry — a heap of pieces, built up front and hidden rather than swapped in on `prep()`, because a generator that rebuilds meshes mid-game allocates during play.
+
+### One bug, and the fix generalised
+
+The sideways kinds sat *below* their own base — a carrot a centimetre into the worktop and a fish nearly three. A cylinder laid on its side has a seven-sided cross-section that is not symmetric about its axis, so "put the centre at the radius" is simply wrong, and every one of those numbers would have had to be found and tuned per kind. Both versions are now **measured and seated** on y = 0 after building. Shifting the children rather than the group also keeps the wilting scale shrinking toward the surface instead of lifting the thing off it.
