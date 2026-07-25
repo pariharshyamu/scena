@@ -352,6 +352,61 @@ game.start();`,
   },
 
   {
+    id: 'sail',
+    title: 'Sailing to windward',
+    group: 'Worldbuilding',
+    code: `// Four rigs, six hundred years apart, in ONE breeze — all trying to reach
+// the same mark dead to windward. Nobody can point at it, so each sails the
+// closest course her own rig will hold: layline(). The square rigger has to
+// bear away seventy degrees, the Bermudan sloop only forty, and that gap is
+// the entire history of getting anywhere upwind.
+import { createSailRig, createWindField, createDeckedShip, createOcean,
+         createSky, createLightingRig, RIG_KINDS, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const sea = createOcean({ amplitude: 0.5, wavelength: 26, size: 700, segments: 160 });
+scene.add(sea.mesh);
+
+// Blowing toward +x, so it comes FROM this bearing.
+const wind = createWindField({ direction: 0, strength: 1, gust: 0 });
+const FROM = -Math.PI / 2;
+
+const HULLS = { square: 'carrack', lateen: 'galley', gaff: 'carrack', bermudan: 'galley' };
+const fleet = RIG_KINDS.map((kind, i) => {
+  const rig = createSailRig({ kind, seed: i + 2, palette, scale: 1.3 });
+  rig.setWind(wind);
+  const ship = createDeckedShip({ era: HULLS[kind], seed: i + 4, palette });
+  // The mark is dead upwind. This is the only honest answer to "steer at it".
+  ship.object.rotation.y = rig.layline(FROM, FROM + rig.noGo);
+  ship.object.position.set(-60 + i * 40, 0, 0);
+  ship.float((x, z) => sea.heightAt(x, z));
+  rig.object.position.y = ship.decks[0].y * 0.92;
+  ship.object.add(rig.object);
+  scene.add(ship.object);
+  return { rig, ship };
+});
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  wind.update(t.delta);
+  for (const { rig, ship } of fleet) {
+    rig.update(t.delta);
+    // No throttle anywhere: the polar decides, and where she points is why.
+    ship.update(t.delta, { speed: rig.drive * 2 });
+  }
+  const a = t.elapsed * 0.05;
+  game.camera.position.set(Math.sin(a) * 40, 34, 120);
+  game.camera.lookAt(0, 8, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'surge',
     title: 'Storm surge',
     group: 'Worldbuilding',

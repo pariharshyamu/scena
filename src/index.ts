@@ -475,6 +475,15 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createSailRig,
+  RIG_KINDS,
+  noGoDegrees,
+  type SailRig,
+  type SailOptions,
+  type RigKind,
+  type WindSource,
+} from './props/sail';
+export {
   createDeckedShip,
   SHIP_ERAS,
   type DeckedShip,

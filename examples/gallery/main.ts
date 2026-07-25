@@ -10,6 +10,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   Scene,
   Vector2,
   Vector3,
@@ -50,6 +51,8 @@ import {
   createIngredient,
   createDeckedShip,
   createOcean,
+  createSailRig,
+  createWindField,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -107,6 +110,8 @@ import {
   type Ingredient,
   type DeckedShip,
   type Ocean,
+  type SailRig,
+  type WindField,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -118,6 +123,26 @@ const params = new URLSearchParams(location.search);
 const view = params.get('view') ?? 'room';
 const pinned = params.get('t') !== null ? Number(params.get('t')) : null;
 const palette = PALETTES.meadow;
+
+/**
+ * What the HUD says, for views that have outgrown the default blurb.
+ *
+ * A screenshot of the wrong caption is a screenshot that argues for the
+ * wrong thing, and these get read back long after the session that made
+ * them.
+ */
+const CAPTIONS: Record<string, string> = {
+  sail:
+    '<strong>SCENA — sail</strong><br />' +
+    'Four rigs, six centuries, one breeze. The arrow is the wind. Nobody can ' +
+    'sail at a mark dead to windward, so every ship here is on the closest ' +
+    'course her own rig will hold — <code>layline()</code> — which is why ' +
+    'they fan out: the square rigger has had to bear away seventy degrees ' +
+    'and the Bermudan sloop only forty. Try ' +
+    '<code>gallerySail(0)</code> in the console to put them all in irons.',
+};
+const hud = document.getElementById('hud');
+if (hud && CAPTIONS[view]) hud.innerHTML = CAPTIONS[view];
 
 const scene = new Scene();
 scene.background = new Color(0x0a0d13);
@@ -196,6 +221,11 @@ const ships: DeckedShip[] = [];
 const oceans: Ocean[] = [];
 /** Markers standing on decks. `at` is written by NOTHING but `ride`. */
 const shipRiders: Array<{ ship: DeckedShip; at: Vector3; post: Mesh; z0: number }> = [];
+const rigs: Array<{ rig: SailRig; ship: DeckedShip; label: Mesh }> = [];
+/** Mast heights, mirrored from the rig table so pennants sit on top. */
+const KINDS_MAST = { square: 11, lateen: 10, gaff: 12, bermudan: 13 };
+let breeze: WindField | null = null;
+let windVane: Mesh | null = null;
 const UP = new Vector3(0, 1, 0);
 const plumes: SmokeSource[] = [];
 let smokeRoom: SmokeLayer | null = null;
@@ -671,6 +701,107 @@ if (view === 'room') {
     }
   });
 
+} else if (view === 'sail') {
+  // Four rigs, six hundred years apart, in ONE breeze — and each one steered
+  // to the closest course it can actually hold. That last clause is the whole
+  // view: they are not on four arbitrary headings, they are each on the
+  // heading `layline` gave them for the same upwind mark, which is why they
+  // fan out. The square rigger is pointing nearly across the picture and the
+  // Bermudan sloop is pointing almost at it.
+  // Daylight, and a sky to put it in. The gallery's near-black background is
+  // right for a room and wrong for the open sea: it turns white canvas grey
+  // and makes a fine breezy morning look like a shipwreck at midnight.
+  scene.background = new Color(0x8fb4d6);
+  // The gallery's camera is built for a sitting room and clips at a hundred
+  // metres. A fleet works to windward on courses seventy degrees apart and
+  // is past that inside a minute — at which point the ships vanish while
+  // every number about them stays perfectly correct, which is the most
+  // expensive failure mode in this whole library.
+  camera.far = 2200;
+  camera.near = 0.5;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.9));
+  const sailKey = new DirectionalLight(0xffffff, 1.9);
+  sailKey.position.set(-14, 16, 9);
+  scene.add(sailKey);
+  const sea = createOcean({ amplitude: 0.5, wavelength: 26, size: 700, segments: 180 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  // Blowing toward +x, so it comes FROM -x. Gust 0 so a screenshot is not a
+  // lottery over which frame caught the lull.
+  breeze = createWindField({ direction: 0, strength: 1, gust: 0 });
+  const windFrom = -Math.PI / 2;
+
+  // Each rig on the hull it belongs to, and sized to it — a square course on
+  // a carrack, a lateen yard on a galley.
+  const FLEET = [
+    { kind: 'square' as const, era: 'carrack' as const, scale: 1.5 },
+    { kind: 'lateen' as const, era: 'galley' as const, scale: 1.4 },
+    { kind: 'gaff' as const, era: 'carrack' as const, scale: 1.3 },
+    { kind: 'bermudan' as const, era: 'galley' as const, scale: 1.15 },
+  ];
+
+  // Build the rigs FIRST, because where each ship goes depends on where she
+  // has to point, and that is `layline`'s answer rather than mine.
+  const built = FLEET.map(({ kind, era, scale: rigScale }, i) => {
+    const rig = createSailRig({ kind, seed: i + 2, palette, scale: rigScale });
+    rig.setWind(breeze!);
+    // The mark is dead to windward. Nobody can sail at it; everybody sails
+    // as near to it as their own rig allows.
+    return { kind, era, rigScale, rig, heading: rig.layline(windFrom, windFrom + rig.noGo), i };
+  });
+
+  // Lay the fleet out ACROSS the camera's line of sight, which is across the
+  // course they are all steering — not along the world's x axis. Strung out
+  // on the axis the camera looks down, four ships are one ship with three
+  // hidden behind it, and the first cut of this view was exactly that.
+  const meanHeading = built.reduce((a, b) => a + b.heading, 0) / built.length;
+  const along = new Vector3(Math.sin(meanHeading), 0, Math.cos(meanHeading));
+
+  built.forEach(({ kind, era, rigScale, rig, heading, i }) => {
+    const ship = createDeckedShip({ era, seed: i + 4, palette });
+    ship.object.position.copy(along).multiplyScalar((i - 1.5) * 42);
+    ship.object.rotation.y = heading;
+    ship.float((x, z) => sea.heightAt(x, z));
+    scene.add(ship.object);
+    ships.push(ship);
+
+    rig.object.position.y = ship.decks[0].y * 0.92;
+    ship.object.add(rig.object);
+
+    // A pennant at the masthead so the picture says which rig is which
+    // without anybody having to count sails.
+    const label = new Mesh(
+      new BoxGeometry(1.1, 1.1, 1.1),
+      new MeshStandardMaterial({
+        color: [0xd8483a, 0xe0a531, 0x53b06a, 0x4f8fd8][i],
+        emissive: [0x3a0f0a, 0x3a2a06, 0x0d2a15, 0x0c1e35][i],
+        flatShading: true,
+      })
+    );
+    label.position.set(0, rig.object.position.y + KINDS_MAST[kind] * rigScale + 0.8, 0);
+    ship.object.add(label);
+    rigs.push({ rig, ship, label });
+  });
+
+  // Which way the wind is blowing, made of something you can see. A scene
+  // about the angle to the wind with no wind in it is four boats on a pond.
+  //
+  // Lying FLAT on the water, not standing up in the sky: the camera moves
+  // round the fleet to keep the canvas broadside, so anything upright ends
+  // up end-on sooner or later — an arrow in the sky was a thumbtack in two
+  // shots out of four. Seen from above, a flat one always reads.
+  const vaneMat = new MeshStandardMaterial({
+    color: 0xf6f2e8, emissive: 0x515b66, roughness: 0.9, flatShading: true,
+  });
+  windVane = new Mesh(new BoxGeometry(34, 0.5, 3.4), vaneMat);
+  scene.add(windVane);
+  const head = new Mesh(new CylinderGeometry(0, 5.5, 11, 3), vaneMat);
+  head.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
+  head.position.set(22, 0, 0);
+  windVane.add(head);
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -917,6 +1048,10 @@ renderer.setAnimationLoop(() => {
     for (const v of vents) v.update(dt, 1);
     smokeRoom?.update(dt);
   }
+  if (view === 'sail') {
+    for (const o of oceans) o.update(dt);
+    stepSail(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -963,6 +1098,8 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'smoke') {
     camera.position.set(Math.sin(t * 0.08) * 1.2, 1.75, 5.4);
     camera.lookAt(0, 1.5, -0.6);
+  } else if (view === 'sail') {
+    placeSailCamera();
   } else if (view === 'ship') {
     const lead = ships[1];
     const f = lead ? lead.object.position : new Vector3();
@@ -987,6 +1124,115 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
+/**
+ * The bearing from which the fleet is showing the most canvas.
+ *
+ * Measured off the sails' own world normals rather than reasoned about from
+ * the trim, so it stays right for rigs whose geometry I have not thought
+ * about — a square yard braced up and a boom squared off want opposite
+ * answers and both come out of the same sweep.
+ */
+const broadsideOn = (fallback: number): number => {
+  const normal = new Vector3();
+  const view = new Vector3();
+  const faces: Array<{ n: Vector3; area: number }> = [];
+  for (const { rig } of rigs) {
+    rig.object.updateWorldMatrix(true, true);
+    rig.object.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh || m.geometry?.type !== 'PlaneGeometry' || !m.visible) return;
+      const p = (m.geometry as PlaneGeometry).parameters;
+      m.getWorldScale(view);
+      faces.push({
+        n: normal.set(0, 0, 1).applyQuaternion(m.getWorldQuaternion(new Quaternion())).clone(),
+        area: p.width * p.height * view.x * view.y,
+      });
+    });
+  }
+  if (!faces.length) return fallback + Math.PI / 2;
+  let best = fallback + Math.PI / 2;
+  let most = -1;
+  for (let i = 0; i < 36; i++) {
+    const a = (i / 36) * Math.PI * 2;
+    // Looking from `a` toward the fleet.
+    view.set(-Math.sin(a), 0, -Math.cos(a));
+    let seen = 0;
+    for (const f of faces) seen += Math.abs(f.n.dot(view)) * f.area;
+    if (seen > most) {
+      most = seen;
+      best = a;
+    }
+  }
+  return best;
+};
+
+/**
+ * Frame the fleet, wherever their own courses have taken them.
+ *
+ * Called from the render loop AND from `galleryDebug`, which is the whole
+ * reason it is a function: a headless run steps a minute of sailing inside
+ * one `evaluate` with no frames in between, and a camera that is only moved
+ * by the render loop is then aimed at where the ships used to be. The first
+ * screenshot off this view was an empty sea for exactly that reason.
+ */
+const placeSailCamera = (): void => {
+  if (!rigs.length) return;
+  const mid = new Vector3();
+  for (const r of rigs) mid.add(r.ship.object.position);
+  mid.multiplyScalar(1 / rigs.length);
+  let heading = 0;
+  let spread = 0;
+  for (const r of rigs) {
+    heading += r.ship.object.rotation.y / rigs.length;
+    spread = Math.max(spread, r.ship.object.position.distanceTo(mid));
+  }
+  // Stand where the CANVAS is widest, rather than at a fixed angle off the
+  // bow. A sail seen end-on is an invisible sail, and where end-on is moves
+  // with the point of sailing: close-hauled the booms are sheeted in along
+  // the hull and you want to be on her beam, dead downwind they are squared
+  // right out and the beam is the one place you see nothing. Two cuts of
+  // this view were tuned to one of those and broken for the other, so this
+  // one asks the sails: sweep the horizon and stand where their normals
+  // face you.
+  const beam = broadsideOn(heading);
+  const back = 44 + spread * 1.35;
+  camera.position.set(mid.x + Math.sin(beam) * back, 14 + back * 0.16, mid.z + Math.cos(beam) * back);
+  camera.lookAt(mid.x, 9, mid.z);
+  // Straight over the fleet, so the wind is in shot whatever the framing.
+  // In the foreground, between the viewer and the fleet. Parked to windward
+  // it ended up at the horizon and behind a hull, which is a wind arrow
+  // nobody can see. It still points the true direction — only where it is
+  // drawn is chosen for the camera.
+  if (windVane) {
+    windVane.position.set(
+      mid.x + Math.sin(beam) * back * 0.42,
+      1.4,
+      mid.z + Math.cos(beam) * back * 0.42
+    );
+  }
+};
+
+/**
+ * Sail the rigged fleet one tick.
+ *
+ * The handshake in four lines: the wind is a field, the rig reads it, the
+ * DRIVE comes out of the polar, and the hull is given that and nothing else.
+ * No throttle anywhere — if a ship is not moving it is because of where she
+ * is pointing.
+ */
+const stepSail = (dt: number): void => {
+  breeze?.update(dt);
+  for (const { rig, ship, label } of rigs) {
+    rig.update(dt);
+    // Slow on purpose: these four are on divergent courses and at any real
+    // hull speed they are out of one frame inside a minute.
+    ship.update(dt, { speed: rig.drive * 0.8 });
+    // The masthead pennant dips as she heels — a read on the number that has
+    // no other way of being seen.
+    label.rotation.z = -rig.heelForce * 0.5;
+  }
+};
+
 // --- headless verification ---------------------------------------------
 
 declare global {
@@ -1001,6 +1247,9 @@ declare global {
     galleryDoors: (open: number) => void;
     gallerySinks: (fresh: number) => void;
     galleryShut: (shut: number) => void;
+    gallerySail: (mode: number, set?: number) => void;
+    gallerySailReport: () => Array<Record<string, unknown>>;
+    gallerySailPositions: () => Record<string, unknown>;
   }
 }
 
@@ -1053,6 +1302,7 @@ window.galleryStep = (dt: number) => {
   }
   for (const v of vents) v.update(dt, 1);
   smokeRoom?.update(dt);
+  stepSail(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1066,6 +1316,66 @@ window.galleryStep = (dt: number) => {
     basin.fillBy(tap * dt * 0.22);
     basin.update(dt);
   }
+};
+
+/**
+ * Steer the fleet, for the headless run.
+ *
+ * 0 = straight at the wind (in irons, every sail flogging), 1 = each ship's
+ * own layline to the same upwind mark, 2 = dead before it. `set` shortens
+ * sail. Three settings, because the claims are about the difference between
+ * them and a single screenshot cannot show a difference.
+ */
+window.gallerySail = (mode: number, set = 1) => {
+  const from = -Math.PI / 2;
+  for (const { rig, ship } of rigs) {
+    rig.setSail(set);
+    ship.object.rotation.y =
+      mode < 0.5 ? from : mode < 1.5 ? rig.layline(from, from + rig.noGo) : from + Math.PI;
+  }
+};
+
+/**
+ * What every rig thinks it is doing, next to where its canvas actually is.
+ *
+ * Both halves matter and they have caught different bugs: numbers that look
+ * right while a sail is rigged the wrong way across the ship, and canvas
+ * that looks right while nothing is reading the wind.
+ */
+window.gallerySailReport = () =>
+  rigs.map(({ rig, ship }) => {
+    ship.object.updateMatrixWorld(true);
+    const box = new Box3();
+    rig.object.traverse((o) => {
+      const m = o as Mesh;
+      if (m.isMesh && m.geometry?.type === 'PlaneGeometry' && m.visible) {
+        box.union(new Box3().setFromObject(m));
+      }
+    });
+    return {
+      kind: rig.kind,
+      off: Number(((rig.windAngle * 180) / Math.PI).toFixed(1)),
+      drive: Number(rig.drive.toFixed(3)),
+      heel: Number(rig.heelForce.toFixed(3)),
+      luffing: rig.luffing,
+      canvasY: box.isEmpty() ? null : [Number(box.min.y.toFixed(2)), Number(box.max.y.toFixed(2))],
+      speed: Number(ship.object.position.length().toFixed(1)),
+    };
+  });
+
+window.gallerySailPositions = () => {
+  placeSailCamera();
+  camera.updateMatrixWorld(true);
+  const p = new Vector3();
+  return {
+    camera: camera.position.toArray().map((n) => Number(n.toFixed(1))),
+    ships: rigs.map((r) => r.ship.object.position.toArray().map((n) => Number(n.toFixed(1)))),
+    ndc: rigs.map((r) => {
+      p.copy(r.ship.object.position).project(camera);
+      return p.toArray().map((n) => Number(n.toFixed(2)));
+    }),
+    vane: windVane ? windVane.position.toArray().map((n) => Number(n.toFixed(1))) : null,
+  };
 };
 
 /** Shut every dresser door, for the headless run. */
@@ -1172,6 +1482,7 @@ window.galleryLook = (x, y, z, tx, ty, tz) => {
 };
 window.galleryDebug = (t?: number) => {
   if (typeof t === 'number') setTime(t);
+  if (view === 'sail') placeSailCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
