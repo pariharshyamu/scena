@@ -638,3 +638,35 @@ The matching pair: `temperature` is what the source is doing and `zone.heat` is 
 - **`steel` renders near-black.** It is a high-metalness preset and there was nothing in the scene for it to reflect — the same trap as the chrome pool ladder. `paintedMetal` was no better: it puts a pitted render finish on what should be a smooth enamelled panel. A modern appliance front has no texture worth simulating, and a plain material is the right answer.
 
 And one trap in the harness rather than the prop: the gallery's headless `galleryStep` keeps its **own** list of things to update, separate from the animation loop. The stoves were missing from it, so the first verification run reported entirely plausible temperatures for a system nobody had ever stepped.
+
+## Cookware, and what is in it
+
+The heat track made a field; this is the thing that reads it. A pan is a container with **contents that change** — raw → cooking → done → burnt — driven entirely by how hot it is where the pan is standing.
+
+```ts
+const pot = createCookware({ kind: 'pot' });
+pot.add(0.8, { cookFor: 40 });
+game.onUpdate((t) => pot.update(t.delta, stove));   // reads heatAt itself
+```
+
+`update` takes the **stove**, not a number: the pan samples `heatAt` at its own world position, so sliding it off the ring is all it takes, and hanging a cauldron on a hearth crane needs no special case at all. Everything is a `Carryable`, so ANIMA picks it up with no adapter.
+
+Two rules do all the work:
+
+- **The pan has its own temperature, and it lags.** Food does not start cooking the instant a ring is lit. A frying pan is up in four seconds; a cauldron takes nearly a minute, because there is a great deal more iron in it — the difference between searing something and putting a stew on. Drive `progress` straight off `heatAt` and everything cooks the moment it is put down, which is a timer, not a stove.
+- **Water boils away.** A pot left on goes dry, and a dry pot burns. That one rule turns "wait for the bar to fill" into something you have to watch, and it is why a lid matters: covered, it comes up hotter *and* loses less.
+
+A kettle whistles when it boils — once, and again only after somebody has taken it off.
+
+### Two bugs the tests caught, both about disagreement
+
+- **`mass` is the time constant in seconds, and a stray multiplier was dividing every number in the table by twelve.** A cauldron was coming up in four seconds and a frying pan in a third of one, which makes the whole column decorative. The test that caught it just asserted the thing the docs already claimed.
+- **The colour and the verdict disagreed.** A pot that catches *because it boiled dry* never gets past `done` on the timer, so a purely progress-based colour ramp left it looking half-cooked while reporting itself burnt. The tint follows the state now.
+
+And one modelling slip the tests found on their own: steam was keyed off `burnt`, which silenced a pot that had caught but was still half full of stock — exactly when it steams hardest. Steam follows the **water**.
+
+### A note on the harness, which was costing minutes a run
+
+The gallery's headless `galleryStep` called `renderer.render` on every step. Stepping ninety seconds of stove time meant ninety seconds of *software* rasterisation for frames nobody ever looked at — a five-minute verification run that should take five seconds. Stepping and drawing are different jobs: `galleryLook` and `galleryDebug` both render, and a screenshot always follows one of them. The same run is now 5.6 s.
+
+The matching lesson from the demo itself: `getWorldPosition` on a freshly added object returns whatever the stale matrix says. Every pan came out hovering beside its stove instead of on the ring, because nothing had called `updateMatrixWorld` yet.

@@ -460,6 +460,14 @@ export {
   type HeatField,
 } from './props/heat';
 export {
+  createCookware,
+  COOKWARE_KINDS,
+  type Cookware,
+  type CookwareOptions,
+  type CookwareKind,
+  type CookState,
+} from './props/cookware';
+export {
   createBasin,
   createTap,
   createEwer,

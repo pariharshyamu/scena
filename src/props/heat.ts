@@ -387,16 +387,22 @@ export function createHeatSource(options: HeatOptions = {}): HeatSource {
     arm.rotation.z = Math.PI / 2;
     arm.position.set(0.36, 1.02, 0);
     pivot.add(arm);
-    const chain = new Mesh(new CylinderGeometry(0.008, 0.008, 0.3, 5), iron);
-    chain.position.set(0.66, 0.87, 0);
+    // Long enough to bring a pot DOWN INTO the fire. The first version hung
+    // it level with the crane arm, a metre above the flames, which is a pot
+    // stored on a bracket rather than one being cooked in.
+    const chain = new Mesh(new CylinderGeometry(0.008, 0.008, 0.66, 5), iron);
+    chain.position.set(0.66, 0.69, 0);
     pivot.add(chain);
     const hookIron = new Mesh(new TorusGeometry(0.03, 0.007, 4, 10, Math.PI * 1.4), iron);
     hookIron.rotation.y = Math.PI / 2;
-    hookIron.position.set(0.66, 0.71, 0);
+    hookIron.position.set(0.66, 0.345, 0);
     pivot.add(hookIron);
     const hook = new Object3D();
     hook.name = 'zone:hook';
-    hook.position.set(0.66, 0.7, 0);
+    // Where a pot's BASE goes — cookware is authored base-at-origin like
+    // everything else in the library, so the anchor has to be the bottom of
+    // the pot, not the point the bail hangs from.
+    hook.position.set(0.66, 0.3, 0);
     pivot.add(hook);
     // The hook is a PLACE, not an emitter. Its anchor rides on the crane, so
     // swinging the crane moves it through the fire's field and heatAt does

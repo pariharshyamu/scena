@@ -1,6 +1,7 @@
 import {
   AmbientLight,
   Box3,
+  BoxGeometry,
   CylinderGeometry,
   Clock,
   Color,
@@ -41,6 +42,8 @@ import {
   createTub,
   createPool,
   createHeatSource,
+  createCookware,
+  COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
   BASIN_ERAS,
@@ -75,6 +78,7 @@ import {
   type Pool,
   type HeatSource,
   type HeatEra,
+  type Cookware,
   type Jacuzzi,
   type Basin,
   type PropSurface,
@@ -152,6 +156,7 @@ const showers: Shower[] = [];
 const tubs: Tub[] = [];
 const pools: Pool[] = [];
 const stoves: HeatSource[] = [];
+const pans: Cookware[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -310,6 +315,46 @@ if (view === 'room') {
     stove.setPower(1);
     scene.add(stove.object);
     stoves.push(stove);
+  });
+
+  // One pot on each stove, reading the field at its own position — and a
+  // bench row in front showing every kind at a different stage of cooking.
+  stoves.forEach((stove, i) => {
+    const kind = i === 0 ? 'cauldron' : i === 1 ? 'pot' : i === 2 ? 'pan' : 'kettle';
+    const w = createCookware({ kind, seed: i + 5, palette });
+    w.add(0.9, { cookFor: i === 0 ? 90 : 45 });
+    if (w.lid) w.lid.set(i === 1);
+    if (i === 0) {
+      // Hung on the crane hook: the medieval way, and the reason heat is a
+      // field rather than a property of the stove.
+      stove.zones[0].anchor.add(w.object);
+    } else {
+      // updateMatrixWorld FIRST. getWorldPosition on a freshly added object
+      // returns whatever the stale matrix says, so every pan came out
+      // hovering beside its stove rather than on the ring.
+      stove.object.updateMatrixWorld(true);
+      const zone = stove.zones[0].anchor.getWorldPosition(new Vector3());
+      w.object.position.copy(zone);
+      scene.add(w.object);
+    }
+    pans.push(w);
+  });
+  // A bench for the row to stand on, because a pan floating at worktop
+  // height with nothing under it is a pan floating in mid-air.
+  const benchTop = 0.86;
+  const benchSlab = new Mesh(
+    new BoxGeometry(4.0, 0.08, 0.6),
+    new MeshStandardMaterial({ color: 0x6d6862, roughness: 0.8 })
+  );
+  benchSlab.position.set(0, benchTop - 0.04, 2.3);
+  scene.add(benchSlab);
+  COOKWARE_KINDS.forEach((kind, i) => {
+    const w = createCookware({ kind, seed: i + 20, palette });
+    w.add(0.8, { cookFor: 20 + i * 30 });
+    if (w.lid) w.lid.set(false);
+    w.object.position.set(-1.6 + i * 0.8, benchTop, 2.3);
+    scene.add(w.object);
+    pans.push(w);
   });
 
 } else if (view === 'water') {
@@ -521,6 +566,11 @@ renderer.setAnimationLoop(() => {
   }
   if (view === 'heat') {
     for (const st of stoves) st.update(dt);
+    for (let i = 0; i < pans.length; i++) {
+      // The four on the stoves read their own stove; the bench row is fed a
+      // steady bench heat so it shows the states side by side.
+      pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
+    }
   }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
@@ -595,6 +645,14 @@ declare global {
  * frozen frame — two samples come back identical and the water looks static
  * whether it is or not.
  */
+/**
+ * Advance the simulation WITHOUT drawing.
+ *
+ * This used to render on every step, which made stepping a minute of stove
+ * time into a minute of SwiftShader wall clock for pictures nobody looked
+ * at. Stepping and drawing are different jobs: `galleryLook` and
+ * `galleryDebug` both render, and a screenshot always follows one of them.
+ */
 window.galleryStep = (dt: number) => {
   // Everything that has an update must be listed HERE too, not only in the
   // animation loop: galleryStep is what the headless runs drive, so a prop
@@ -602,6 +660,7 @@ window.galleryStep = (dt: number) => {
   // nobody ever stepped.
   for (const st of stoves) st.update(dt);
   for (const pl of pools) pl.update(dt);
+  for (let i = 0; i < pans.length; i++) pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -615,7 +674,6 @@ window.galleryStep = (dt: number) => {
     basin.fillBy(tap * dt * 0.22);
     basin.update(dt);
   }
-  renderer.render(scene, camera);
 };
 
 /** Drive the bathroom, for the headless run. */
@@ -729,6 +787,15 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    pans: pans.map((w) => ({
+      kind: w.kind,
+      state: w.state,
+      temp: Number(w.temperature.toFixed(2)),
+      level: Number(w.level.toFixed(2)),
+      progress: Number(w.progress.toFixed(2)),
+      boiling: w.boiling,
+      steam: Number(w.steam.density.toFixed(2)),
+    })),
     heat: stoves.map((st) => ({
       era: st.era,
       state: st.state,
