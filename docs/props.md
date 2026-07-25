@@ -486,3 +486,36 @@ Everything takes its flow or level **from outside**, so `createValve` (already a
 - **Steam builds slowly and clears slower.** A room that fogs the instant the tap opens is a smoke machine, and the asymmetry is why a bathroom stays fogged afterwards.
 
 Two practical traps. `createFill`'s radius must match the container's **interior at the level the water reaches**, not its widest point — a bowl flares, so a disc cut to the rim pokes out through the sides as a blue band around the outside. And **point sprites have no upper size bound**: a splash viewed from 60 cm becomes a screenful of glowing beach balls, so droplets carry a `maxPixels` cap.
+
+## Basins, taps and ewers
+
+The era here is a **gameplay** axis, not a styling one, and that is the whole reason it is worth having:
+
+| Era | Controls | The loop |
+|---|---|---|
+| `medieval` | none — `taps` is **empty** | water arrives in a vessel, `pour()` it in, throw it out |
+| `victorian` | two crossheads and a plug | hot and cold arrived separately; mixing was your problem |
+| `modern` | one mixer lever and a drain | water on demand |
+
+The same three meshes with different textures would be a re-skin. These differ in what the player *does*, which is why one of them has no taps at all and a laver quietly refuses `setDrain` — pretending it had a plug would let a medieval scene empty itself.
+
+```ts
+const basin = createBasin({ era: 'victorian' });
+basin.taps[0].toggle();
+game.onUpdate((t) => basin.update(t.delta));
+```
+
+The whole **tap → stream → level** loop is wired inside the prop, so the caller only operates the taps. It still composes outward: `Tap` is structurally a `Manipulable`, exactly like a door or a valve, so GAMA's `Automation` or any interaction system drives one without knowing what a basin is. `createEwer` is a `Carryable`, so the medieval half is a carry loop that ANIMA already supports with no adapter.
+
+One detail that is easy to skip and shouldn't be: **the knurled pillar knob has ribs**. A smooth cylinder rotating about its own axis is pixel-identical to a stationary one, which makes the entire control invisible.
+
+## Washing (ANIMA)
+
+`Washing` is the pose that makes a basin usable, and it is genuinely not `DeskWork`. At a desk the forearms come forward at elbow height and the head stays near level, because the screen is at eye height. At a basin the hands go **down and together** into a bowl below the elbows and the head really drops — you are looking at your hands.
+
+Both of those came out backwards on the first attempt, and the fix was to **sweep the rig and measure** rather than reason about it:
+
+- **Arm `Z` controls how far apart the hands are**, not how far forward: 1.05 gives a 69 cm gap, 1.45 gives 42 cm.
+- **Less forearm bend drops the hand below the elbow**, not more: 0.8 puts it 11 cm under, 1.4 puts it 5 cm over.
+
+The first version used the widest, highest combination of both and produced a pose that failed six tests at once.

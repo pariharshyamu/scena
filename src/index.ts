@@ -425,6 +425,19 @@ export {
   type Droplets,
 } from './materials/waterFlow';
 export {
+  createBasin,
+  createTap,
+  createEwer,
+  BASIN_ERAS,
+  type Basin,
+  type BasinOptions,
+  type BasinEra,
+  type Tap,
+  type TapOptions,
+  type TapStyle,
+  type EwerOptions,
+} from './props/washing';
+export {
   createStream,
   createSpray,
   createFill,
