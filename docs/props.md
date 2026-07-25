@@ -697,3 +697,48 @@ A station **runs out**: `remaining` falls with each cycle and stops the loop dea
 The quern's crank stands proud on purpose. A smooth stone turning about its own axis is pixel-identical to a stationary one — the knurled-knob trap for the third time — so the handle sweeps a visible circle, and there is a test that measures the circle rather than the rotation.
 
 One testing note worth keeping: `InstancedMesh` **does not override `.type`**, so it reports as a plain `'Mesh'`. The shared burst pool parks its dead particles at −9999, and a bounding-box helper that filtered on `type === 'Mesh'` let the pool straight through and made every station ten kilometres tall.
+
+## Cold storage: larder to freezer
+
+The mirror of the heat track, and the differences are the interesting part. Heat is a **surface** you put a pot on top of; cold is a **volume** you put food inside, and the whole of it leaks the moment you open the door. So the handshake gains a y:
+
+```ts
+chillAt(x, y, z): number   // °C at a world point, ambient outside
+keepAt(x, y, z): number    // how fast food spoils there, bench = 1
+```
+
+alongside `heatAt(x, z)` and `depthAt(x, z)`. It reports **°C**, not a 0–1 dial, because unlike a fire's output there is a real scale here and the whole game is played against thresholds on it. Note the neutral value is **ambient**, not zero — `depthAt` and `heatAt` can return 0 for "nothing here" because no water and no fire are genuinely nothing, but there is no such thing as a place with no temperature.
+
+The era is not a finish. It is *what you have to do to keep the cold in*:
+
+| Era | Holds | The upkeep loop |
+|---|---|---|
+| `larder` | ~6 °C under the room | **none at all** — on a hot day it does nothing |
+| `icebox` | 7 °C | a block of ice that melts; `restock()` |
+| `fridge` | 4 °C | a compressor that cycles; nothing to do |
+| `freezer` | −18 °C | frost that builds until somebody `defrost()`s it |
+
+### The door is the mechanic
+
+Every one of them has a door, and opening it is what costs you. `openLeak` is within a factor of three across all four eras, because an open door is an open door: **a £900 fridge standing open is barely better than a stone cupboard.** There is a test that asserts exactly that, and it is the point of the whole track. On the eras that have one, an alarm fires once per opening — not once per frame it is still hanging there.
+
+### Three bugs, and all three were the model rather than the mesh
+
+- **The larder was double-counted.** It had both a leak toward the room *and* a settling term toward "six degrees under the room", which fought and met in the middle: a larder in an 8 °C pantry sat at 5 °C instead of 2. A passive store has exactly one term — what it leaks *toward* is `ambient - passive` when shut and plain `ambient` when the door is open.
+- **The ice was charged twice, and it inverted the result.** Melting was billed for the heat entering the box *plus* the heat the ice removed. Heat entering the box only melts ice insofar as the ice takes it out again, and once an open icebox had warmed to room temperature nothing was leaking in any more — so an icebox left standing wide open melted its block **more slowly** than a shut one. Charge the block for what it absorbed, and nothing else.
+- **The compressor never switched off.** Hysteresis has to be a band on **both** sides of the setpoint. Switching off at exactly the setpoint reads correctly and does not work: the leak adds a hair every frame, so the interior never quite reaches the line and the compressor runs forever. A real one overshoots below and coasts back up, which is why you hear a fridge start and stop rather than hum steadily. (A block of ice genuinely *can't* go below its own temperature, so that one keeps the clamp.)
+
+### And two that only the render caught
+
+Both the same defect, and it is one this library keeps rediscovering: **a reading with no contrast is not a reading.** The `frost` field read `1.0` in the debug dump while the screenshot showed a spotless freezer, because the rime was white cards on a white liner. The ice block was a pale box against a pale liner and looked like a blank panel. Neither is fixed by making them bigger:
+
+- the ice is **blue** and faceted, and the icebox is lined in dark zinc for it to sit against;
+- the frost is a blue white, and most of it grows on the **shelves**, where pale chunks read against dark wire instead of disappearing into the walls.
+
+The one reading deliberately left invisible is `running`. A fridge cycling its compressor has no visual, because in life you *hear* a fridge — wire it to a hum and a power meter.
+
+### Spoilage
+
+`spoilRate(°C)` is exported on its own. Q10: bacteria and the chemistry roughly halve for every ten degrees off. That alone would make a freezer only twelve times better than a worktop, which is nonsense — frozen food keeps for a year — so freezing is modelled as what it actually is, a **phase change** rather than more of the same, smoothed over the two degrees below zero so a fridge hovering there does not flicker between regimes.
+
+Shelves are published as `surfaces`, so `dress` fills a fridge with no special case. They **span** the cavity rather than marching up from the bottom: dividing by the shelf count instead of the gaps left a third of every cabinet empty above the top shelf and squeezed the lower ones close enough together that a bottle stood on one went through the next.

@@ -44,7 +44,9 @@ import {
   createHeatSource,
   createCookware,
   createPrepStation,
+  createColdStore,
   PREP_KINDS,
+  COLD_ERAS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -84,6 +86,7 @@ import {
   type PrepStation,
   type Jacuzzi,
   type Basin,
+  type ColdStore,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -161,6 +164,7 @@ const pools: Pool[] = [];
 const stoves: HeatSource[] = [];
 const pans: Cookware[] = [];
 const preps: PrepStation[] = [];
+const colds: ColdStore[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -382,6 +386,42 @@ if (view === 'room') {
     preps.push(st);
   });
 
+} else if (view === 'cold') {
+  // Four eras of cold storage, all with their doors hanging open — because
+  // the inside is the prop. A cold store photographed shut is a cupboard.
+  scene.add(new AmbientLight(0xffffff, 0.42));
+  const coldKey = new DirectionalLight(0xffffff, 1.0);
+  coldKey.position.set(3, 7, 5);
+  scene.add(coldKey);
+  const coldFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x4a4742, roughness: 0.9 })
+  );
+  coldFloor.rotation.x = -Math.PI / 2;
+  scene.add(coldFloor);
+  COLD_ERAS.forEach((era, i) => {
+    const store = createColdStore({ era, seed: i + 2, ambient: 22, palette });
+    store.object.position.set(-2.6 + i * 1.75, 0, 0);
+    // Standing open, which is also the only way to see the ice melt and the
+    // frost creep — and, conveniently, the state that breaks all four.
+    store.door.set(true);
+    scene.add(store.object);
+    colds.push(store);
+    // Something on the middle shelf, so 'inside' has a subject.
+    store.object.updateMatrixWorld(true);
+    const shelf = store.shelves[Math.floor(store.shelves.length / 2)];
+    const jar = createVessel({
+      // Short things: the shelves in a small cabinet do not have the
+      // headroom for a bottle, and one placed there goes straight through
+      // the board above it.
+      style: i % 2 === 0 ? 'jug' : 'bowl',
+      seed: i + 9,
+      palette,
+    });
+    jar.object.position.copy(shelf.anchor.getWorldPosition(new Vector3()));
+    scene.add(jar.object);
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -600,6 +640,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'prep') {
     for (const st of preps) st.update(dt, true);
   }
+  if (view === 'cold') {
+    for (const st of colds) st.update(dt);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -627,6 +670,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'prep') {
     camera.position.set(Math.sin(t * 0.1) * 1.2, 1.5, 2.6);
     camera.lookAt(0, 0.95, 0);
+  } else if (view === 'cold') {
+    camera.position.set(Math.sin(t * 0.1) * 1.4, 1.5, 3.6);
+    camera.lookAt(0, 0.85, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -657,6 +703,7 @@ declare global {
     galleryWater: (on: number) => void;
     galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
+    galleryDoors: (open: number) => void;
   }
 }
 
@@ -693,6 +740,7 @@ window.galleryStep = (dt: number) => {
   for (const pl of pools) pl.update(dt);
   for (let i = 0; i < pans.length; i++) pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
   for (const st of preps) st.update(dt, true);
+  for (const st of colds) st.update(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -706,6 +754,11 @@ window.galleryStep = (dt: number) => {
     basin.fillBy(tap * dt * 0.22);
     basin.update(dt);
   }
+};
+
+/** Open or shut every cold store, for the headless run. */
+window.galleryDoors = (open: number) => {
+  for (const st of colds) st.door.set(open > 0.5);
 };
 
 /** Drive the bathroom, for the headless run. */
@@ -829,6 +882,29 @@ window.galleryDebug = (t?: number) => {
           .distanceTo(st.guide.getWorldPosition(new Vector3())).toFixed(3)
       ),
     })),
+    cold: colds.map((st) => {
+      st.object.updateMatrixWorld(true);
+      const shelf = st.shelves[Math.floor(st.shelves.length / 2)].anchor
+        .getWorldPosition(new Vector3());
+      const out = shelf.clone().add(new Vector3(0, 0, 1.5));
+      return {
+        era: st.era,
+        state: st.state,
+        temp: Number(st.temperature.toFixed(2)),
+        setpoint: st.setpoint,
+        running: st.running,
+        ice: Number(st.ice.toFixed(3)),
+        frost: Number(st.frost.toFixed(3)),
+        door: Number(st.door.state.toFixed(2)),
+        ajar: Number(st.ajar.toFixed(1)),
+        // Inside vs a metre and a half out in the room: if these two read the
+        // same the cavity is not where the geometry is.
+        inside: Number(st.chillAt(shelf.x, shelf.y, shelf.z).toFixed(2)),
+        outside: Number(st.chillAt(out.x, out.y, out.z).toFixed(2)),
+        keeps: Number(st.keepAt(shelf.x, shelf.y, shelf.z).toFixed(3)),
+        light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
+      };
+    }),
     pans: pans.map((w) => ({
       kind: w.kind,
       state: w.state,

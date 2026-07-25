@@ -475,6 +475,20 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createColdStore,
+  createLarder,
+  createIcebox,
+  createFridge,
+  spoilRate,
+  COLD_ERAS,
+  type ColdStore,
+  type ColdOptions,
+  type ColdEra,
+  type ColdState,
+  type ColdDoor,
+  type ChillField,
+} from './props/cold';
+export {
   createBasin,
   createTap,
   createEwer,
