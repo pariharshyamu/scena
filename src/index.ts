@@ -348,3 +348,27 @@ export {
   type TackOptions,
   type TackStyle,
 } from './props/climbing';
+
+// Screens & electronics
+export {
+  createScreenPanel,
+  type ScreenPanel,
+  type ScreenPanelOptions,
+  type ScreenMode,
+  type ScreenOptions,
+} from './materials/screen';
+export {
+  createMonitor,
+  createTelevision,
+  createLaptop,
+  createSmartDisplay,
+  createTablet,
+  createScreenLight,
+  type ScreenProp,
+  type ScreenPropOptions,
+  type ScreenCarryable,
+  type TelevisionOptions,
+  type LaptopOptions,
+  type ScreenLight,
+  type ScreenLightOptions,
+} from './props/electronics';

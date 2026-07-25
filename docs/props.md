@@ -233,3 +233,40 @@ horse.bones.Head.add(createBridle({ horseHeight: horse.height }).object);
 ```
 
 The stirrups hang where the rider's foot goes and the reins run forward to the bit — so ANIMA's ride pose (heels down, hands forward) and the tack meet by construction rather than by fiddling. `english`, `western` (with the horn) and a `bareback` pad.
+
+## Screens & electronics
+
+An interior at night used to be black, because every light source in the kit was a fire. Screens fix that, and they are the thing that makes a room read as *now* rather than as a period set.
+
+```ts
+const tv = createTelevision({ diagonal: 1.4, mount: 'stand', mode: 'video' });
+scene.add(tv.object);
+const glow = createScreenLight(tv.screen);
+game.onUpdate((t) => { tv.screen.update(t.delta); glow.update(); });
+```
+
+`createMonitor`, `createTelevision`, `createLaptop` (with a hinged `open` lid), `createSmartDisplay`, and `createTablet` — which is a `Carryable` that happens to have a screen, so pick-up, carry, put-down and hand-off already work on it with nothing added.
+
+### The content is drawn, not fetched
+
+`createScreenPanel(width, height, { mode })` builds the material. Nine modes — `off`, `standby`, `home`, `feed`, `video`, `map`, `chart`, `call`, `keypad` — drawn procedurally in the fragment shader from the panel's UVs, the same way `createSurface` draws brick.
+
+Deliberately **not text**. A phone is a few pixels across at conversational distance; what you need is the *impression* of an interface — rows, tiles, a route line, a scrubbing bar — not readable content. Real glyphs would cost thousands of triangles for something illegible.
+
+Content is written into emissive radiance rather than `material.emissive`, so the day/night cycle cannot dim a screen. A monitor at midnight is as bright as one at noon, which is the whole reason anyone notices screens at night. And `off` is not black: it is a dark mirror.
+
+### Why the light is a spotlight
+
+`createScreenLight` returns a **`SpotLight`**, wide and fully soft, aimed along the panel normal. This is not a detail.
+
+A screen emits from its front face only. A `PointLight` — which is what this had first — radiates in every direction, so it lights the wall the television is standing against 1.4 m away five times harder than the person watching it 3.2 m away. The render came out as a bright halo behind the set with the viewer sitting in shadow: exactly backwards, and invisible to every numeric check, because the light *was* on and *was* the right colour.
+
+Emission scales with panel **area**, not diagonal — a 55" set puts out roughly twenty times a tablet, where a diagonal-based figure makes it about twice.
+
+Lights stay a budget, as everywhere else here: this is opt-in per panel. A room of monitors should light one or two faces and let the rest carry on their emissive alone.
+
+### A television, not a blue lamp
+
+`panel.glow` publishes the colour and level of what is being drawn *right now*, so a light that copies it flickers in time with the picture's own cuts.
+
+The shot list is deliberately uneven — cuts run 0.55–4 s, because a fixed cut length reads as a strobe and the room lighting gives it away long before the picture does. The CPU pushes each shot's colour and level into the shader as uniforms rather than letting the shader pick its own, so the light and the picture cannot drift apart: they are the same event.

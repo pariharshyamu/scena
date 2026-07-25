@@ -41,3 +41,18 @@ GAMA's `generateNavMesh` raycasts against level geometry — hand it the terrain
 ## Determinism across the network
 
 Both libraries are deterministic where it matters: the same manifest seed reproduces the same world, so two clients can build identical forests — identical *obstacles* — from a few bytes of JSON, and agents steering through them stay coherent without syncing any geometry.
+
+## Screens
+
+`ScreenPanel` (published as `screen` by every electronics prop) is two handshakes at once:
+
+- `{ surface, width, height }` is structurally ANIMA's `Viewable`, so `new Watching(rig, gaze).watch(tv.screen)` puts a character's eyes on it.
+- `setMode(mode: string)` is structurally GAMA's `DisplayTarget`, so `new Device().attach(tv.screen)` lets a power state machine drive what it shows.
+
+```ts
+const tv = createTelevision({ mode: 'off' });     // SCENA owns how it looks
+new Device({ boot: 2.4 }).attach(tv.screen);      // GAMA owns whether it is on
+new Watching(rig, gaze).watch(tv.screen);         // ANIMA owns who is looking
+```
+
+No library imports another. GAMA never learns what a `video` mode looks like; SCENA never learns what booting means.
