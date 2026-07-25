@@ -460,3 +460,29 @@ Two new `PictureStyle`s carry it — `poster` (a flat colour field, a heavy band
 | `createStickyNotes({ count, seed })` | a cluster, never an even scatter |
 
 The **overlap** is the whole pinboard. A board of neatly spaced non-touching notes is a spreadsheet; a real one has a photo half over a flyer with a corner of a receipt under both, everything at a different angle, and the notes stacked in z so the ones on top really are.
+
+## Water in motion
+
+The porcelain in a bathroom is trivial: a basin is a lathe and a tub is a box with a hole in it. What makes any of it read is **water behaving**. `materials/waterFlow.ts` is the shared layer, extracted the same way `clothWave` was — the fountain had falling water and a jet since 0.9, and every tap, shower and cascade wants both.
+
+It also **fixed** what was there. The fountain's falling water was eight *static* translucent cylinders. At rest that reads as glass rods, and no amount of tinting helps, because the thing that says water is not the colour — it is that the surface travels downward and comes apart as it goes.
+
+| Generator | Notes |
+|---|---|
+| `createStream({ height, radius, flow })` | a tap, a spout, a weir. Origin at the **lip** |
+| `createSpray({ height, radius, spread })` | a shower's cone, with mist where it lands |
+| `createFill({ radius \| width, depth })` | the water *inside* a container; `setLevel`, `fillBy`, `disturb` |
+| `createSteam({ radius, height })` | the only particles in the set |
+
+Everything takes its flow or level **from outside**, so `createValve` (already a `Manipulable` with an eased `state`) or GAMA's `Automation` drives it with no library importing another.
+
+### What makes it read as water
+
+- **Falling water accelerates**, so the column narrows and the pattern *stretches* rather than scrolling. Constant-rate scrolling gives a barber's pole.
+- **It breaks up with distance fallen** — a sheet near the lip, separate ropes further down. `breakUp` is *how far down* that starts, so a thin tap stream wants a **low** value and a thick weir a high one. I had this inverted at first, which gave tap water holding as a sheet all the way to the basin while a weir shattered at the lip.
+- **The body is transparent and the lit edges are not.** A uniformly pale tube is a rod whatever it is tinted; the contrast along the length is the whole effect.
+- **A closed tap draws nothing at all** — not "fully transparent", which still costs a draw and still sorts against everything behind it.
+- **A fill is agitated while filling and settles when it stops.** A still disc of blue is a disc of blue; the decay is the difference.
+- **Steam builds slowly and clears slower.** A room that fogs the instant the tap opens is a smoke machine, and the asymmetry is why a bathroom stays fogged afterwards.
+
+Two practical traps. `createFill`'s radius must match the container's **interior at the level the water reaches**, not its widest point — a bowl flares, so a disc cut to the rim pokes out through the sides as a blue band around the outside. And **point sprites have no upper size bound**: a splash viewed from 60 cm becomes a screenful of glowing beach balls, so droplets carry a `maxPixels` cap.

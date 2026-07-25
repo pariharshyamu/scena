@@ -1,20 +1,10 @@
-import {
-  AdditiveBlending,
-  BoxGeometry,
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  Points,
-  ShaderMaterial,
-} from 'three';
+import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
 import { createWater } from '../environment/water';
+import { createDroplets } from '../materials/waterFlow';
+import { createStream, type Stream } from './waterworks';
 import { createStatue, type StatueFigure } from './statue';
 import type { Prop } from '../core/types';
 
@@ -116,24 +106,35 @@ export function createFountain(options: FountainOptions = {}): Prop {
   statue.object.scale.setScalar(0.9);
   group.add(statue.object);
 
-  // --- Falling water: translucent sheets from the bowl rim to the pool.
-  const waterMat = new MeshStandardMaterial({
-    color: palette.water,
-    transparent: true,
-    opacity: 0.4,
-    roughness: 0.3,
-    metalness: 0.4,
-    flatShading: true,
-  });
+  // --- Falling water from the bowl rim to the pool.
+  //
+  // These were STATIC translucent cylinders until 0.52 — at rest that reads
+  // as eight glass rods, because what says "water" is not the tint, it is
+  // that the surface travels downward and comes apart as it falls.
+  const fallHeight = bowlY - lowerLevel - 0.05;
+  const falls: Stream[] = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
-    const fall = new Mesh(new CylinderGeometry(0.02, 0.03, bowlY - lowerLevel - 0.05, 4), waterMat);
-    fall.position.set(Math.cos(a) * size * 0.28, (bowlY + lowerLevel) / 2, Math.sin(a) * size * 0.28);
-    group.add(fall);
+    const fall = createStream({
+      height: fallHeight,
+      radius: 0.022,
+      splash: false,
+      seed: seed + i,
+      palette,
+    });
+    fall.object.position.set(Math.cos(a) * size * 0.28, bowlY - 0.05, Math.sin(a) * size * 0.28);
+    group.add(fall.object);
+    falls.push(fall);
   }
 
-  // --- Jet spray: additive droplet points rising from the spout and falling.
-  const spray = makeSpray(rng, size * 0.14, bowlY + size * 0.2);
+  // --- Jet spray: droplets rising from the spout and falling back.
+  const spray = createDroplets({
+    count: 22,
+    spread: size * 0.14,
+    rise: (bowlY + size * 0.2) * 0.42,
+    size: 0.28,
+    seed,
+  });
   spray.mesh.position.y = bowlY + 0.12;
   group.add(spray.mesh);
 
@@ -145,84 +146,11 @@ export function createFountain(options: FountainOptions = {}): Prop {
     last = now;
     water.update(dt);
     bowlWater.update(dt);
-    spray.uniforms.uTime.value = now;
+    spray.update(dt);
+    for (const fall of falls) fall.update(dt);
   };
 
   return { object: group, obstacleRadius: half + 0.1 };
 }
 
 // ---- helpers -----------------------------------------------------------
-
-const SPRAY_VERT = /* glsl */ `
-attribute float aPhase;
-attribute float aSpeed;
-attribute float aRad;
-attribute float aAng;
-uniform float uTime;
-uniform float uRise;
-uniform float uSize;
-varying float vLife;
-void main() {
-  float life = fract(uTime * aSpeed + aPhase);
-  vLife = life;
-  // Ballistic arc: up then down.
-  float h = 4.0 * life * (1.0 - life);
-  float rad = aRad * life;
-  vec3 p = vec3(cos(aAng) * rad, h * uRise, sin(aAng) * rad);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_PointSize = uSize * (240.0 / -mv.z);
-  gl_Position = projectionMatrix * mv;
-}`;
-
-const SPRAY_FRAG = /* glsl */ `
-uniform vec3 uColor;
-varying float vLife;
-void main() {
-  float d = length(gl_PointCoord - 0.5);
-  if (d > 0.5) discard;
-  // Fade in at birth, out at death; soft round dot; kept dim so many
-  // droplets read as a fine spray rather than a blown-out bloom.
-  float fade = max(0.0, 0.5 - abs(vLife - 0.5));
-  gl_FragColor = vec4(uColor, (1.0 - d * 2.0) * fade * 0.8);
-}`;
-
-function makeSpray(
-  rng: Rng,
-  spread: number,
-  riseTo: number
-): { mesh: Points; uniforms: { uTime: { value: number } } } {
-  const N = 22;
-  const pos = new Float32Array(N * 3);
-  const aPhase = new Float32Array(N);
-  const aSpeed = new Float32Array(N);
-  const aRad = new Float32Array(N);
-  const aAng = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    aPhase[i] = rng.next();
-    aSpeed[i] = rng.range(0.35, 0.6);
-    aRad[i] = rng.range(0.25, 1) * spread;
-    aAng[i] = rng.range(0, Math.PI * 2);
-  }
-  const geo = new BufferGeometry();
-  geo.setAttribute('position', new BufferAttribute(pos, 3));
-  geo.setAttribute('aPhase', new BufferAttribute(aPhase, 1));
-  geo.setAttribute('aSpeed', new BufferAttribute(aSpeed, 1));
-  geo.setAttribute('aRad', new BufferAttribute(aRad, 1));
-  geo.setAttribute('aAng', new BufferAttribute(aAng, 1));
-  const mat = new ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uRise: { value: riseTo * 0.42 },
-      uSize: { value: 0.28 }, // gl_PointSize ≈ uSize * 240 / dist — small droplets
-      uColor: { value: new Color(0xbfe0ee) },
-    },
-    vertexShader: SPRAY_VERT,
-    fragmentShader: SPRAY_FRAG,
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-  });
-  const mesh = new Points(geo, mat);
-  mesh.frustumCulled = false;
-  return { mesh, uniforms: mat.uniforms as { uTime: { value: number } } };
-}

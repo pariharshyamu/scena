@@ -1,6 +1,7 @@
 import {
   AmbientLight,
   Box3,
+  CylinderGeometry,
   Clock,
   Color,
   DirectionalLight,
@@ -32,6 +33,10 @@ import {
   createCurtains,
   createCushion,
   createThrow,
+  createStream,
+  createSpray,
+  createFill,
+  createSteam,
   createPinboard,
   createWhiteboard,
   createPoster,
@@ -54,6 +59,10 @@ import {
   type PictureStyle,
   type ClutterTheme,
   type Curtains,
+  type Stream,
+  type Spray,
+  type Fill,
+  type Steam,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -120,6 +129,11 @@ let surfaces = 0;
 let dressedSurface: PropSurface | null = null;
 let curtains: Curtains | null = null;
 const stirs: Curtains[] = [];
+const streams: Stream[] = [];
+let basin: Fill | null = null;
+let shower: Spray | null = null;
+let steam: Steam | null = null;
+let tap = 1;
 
 if (view === 'room') {
   // The longest clear run gets the salon hang: six pieces, graded, off a
@@ -180,6 +194,53 @@ if (view === 'room') {
       surfaces++;
     }
   }
+} else if (view === 'water') {
+  // Streams, a shower, a filling basin and steam, lit flatly. A water shader
+  // that compiles is not water that moves — this is the only way to know.
+  scene.add(new AmbientLight(0xffffff, 0.55));
+  const key = new DirectionalLight(0xffffff, 1.3);
+  key.position.set(2, 5, 4);
+  scene.add(key);
+  const floor = new Mesh(
+    new PlaneGeometry(14, 14),
+    new MeshStandardMaterial({ color: 0x5d5a56, roughness: 0.9 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  // Four streams, thin to thick, so the break-up difference is visible.
+  [0.005, 0.012, 0.024, 0.045].forEach((radius, i) => {
+    const spout = new Mesh(
+      new CylinderGeometry(radius * 1.6, radius * 1.6, 0.05, 8),
+      new MeshStandardMaterial({ color: 0x9aa2aa, roughness: 0.3, metalness: 0.7 })
+    );
+    spout.position.set(-1.5 + i * 0.42, 1.05, 0);
+    scene.add(spout);
+    const stream = createStream({ height: 0.6, radius, seed: i + 2, palette });
+    stream.object.position.set(-1.5 + i * 0.42, 1.02, 0);
+    scene.add(stream.object);
+    streams.push(stream);
+  });
+
+  // A basin that fills while the tap runs.
+  const bowl = createVessel({ style: 'bowl', height: 0.34, seed: 3, palette });
+  bowl.object.position.set(0.9, 0.4, 0);
+  scene.add(bowl.object);
+  // The fill radius has to match the container's INTERIOR at the level the
+  // water reaches, not its widest point — a bowl flares, so a disc cut to the
+  // rim pokes out through the sides as a blue band around the outside.
+  basin = createFill({ radius: bowl.radius * 0.6, depth: bowl.height * 0.55, palette });
+  basin.object.position.set(0.9, 0.4 + bowl.height * 0.28, 0);
+  scene.add(basin.object);
+
+  // A shower, running.
+  shower = createSpray({ height: 1.7, radius: 0.07, spread: 0.3, seed: 4, palette });
+  shower.object.position.set(2.2, 1.95, 0);
+  scene.add(shower.object);
+  steam = createSteam({ radius: 0.4, height: 1.6, seed: 5 });
+  steam.object.position.set(2.2, 0.1, 0);
+  steam.setTarget(1);
+  scene.add(steam.object);
 } else if (view === 'decor') {
   // M, O and P side by side: every plant species, curtains that stir, and
   // the paper. Flat light, nothing else in the scene.
@@ -331,10 +392,24 @@ renderer.setAnimationLoop(() => {
   }
   for (const c of clocks) c.update(dt);
   for (const c of stirs) c.update(dt);
+  if (view === 'water') {
+    for (const s of streams) s.update(dt);
+    shower?.update(dt);
+    steam?.update(dt);
+    // The basin fills while the taps run, then drains, then fills again — so
+    // a screenshot at any moment catches it doing something.
+    if (basin) {
+      basin.fillBy(tap * dt * 0.22 - (tap > 0 ? 0 : dt * 0.3));
+      basin.update(dt);
+    }
+  }
   const t = clockDriver.elapsedTime;
   if (view === 'room') {
     camera.position.set(Math.sin(t * 0.12) * 1.1, 1.62, 2.2);
     camera.lookAt(Math.sin(t * 0.08) * 0.8, 1.45, -2.6);
+  } else if (view === 'water') {
+    camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
+    camera.lookAt(0.3, 0.95, 0);
   } else if (view === 'decor') {
     camera.position.set(Math.sin(t * 0.1) * 1.2, 1.4, 3.4);
     camera.lookAt(0, 1.1, -0.3);
@@ -358,6 +433,8 @@ declare global {
     galleryDebug: (t?: number) => Record<string, unknown>;
     galleryLook: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => void;
     galleryProbe: (x: number, y: number, w: number, h: number) => Record<string, unknown>;
+    galleryTap: (open: number) => void;
+    galleryStep: (dt: number) => void;
   }
 }
 
@@ -370,6 +447,34 @@ declare global {
  * on, and a probe that always reports zero looks exactly like a shader that
  * draws nothing.
  */
+/**
+ * Advance everything by `dt` and render one frame.
+ *
+ * `galleryLook` stops the animation loop, so anything probed after it is a
+ * frozen frame — two samples come back identical and the water looks static
+ * whether it is or not.
+ */
+window.galleryStep = (dt: number) => {
+  for (const s of streams) s.update(dt);
+  shower?.update(dt);
+  steam?.update(dt);
+  for (const c of stirs) c.update(dt);
+  for (const c of clocks) c.update(dt);
+  if (basin) {
+    basin.fillBy(tap * dt * 0.22);
+    basin.update(dt);
+  }
+  renderer.render(scene, camera);
+};
+
+/** Turn the taps and the shower on or off, for the headless run. */
+window.galleryTap = (open: number) => {
+  tap = open;
+  for (const s of streams) s.setFlow(open);
+  shower?.setFlow(open);
+  steam?.setTarget(open > 0.5 ? 1 : 0);
+};
+
 window.galleryProbe = (x, y, w, h) => {
   renderer.render(scene, camera);
   const gl = renderer.getContext();
@@ -394,7 +499,27 @@ window.galleryProbe = (x, y, w, h) => {
   const n = lums.length;
   const mean = lums.reduce((a, v) => a + v, 0) / n;
   const sd = Math.sqrt(lums.reduce((a, v) => a + (v - mean) ** 2, 0) / n);
+  // A coarse signature across the box. The MEAN cannot tell a moving pattern
+  // from a still one — the average of a travelling texture barely changes —
+  // so sample a grid and let the caller diff two frames cell by cell.
+  const cells = 24;
+  const signature: number[] = [];
+  for (let c = 0; c < cells; c++) {
+    const y0 = Math.floor((c / cells) * ph);
+    const y1 = Math.max(y0 + 1, Math.floor(((c + 1) / cells) * ph));
+    let sum = 0;
+    let cn = 0;
+    for (let py2 = y0; py2 < y1; py2++) {
+      for (let px2 = 0; px2 < pw; px2++) {
+        const i = (py2 * pw + px2) * 4;
+        sum += 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+        cn++;
+      }
+    }
+    signature.push(Math.round((sum / Math.max(1, cn)) * 10) / 10);
+  }
   return {
+    signature,
     rgb: [Math.round(r / n), Math.round(g / n), Math.round(b / n)],
     lum: Math.round(mean),
     variation: Math.round(sd * 10) / 10,
@@ -438,6 +563,14 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    water: {
+      tap: Number(tap.toFixed(2)),
+      streams: streams.length,
+      streamFlow: streams[0] ? Number(streams[0].flow.toFixed(2)) : null,
+      basinLevel: basin ? Number(basin.level.toFixed(3)) : null,
+      showerFlow: shower ? Number(shower.flow.toFixed(2)) : null,
+      steam: steam ? Number(steam.density.toFixed(3)) : null,
+    },
     curtainTime: curtains
       ? Number(
           (

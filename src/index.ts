@@ -418,6 +418,27 @@ export {
   type TapestryOptions,
 } from './props/wallArt';
 export {
+  flowingWaterMaterial,
+  createDroplets,
+  type FlowOptions,
+  type DropletOptions,
+  type Droplets,
+} from './materials/waterFlow';
+export {
+  createStream,
+  createSpray,
+  createFill,
+  createSteam,
+  type Stream,
+  type StreamOptions,
+  type Spray,
+  type SprayOptions,
+  type Fill,
+  type FillOptions,
+  type Steam,
+  type SteamOptions,
+} from './props/waterworks';
+export {
   createPlant,
   createHangingPlant,
   createWindowBox,
