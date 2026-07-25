@@ -342,3 +342,29 @@ Two defaults are doing most of the work:
 
 - **Nothing hangs level.** `tilt` defaults to about a degree of *roll*, and that single value is most of the difference between a prop on a wall and a picture in a room. It is roll and not yaw or pitch because a picture hangs from one point and swings in its own plane; tilting in any other axis drives a corner into the plaster. Set `tilt: 0` for things actually screwed on, like a clock.
 - **A wall of pictures is not a row of pictures.** `hangGallery` hangs a group off a **spine** — an invisible horizontal line that pieces touch with their centre, their top edge or their bottom edge — with uneven gaps. It returns what it actually placed; overflow is left off rather than crammed in or silently overlapped.
+
+## Dressing surfaces
+
+`hangOn` deals with walls. `dress` deals with everything horizontal — tabletops, shelf boards, the lid of a chest — and it is the same argument: a room with pictures up and bare tables is still a show home.
+
+```ts
+dress(table.surfaces[0], [mug, bowl, candle, book], { seed: 3 });
+```
+
+Props publish `surfaces` the way they publish `slots`: an anchor sitting **on** the surface with +y up, +x along its width and +z along its depth. `createTable`, `createShelf` and `createChest` carry them, and `createPropSurface` builds one for anything you made yourself. Two of those are opinionated on purpose — a stocked shelf only offers the boards that are not already full of books, and an **open** chest offers nothing at all, because its lid is not a surface when it is standing vertically.
+
+Four properties are the whole of the placer, and the naive version fails on every one of them:
+
+- **Tall things go behind.** Otherwise a candlestick lands in front of a bowl and hides it.
+- **Things cluster.** Positions are drawn around a seeded centre of gravity, off-centre on purpose, so one part of the surface is busy and another is clear. An even spread is a display of merchandise.
+- **Nothing is square.** Small random yaw. Nobody sets a mug down aligned to the table.
+- **Nothing overlaps, and nothing floats.** Placement is checked against what is already down, using the *turned* extent of each footprint; and whatever a prop's own origin convention, its lowest point ends up at surface level.
+
+Things it will not do: cram in what does not fit (the overflow is left unparented and simply missing from the return), or stack.
+
+### Four things learned by looking at the render
+
+- **The first version laid everything out in a line.** Aiming each item at a depth computed from its height puts everything of similar height at the same z — and a set of tabletop props are all of similar height. The height-vs-depth correlation test passed comfortably; the absolute spread was nil. Depth is now a *bias* applied to a full-range sample, and there is a test on the span.
+- **A phone set down as authored stands on its short edge like a domino.** Props are modelled in the orientation they are *used* in, which for a phone is upright in a hand. `dress` works out which way up a thing comes to rest from its shape — a **slab** lies down, a candle does not, and a photo frame's strut thickens it past the threshold so it keeps standing. `rest` overrides it.
+- **Random sampling cannot find a narrow gap.** Once two wide items are down, a shallow surface is effectively one-dimensional: nothing can pass a 48 cm basket within the depth of a 90 cm table. A phone with obvious room in the corner was missing it on all 24 attempts. There is now a shuffled coarse-grid sweep as a fallback, which took a demo table from 4 items placed to 10.
+- **Loosening to a uniform draw when attempts fail defeats clustering entirely** — because a tight cluster is exactly what fails often enough to trigger the fallback, so `cluster: 1` spread things out *more* than `cluster: 0`. The sampling window now widens gradually around the focus instead.

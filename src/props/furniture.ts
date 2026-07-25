@@ -12,8 +12,8 @@ import {
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
-import { createSlot } from '../core/types';
-import type { Prop, PropSlot } from '../core/types';
+import { createPropSurface, createSlot } from '../core/types';
+import type { Prop, PropSlot, PropSurface } from '../core/types';
 
 /**
  * Interior furniture — the cottage set. Every piece follows the Prop
@@ -45,6 +45,7 @@ export function createTable(options: TableOptions = {}): Prop {
   const group = new Group();
   group.name = `table-${style}`;
   const h = 0.74 + rng.range(-0.02, 0.02);
+  const surfaces: PropSurface[] = [];
   let radius = 0.8;
 
   if (style === 'round') {
@@ -55,6 +56,7 @@ export function createTable(options: TableOptions = {}): Prop {
     const foot = new Mesh(new CylinderGeometry(0.34, 0.4, 0.08, 8), legWood);
     foot.position.y = 0.04;
     group.add(board, stem, foot);
+    surfaces.push(createPropSurface('top', group, 0, h + 0.035, 0, 1.24, 1.24));
     radius = 0.78;
   } else if (style === 'trestle') {
     const board = new Mesh(new BoxGeometry(2.0, 0.08, 0.9), top);
@@ -71,6 +73,7 @@ export function createTable(options: TableOptions = {}): Prop {
     const stretcher = new Mesh(new BoxGeometry(1.66, 0.08, 0.1), legWood);
     stretcher.position.y = 0.24;
     group.add(stretcher);
+    surfaces.push(createPropSurface('top', group, 0, h + 0.04, 0, 2.0, 0.9));
     radius = 1.05;
   } else {
     const board = new Mesh(new BoxGeometry(1.3, 0.06, 0.68), top);
@@ -86,9 +89,10 @@ export function createTable(options: TableOptions = {}): Prop {
         group.add(leg);
       }
     }
+    surfaces.push(createPropSurface('top', group, 0, h + 0.03, 0, 1.3, 0.68));
     radius = 0.72;
   }
-  return { object: group, obstacleRadius: radius };
+  return { object: group, obstacleRadius: radius, surfaces };
 }
 
 // ---- seats -------------------------------------------------------------
@@ -281,10 +285,20 @@ export function createShelf(options: ShelfOptions = {}): Prop {
   group.add(back);
 
   const boardYs = [0.28, 0.78, 1.28, 1.72];
+  const surfaces: PropSurface[] = [];
+  // The top of the carcass is a surface too, and the most used one in any
+  // real room.
+  surfaces.push(createPropSurface('top', group, 0, H, 0, W - 0.14, D - 0.06));
   for (const y of boardYs) {
     const shelfBoard = new Mesh(new BoxGeometry(W - 0.1, 0.05, D - 0.04), board);
     shelfBoard.position.set(0, y, 0);
     group.add(shelfBoard);
+  }
+  // Only the boards that are not already stocked: dressing a shelf of books
+  // puts a mug inside the books.
+  const free = (options.stock ?? 'books') === 'empty' ? boardYs : boardYs.slice(3);
+  for (const y of free) {
+    surfaces.push(createPropSurface('shelf', group, 0, y + 0.025, 0, W - 0.14, D - 0.08));
   }
 
   if (stock !== 'empty') {
@@ -330,7 +344,7 @@ export function createShelf(options: ShelfOptions = {}): Prop {
       }
     }
   }
-  return { object: group, obstacleRadius: 0.65 };
+  return { object: group, obstacleRadius: 0.65, surfaces };
 }
 
 // ---- chests ------------------------------------------------------------
@@ -383,7 +397,13 @@ export function createChest(options: ChestOptions = {}): Prop {
   hasp.position.set(0, H - 0.02, D / 2 + 0.015);
   group.add(hasp);
 
-  return { object: group, obstacleRadius: 0.55 };
+  // A closed chest is a surface; an open one is a hole. Publishing the lid
+  // top regardless would stand a candle in mid-air over an open box.
+  const surfaces = options.open
+    ? []
+    : [createPropSurface('top', group, 0, H + 0.12, 0, W - 0.08, D - 0.08)];
+
+  return { object: group, obstacleRadius: 0.55, surfaces };
 }
 
 // ---- candles -----------------------------------------------------------

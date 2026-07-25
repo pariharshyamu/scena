@@ -52,6 +52,24 @@ export interface Carryable extends Prop {
   grip?: { x?: number; y?: number; z?: number };
 }
 
+/**
+ * A flat surface on a prop that things can be put down on: a tabletop, a
+ * shelf board, the lid of a chest, a windowsill.
+ *
+ * The anchor sits **on** the surface with +y up, +x along its width and +z
+ * along its depth, so `dress` only has to think in two dimensions and the
+ * height of whatever it places.
+ */
+export interface PropSurface {
+  /** Free label: 'top', 'shelf', 'sill'. */
+  kind: string;
+  /** Anchor at surface level, a child of the prop. */
+  anchor: Object3D;
+  /** Usable extent along the anchor's local x and z, in metres. */
+  width: number;
+  depth: number;
+}
+
 /** What a prop generator returns: the visual plus gameplay metadata. */
 export interface Prop {
   object: Group;
@@ -62,6 +80,36 @@ export interface Prop {
   obstacleRadius: number;
   /** Interaction slots, on props a character can use. */
   slots?: PropSlot[];
+  /** Flat surfaces things can be set down on — feed these to `dress`. */
+  surfaces?: PropSurface[];
+  /**
+   * Which way up this comes to rest when it is set down on something.
+   *
+   * Props are authored in the orientation they are *used* in, which for a
+   * phone is upright in a hand — put one down as authored and it stands on
+   * its short edge like a domino. `dress` works this out for itself from the
+   * shape (a slab lies down, a candle does not); set this only to override.
+   */
+  rest?: 'upright' | 'flat';
+}
+
+/** Build a surface: an anchor parented into the prop at (x, y, z). */
+export function createPropSurface(
+  kind: string,
+  parent: Group,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+  depth: number,
+  rotY = 0
+): PropSurface {
+  const anchor = new Object3D();
+  anchor.name = `surface:${kind}`;
+  anchor.position.set(x, y, z);
+  anchor.rotation.y = rotY;
+  parent.add(anchor);
+  return { kind, anchor, width, depth };
 }
 
 /**

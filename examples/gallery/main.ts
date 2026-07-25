@@ -1,5 +1,6 @@
 import {
   AmbientLight,
+  Box3,
   Clock,
   Color,
   DirectionalLight,
@@ -12,7 +13,15 @@ import {
 import {
   PALETTES,
   PICTURE_STYLES,
+  createBasket,
+  createCandle,
   createFramedPhoto,
+  createLantern,
+  createPhone,
+  createSack,
+  createTable,
+  createTablet,
+  dress,
   createInteriorLight,
   createMirror,
   createPainting,
@@ -25,6 +34,7 @@ import {
   hangOn,
   type FrameStyle,
   type PictureStyle,
+  type PropSurface,
   type WallArt,
 } from 'scena3d';
 
@@ -71,7 +81,7 @@ const setTime = (t: number): void => {
 
 if (view === 'room') {
   scene.add(room.group);
-} else {
+} else if (view === 'swatches') {
   // Swatches get flat even light and nothing else in the scene. Judging a
   // picture shader inside a dim interior tells you about the interior.
   scene.add(new AmbientLight(0xffffff, 1.5));
@@ -85,6 +95,9 @@ if (view === 'room') {
 const hung: WallArt[] = [];
 const clocks: ReturnType<typeof createWallClock>[] = [];
 let galleryCount = 0;
+let dressed = 0;
+let surfaces = 0;
+let dressedSurface: PropSurface | null = null;
 
 if (view === 'room') {
   // The longest clear run gets the salon hang: six pieces, graded, off a
@@ -127,15 +140,51 @@ if (view === 'room') {
     hung.push(tapestry);
   }
 
-  // A photo standing on a piece of the furniture, to prove the standing
-  // variant sits ON a surface rather than half inside it.
-  const shelf = furnished.props.find((p) => p.object.name.includes('shelf') || p.object.name.includes('table'));
-  if (shelf) {
-    const photo = createFramedPhoto({ seed: 9, standing: true, size: 0.15 });
-    photo.object.position.set(0, 0.78, 0);
-    shelf.object.add(photo.object);
-    hung.push(photo);
+  // Every flat surface the furnishing left gets dressed. This is the other
+  // half of the job: a room with pictures up and bare tables is still a show
+  // home.
+  let n = 0;
+  for (const prop of furnished.props) {
+    for (const surface of prop.surfaces ?? []) {
+      n++;
+      const kit = [
+        createCandle({ seed: n * 3 }),
+        createBasket({ seed: n * 5 }),
+        createFramedPhoto({ seed: n * 7, standing: true, size: 0.15 }),
+        createCandle({ seed: n * 11 }),
+        createBasket({ seed: n * 13 }),
+      ];
+      dressed += dress(surface, kit, { seed: n, density: 0.42 }).length;
+      surfaces++;
+    }
   }
+} else if (view === 'table') {
+  // A single dressed tabletop, close up, so the placement can be judged
+  // rather than assumed.
+  scene.add(new AmbientLight(0xffffff, 1.1));
+  const key = new DirectionalLight(0xffffff, 1.9);
+  key.position.set(2, 5, 3);
+  scene.add(key);
+  const table = createTable({ style: 'trestle', seed: 2, palette });
+  scene.add(table.object);
+  // Tabletop-sized things. A carryable basket is 45 cm across — three of
+  // them IS a full table, and a demo stocked with them says nothing about
+  // the layout.
+  const kit = [
+    createCandle({ seed: 1 }),
+    createFramedPhoto({ seed: 3, standing: true, size: 0.17 }),
+    createCandle({ seed: 4 }),
+    createLantern({ seed: 7 }),
+    createCandle({ seed: 8 }),
+    createFramedPhoto({ seed: 12, standing: true, size: 0.13 }),
+    createPhone({ seed: 2 }),
+    createTablet({ seed: 6 }),
+    createBasket({ seed: 2 }),
+    createSack({ seed: 5 }),
+  ];
+  dressed = dress(table.surfaces![0], kit, { seed: 4, density: 0.55 }).length;
+  surfaces = 1;
+  dressedSurface = table.surfaces![0];
 } else {
   // Swatches: every picture style across every frame, lit flatly, so the
   // shader can be judged rather than guessed at. Tests pass on mush.
@@ -179,6 +228,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'room') {
     camera.position.set(Math.sin(t * 0.12) * 1.1, 1.62, 2.2);
     camera.lookAt(Math.sin(t * 0.08) * 0.8, 1.45, -2.6);
+  } else if (view === 'table') {
+    camera.position.set(Math.sin(t * 0.2) * 0.8, 1.28, 1.5);
+    camera.lookAt(0, 0.78, 0);
   } else {
     camera.position.set(0, 0.28, 2.9);
     camera.lookAt(0, 0.28, 0);
@@ -272,6 +324,22 @@ window.galleryDebug = (t?: number) => {
       normal: [w.normal.x, w.normal.z],
     })),
     galleryCount,
+    surfaces,
+    dressed,
+    // What is actually sitting on the dressed surface, in ITS space — the
+    // only way to see whether things are on the top or through it.
+    onTop: dressedSurface
+      ? dressedSurface.anchor.children.map((child) => {
+          const box = new Box3().setFromObject(child);
+          const local = dressedSurface!.anchor.worldToLocal(box.min.clone());
+          return {
+            sunk: Number(local.y.toFixed(4)),
+            turn: Number(child.rotation.y.toFixed(3)),
+            x: Number(child.position.x.toFixed(3)),
+            z: Number(child.position.z.toFixed(3)),
+          };
+        })
+      : null,
     hung: placed.length,
     facingIntoRoom: placed.filter((p) => p.inRoom).length,
     level: placed.filter((p) => p.roll === 0).length,
