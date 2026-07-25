@@ -48,6 +48,9 @@ import {
   createWashUp,
   createDresser,
   createIngredient,
+  createSmoke,
+  createExtractor,
+  createSmokeLayer,
   createKitchenware,
   stock,
   PREP_KINDS,
@@ -55,6 +58,7 @@ import {
   SINK_ERAS,
   DRESSER_KINDS,
   INGREDIENT_KINDS,
+  EXTRACTOR_ERAS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -98,6 +102,9 @@ import {
   type WashUp,
   type Storage,
   type Ingredient,
+  type SmokeLayer,
+  type Extractor,
+  type SmokeSource,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -179,6 +186,9 @@ const colds: ColdStore[] = [];
 const washes: WashUp[] = [];
 const dressers: Storage[] = [];
 const foods: Ingredient[] = [];
+const vents: Extractor[] = [];
+const plumes: SmokeSource[] = [];
+let smokeRoom: SmokeLayer | null = null;
 let foodChill: ColdStore | null = null;
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
@@ -540,6 +550,77 @@ if (view === 'room') {
     foods.push(food);
   });
 
+} else if (view === 'smoke') {
+  // Four eras of extraction, each with its own plume under it, in one room
+  // whose ceiling layer they all share. The point of the row is that a
+  // plume under a hood barely reaches the ceiling and a plume under a hole
+  // in the roof mostly does — and, behind all of it, that this is the only
+  // thing in the library drawn with NormalBlending, because additive smoke
+  // is steam.
+  scene.add(new AmbientLight(0xffffff, 0.62));
+  const sKey = new DirectionalLight(0xffffff, 1.1);
+  sKey.position.set(3, 7, 4);
+  scene.add(sKey);
+  // A pale back wall, so the smoke has something to be dark AGAINST. On the
+  // black gallery background an additive plume and a normal-blended one are
+  // indistinguishable, which would defeat the entire view.
+  const wall = new Mesh(
+    new BoxGeometry(11, 3.2, 0.12),
+    new MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.95 })
+  );
+  wall.position.set(0, 1.6, -1.6);
+  scene.add(wall);
+  const sFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x8a857c, roughness: 0.95 })
+  );
+  sFloor.rotation.x = -Math.PI / 2;
+  scene.add(sFloor);
+
+  // A ceiling. The layer needs something to hang under, and a smoke hole
+  // with no roof to be a hole in is a wooden pergola hovering in mid-air.
+  const ceiling = new Mesh(
+    new BoxGeometry(11, 0.1, 3.4),
+    new MeshStandardMaterial({ color: 0xcfcac1, roughness: 0.95 })
+  );
+  ceiling.position.set(0, 2.95, -0.4);
+  scene.add(ceiling);
+
+  smokeRoom = createSmokeLayer({ width: 10, depth: 3, height: 2.9, alarmY: 2.6 });
+  smokeRoom.object.position.set(0, 0, -0.4);
+  scene.add(smokeRoom.object);
+
+  const styles = ['wood', 'soot', 'grease', 'scorch'] as const;
+  EXTRACTOR_ERAS.forEach((era, i) => {
+    const x = -3.6 + i * 2.4;
+    const vent = createExtractor({ era, seed: i + 2, palette });
+    vent.object.position.set(x, 0, -0.5);
+    vent.setPower(1);
+    scene.add(vent.object);
+    vents.push(vent);
+    smokeRoom!.vent(vent);
+
+    // Under the mouth the extractor publishes — not the origin, which is on
+    // its front face.
+    vent.object.updateMatrixWorld(true);
+    const m = vent.mouth.getWorldPosition(new Vector3());
+    const plume = createSmoke({ style: styles[i], seed: i + 5, height: 1.9 });
+    plume.setRate(1);
+    plume.object.position.set(m.x, 0.9, m.z);
+    scene.add(plume.object);
+    plumes.push(plume);
+    smokeRoom!.add(plume);
+
+    // A bench for each plume to be coming off, because smoke rising out of
+    // thin air is a bug report.
+    const bench = new Mesh(
+      new BoxGeometry(1.0, 0.08, 0.6),
+      new MeshStandardMaterial({ color: 0x6e675e, roughness: 0.85 })
+    );
+    bench.position.set(m.x, 0.86, m.z);
+    scene.add(bench);
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -767,6 +848,10 @@ renderer.setAnimationLoop(() => {
   if (view === 'dresser') {
     for (const d of dressers) d.update(dt);
   }
+  if (view === 'smoke') {
+    for (const v of vents) v.update(dt, 1);
+    smokeRoom?.update(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -810,6 +895,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'larder') {
     camera.position.set(Math.sin(t * 0.1) * 0.9, 1.42, 2.4);
     camera.lookAt(-0.3, 0.92, 0);
+  } else if (view === 'smoke') {
+    camera.position.set(Math.sin(t * 0.08) * 1.2, 1.75, 5.4);
+    camera.lookAt(0, 1.5, -0.6);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -883,6 +971,8 @@ window.galleryStep = (dt: number) => {
   for (const w of washes) w.update(dt, true);
   for (const d of dressers) d.update(dt);
   for (const f of foods) f.update(dt, foodChill ?? undefined);
+  for (const v of vents) v.update(dt, 1);
+  smokeRoom?.update(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1062,6 +1152,28 @@ window.galleryDebug = (t?: number) => {
         outside: Number(st.chillAt(out.x, out.y, out.z).toFixed(2)),
         keeps: Number(st.keepAt(shelf.x, shelf.y, shelf.z).toFixed(3)),
         light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
+      };
+    }),
+    smoke: smokeRoom === null ? null : {
+      level: Number(smokeRoom.level.toFixed(3)),
+      descent: Number(smokeRoom.descent.toFixed(2)),
+      baseY: Number(smokeRoom.baseY.toFixed(2)),
+      ceiling: Number(smokeRoom.smokeAt(0, 2.7, -0.4).toFixed(3)),
+      head: Number(smokeRoom.smokeAt(0, 1.6, -0.4).toFixed(3)),
+      knee: Number(smokeRoom.smokeAt(0, 0.4, -0.4).toFixed(3)),
+      outside: smokeRoom.smokeAt(0, 1.6, 9),
+    },
+    vents: vents.map((v) => {
+      v.object.updateMatrixWorld(true);
+      const m = v.mouth.getWorldPosition(new Vector3());
+      return {
+        era: v.era,
+        draw: Number(v.draw.toFixed(3)),
+        clogged: Number(v.clogged.toFixed(3)),
+        fan: v.fan !== null,
+        // How much of the plume standing right under it never gets out.
+        catches: Number(v.catches(m.x, m.z).toFixed(3)),
+        acrossTheRoom: Number(v.catches(m.x + 3, m.z).toFixed(3)),
       };
     }),
     foods: foods.map((f) => {

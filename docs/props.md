@@ -863,3 +863,40 @@ The skin desaturates toward a grey-brown, and it **shrinks**, because everything
 ### One bug, and the fix generalised
 
 The sideways kinds sat *below* their own base — a carrot a centimetre into the worktop and a fish nearly three. A cylinder laid on its side has a seven-sided cross-section that is not symmetric about its axis, so "put the centre at the radius" is simply wrong, and every one of those numbers would have had to be found and tuned per kind. Both versions are now **measured and seated** on y = 0 after building. Shifting the children rather than the group also keeps the wilting scale shrinking toward the surface instead of lifting the thing off it.
+
+## Smoke, and getting rid of it
+
+This track exists because of one fact about the steam in `waterworks`: it is drawn with **additive blending**, and its fragment shader writes white. Additive can only ever *add* light. It is not that the steam is the wrong colour for smoke — it is that no choice of colour or opacity in an additive pass can make the wall behind it darker, and a plume that brightens what it covers is steam whatever you call it.
+
+So `createSmoke` has its own material: `NormalBlending`, and a fragment stage that writes the smoke's **own colour**. There is a test that asserts both, side by side with the steam it is not.
+
+### Smoke stratifies, and that is the second new thing
+
+Heat is a field over a surface. Cold is a field inside a box. Water is a depth. Smoke is a **layer that fills a room from the ceiling down**:
+
+```ts
+smokeAt(x, y, z): number   // 0–1, and y is the interesting argument
+```
+
+The fourth spatial handshake, and the first where how *tall* you are matters more than where you stand. Thick at the ceiling long before it is anything at head height — which is why extractors are mounted high, why you crawl, and why an alarm on the ceiling sounds while the room is still perfectly usable. The alarm test asserts exactly that: at the moment it goes off, head height is clearer than ceiling height.
+
+### An extractor does two different jobs
+
+| | what it does |
+|---|---|
+| `catches(x, z)` | intercepts a plume **before it ever reaches the room** |
+| `draw` | scavenges the standing layer, m³/s |
+
+Keeping the second much smaller than the first is the only reason it matters that the hood is over the hob. **The first version of the era table got this wrong** — it gave a hood 0.9 m³/s of room-scavenging, more than a smoking pan produces, so the extractor cleared the room no matter where the pan was standing and the entire distinction quietly stopped existing. Every test about capture still passed, because they tested `catches` directly.
+
+`reach` is the column that decides the eras. A smoke hole has a huge capture directly beneath it and a reach of half a metre, so a medieval hall is smoky **everywhere except under the hole** — you do not move the hole, you move the fire. A hood has a smaller peak and twice the reach, which is what a kitchen you can stand in needs.
+
+**A cold flue does not draw.** `hole` and `chimney` scale with the heat below them, which is why a fire smokes into the room when you first light it. Hand `update` the stove and it samples `heatAt` for itself.
+
+And the hood's filter **clogs**, chokes both numbers, and wants cleaning — the fourth upkeep loop after fuel, ice and frost. Its colour is the only reading a blocked extractor has.
+
+### Three bugs
+
+- **The probe was at the origin.** An extractor's origin is on its front face, which is the one place beneath a canopy that a fire never is — so a flue over a roaring hearth read 0 and never learned the fire was lit. Both `catches` and the heat sample now measure from the mouth, and the mouth is **published** as an anchor, because a caller measuring from the origin would have made the same mistake.
+- **The visible layer was seven stripes.** It was a stack of thin sheets, on the theory that lower ones fading in later would soften the underside. From across the room that is seven hard edges instead of one — the shelf problem seven times over rather than a fix for it. It is one box with a vertical alpha gradient now: one draw call, and no edges to be hard.
+- **A test that ran one hood through both halves of an experiment** measured a blocked extractor in the second half and came out backwards, reporting that a pan *under* the hood filled the room faster than a pan across the kitchen. Two scenes, not one hood run twice.

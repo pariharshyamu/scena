@@ -475,6 +475,23 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createSmoke,
+  createExtractor,
+  createSmokeLayer,
+  SMOKE_STYLES,
+  EXTRACTOR_ERAS,
+  type SmokeSource,
+  type SmokeOptions,
+  type SmokeStyle,
+  type SmokeField,
+  type Extractor,
+  type ExtractorOptions,
+  type ExtractorEra,
+  type ExtractorFan,
+  type SmokeLayer,
+  type SmokeLayerOptions,
+} from './props/smoke';
+export {
   createIngredient,
   keepsFor,
   INGREDIENT_KINDS,
