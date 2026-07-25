@@ -417,6 +417,31 @@ export {
   type TapestryOptions,
 } from './props/wallArt';
 export {
+  createVessel,
+  VESSEL_STYLES,
+  type Vessel,
+  type VesselOptions,
+  type VesselStyle,
+} from './props/vessels';
+export {
+  createBooks,
+  createPapers,
+  createFolded,
+  createTrinket,
+  createFruitBowl,
+  createClutter,
+  CLUTTER_THEMES,
+  type BooksOptions,
+  type BookStyle,
+  type PapersOptions,
+  type FoldedOptions,
+  type TrinketOptions,
+  type FruitBowlOptions,
+  type ClutterOptions,
+  type ClutterKitOptions,
+  type ClutterTheme,
+} from './props/clutter';
+export {
   hangOn,
   hangGallery,
   createWallAnchor,

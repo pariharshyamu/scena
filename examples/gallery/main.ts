@@ -21,7 +21,11 @@ import {
   createSack,
   createTable,
   createTablet,
+  createVessel,
+  createClutter,
+  VESSEL_STYLES,
   dress,
+  placeOn,
   createInteriorLight,
   createMirror,
   createPainting,
@@ -34,6 +38,7 @@ import {
   hangOn,
   type FrameStyle,
   type PictureStyle,
+  type ClutterTheme,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -158,11 +163,47 @@ if (view === 'room') {
       surfaces++;
     }
   }
+} else if (view === 'clutter') {
+  // Every vessel style, and a dressed table of clutter beside them, lit
+  // flatly. A lathe profile passes a raycast test and still renders as an
+  // egg; this is the only way to know.
+  // Modest, or everything clips to white and every surface reads as the same
+  // washed-out cream.
+  scene.add(new AmbientLight(0xffffff, 0.5));
+  const key = new DirectionalLight(0xffffff, 1.15);
+  key.position.set(2, 5, 3);
+  scene.add(key);
+  const shelf = createTable({ style: 'trestle', seed: 2, palette });
+  scene.add(shelf.object);
+  VESSEL_STYLES.forEach((style, i) => {
+    const v = createVessel({ style, seed: i + 2, palette });
+    placeOn(shelf.surfaces![0], v, {
+      along: (i - (VESSEL_STYLES.length - 1) / 2) * 0.23,
+      across: 0.18,
+      turn: 0.2,
+    });
+  });
+  const themed = createClutter({
+    theme: (params.get('theme') as ClutterTheme) ?? 'study',
+    count: 8,
+    seed: 3,
+    palette,
+  });
+  themed.forEach((p, i) => {
+    placeOn(shelf.surfaces![0], p, {
+      along: (i - (themed.length - 1) / 2) * 0.24,
+      across: -0.22,
+      turn: 0.25,
+    });
+  });
+  dressed = VESSEL_STYLES.length + themed.length;
+  surfaces = 1;
+  dressedSurface = shelf.surfaces![0];
 } else if (view === 'table') {
   // A single dressed tabletop, close up, so the placement can be judged
   // rather than assumed.
-  scene.add(new AmbientLight(0xffffff, 1.1));
-  const key = new DirectionalLight(0xffffff, 1.9);
+  scene.add(new AmbientLight(0xffffff, 0.5));
+  const key = new DirectionalLight(0xffffff, 1.15);
   key.position.set(2, 5, 3);
   scene.add(key);
   const table = createTable({ style: 'trestle', seed: 2, palette });
@@ -171,6 +212,7 @@ if (view === 'room') {
   // them IS a full table, and a demo stocked with them says nothing about
   // the layout.
   const kit = [
+    ...createClutter({ theme: 'domestic', count: 6, seed: 3, palette }),
     createCandle({ seed: 1 }),
     createFramedPhoto({ seed: 3, standing: true, size: 0.17 }),
     createCandle({ seed: 4 }),
@@ -228,7 +270,43 @@ renderer.setAnimationLoop(() => {
   if (view === 'room') {
     camera.position.set(Math.sin(t * 0.12) * 1.1, 1.62, 2.2);
     camera.lookAt(Math.sin(t * 0.08) * 0.8, 1.45, -2.6);
-  } else if (view === 'table') {
+  } else if (view === 'clutter') {
+  // Every vessel style, and a dressed table of clutter beside them, lit
+  // flatly. A lathe profile passes a raycast test and still renders as an
+  // egg; this is the only way to know.
+  // Modest, or everything clips to white and every surface reads as the same
+  // washed-out cream.
+  scene.add(new AmbientLight(0xffffff, 0.5));
+  const key = new DirectionalLight(0xffffff, 1.15);
+  key.position.set(2, 5, 3);
+  scene.add(key);
+  const shelf = createTable({ style: 'trestle', seed: 2, palette });
+  scene.add(shelf.object);
+  VESSEL_STYLES.forEach((style, i) => {
+    const v = createVessel({ style, seed: i + 2, palette });
+    placeOn(shelf.surfaces![0], v, {
+      along: (i - (VESSEL_STYLES.length - 1) / 2) * 0.23,
+      across: 0.18,
+      turn: 0.2,
+    });
+  });
+  const themed = createClutter({
+    theme: (params.get('theme') as ClutterTheme) ?? 'study',
+    count: 8,
+    seed: 3,
+    palette,
+  });
+  themed.forEach((p, i) => {
+    placeOn(shelf.surfaces![0], p, {
+      along: (i - (themed.length - 1) / 2) * 0.24,
+      across: -0.22,
+      turn: 0.25,
+    });
+  });
+  dressed = VESSEL_STYLES.length + themed.length;
+  surfaces = 1;
+  dressedSurface = shelf.surfaces![0];
+} else if (view === 'table') {
     camera.position.set(Math.sin(t * 0.2) * 0.8, 1.28, 1.5);
     camera.lookAt(0, 0.78, 0);
   } else {

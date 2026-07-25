@@ -368,3 +368,43 @@ Things it will not do: cram in what does not fit (the overflow is left unparente
 - **A phone set down as authored stands on its short edge like a domino.** Props are modelled in the orientation they are *used* in, which for a phone is upright in a hand. `dress` works out which way up a thing comes to rest from its shape — a **slab** lies down, a candle does not, and a photo frame's strut thickens it past the threshold so it keeps standing. `rest` overrides it.
 - **Random sampling cannot find a narrow gap.** Once two wide items are down, a shallow surface is effectively one-dimensional: nothing can pass a 48 cm basket within the depth of a 90 cm table. A phone with obvious room in the corner was missing it on all 24 attempts. There is now a shuffled coarse-grid sweep as a fallback, which took a demo table from 4 items placed to 10.
 - **Loosening to a uniform draw when attempts fail defeats clustering entirely** — because a tight cluster is exactly what fails often enough to trigger the fallback, so `cluster: 1` spread things out *more* than `cluster: 0`. The sampling window now widens gradually around the focus instead.
+
+## Vessels
+
+The kit is otherwise made of boxes, and it shows: a room built from `BoxGeometry` has no curves in it anywhere, which reads as a *style* right up until you put a bowl of fruit on the table and discover there is no bowl.
+
+A **surface of revolution** fixes that with almost no code. `createVessel` samples a seeded radius profile up the height and spins it, and the same twenty lines produce all of `vase`, `urn`, `bottle`, `jug`, `goblet`, `bowl`, `pot` and `candlestick` — shapes that would each be a separate hand-modelled prop otherwise. The style is nothing but the list of control points.
+
+```ts
+const jug = createVessel({ style: 'jug', seed: 4 });
+```
+
+Two things that are not optional:
+
+- **The profile has to come back down the inside.** Stop at the rim and the lathe caps it flat, and a vase is an egg — fine at fifty metres, obviously wrong the moment anything is set beside it. The whole of a bowl is the hole in it. There is a test that fires a ray down the axis and checks where it lands.
+- **The wall must never invert.** Catmull-Rom overshoots, and a negative radius turns the vessel inside out while the lathe builds it perfectly happily. The sampler clamps.
+
+Heights vary per seed, because a shelf of identical vases is exactly the repetition this whole track exists to avoid.
+
+## Clutter
+
+Every carryable in this kit is a *carryable*: a basket is 48 cm across, so three of them is a full table, and a tabletop dressed from that set says nothing except "somebody left the shopping out". The missing layer was 5–25 cm.
+
+| Generator | Notes |
+|---|---|
+| `createBooks({ style, count, seed })` | `stack` (graded, askew), `row`, `leaning`, `open` (face down, splayed) |
+| `createPapers({ count, size, seed })` | a pile where no two sheets line up, with one clear of it |
+| `createFolded({ width, color, seed })` | folded cloth: offset layers, never square |
+| `createTrinket({ size, seed })` | small lidded box |
+| `createFruitBowl({ count, seed })` | the one piece that composes both tracks — a lathe bowl with fruit in it |
+| `createClutter({ theme, count, seed })` | a mixed set, ready to hand to `dress` |
+
+`createClutter` draws from its theme pool **without replacement until it runs out**, so a set of six is six different things rather than the same vase six times — which is what picking at random gives you, and which is exactly as obviously generated as an even spread. Themes are `domestic`, `kitchen`, `study` and `workshop`.
+
+```ts
+dress(shelf.surfaces[0], createClutter({ theme: 'study', count: 7, seed: 2 }));
+```
+
+Everything here is deliberately cheap — a book is one box, a stack is five. At the size these occupy on screen that is already more detail than survives, and the budget belongs to having *more different things* rather than better ones.
+
+One recurring trap worth naming, because it caught three props in a row: **a tilted box has to be lifted by its rotated half-extent, not its height.** A leaning book positioned at `h·cos(θ)/2` leaves its low corner `w·sin(θ)/2` under the shelf, and a book sunk into the wood is more obviously wrong than one that never leaned. The same arithmetic applies to the splayed leaves of an open book.
