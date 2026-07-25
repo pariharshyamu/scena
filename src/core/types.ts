@@ -70,6 +70,27 @@ export interface PropSurface {
   depth: number;
 }
 
+/**
+ * A body of water something can be in, in **world** coordinates.
+ *
+ * The swimming handshake, and it mirrors `terrain.heightAt` and
+ * `ocean.heightAt`: the prop answers questions about the water and ANIMA
+ * decides what a body does about it. `depthAt` returns 0 anywhere outside,
+ * so "am I in the water" needs no separate `contains`.
+ *
+ * The interesting number is the **depth**, not the surface. Whether a
+ * character wades or swims is a decision made against their own height, and
+ * a pool with one depth everywhere cannot pose that question at all.
+ */
+export interface WaterBody {
+  /** World Y of the still surface. */
+  readonly surfaceY: number;
+  /** Water depth at a world point, in metres. 0 anywhere outside. */
+  depthAt(x: number, z: number): number;
+  /** Ripple it at a world point — a stroke, a dive, a hand going in. */
+  disturb(x: number, z: number, strength?: number): void;
+}
+
 /** What a prop generator returns: the visual plus gameplay metadata. */
 export interface Prop {
   object: Group;

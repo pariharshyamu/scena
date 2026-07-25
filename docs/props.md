@@ -555,3 +555,47 @@ Every defect in it was **a solid where a hole belonged**, and not one of them mo
 Twenty-five numeric tests passed through all three. The test that catches the whole family is one line of geometry: **cast a ray straight down and check the first mesh it meets is the water.** It is in `tests/bathing.test.ts` and it runs over every style.
 
 Sanitaryware also got its own surface, `glaze`. It is emphatically not `porcelain` — that preset is large-format porcelain **floor tile**, grout and all, and a bath shell built from it comes out looking like a tiled box rather than one fired piece.
+
+## Swimming pools
+
+A pool is a tub with one difference that changes everything: **the floor slopes**. That single property is what makes it a gameplay prop rather than a very large bath, because whether a character wades or swims is a decision made against their own height, and a pool with one depth everywhere cannot pose the question.
+
+So the handshake is a depth query, not a surface height:
+
+```ts
+export interface WaterBody {
+  readonly surfaceY: number;
+  depthAt(x: number, z: number): number;   // 0 anywhere outside
+  disturb(x: number, z: number, strength?: number): void;
+}
+```
+
+It mirrors `terrain.heightAt` and `ocean.heightAt`: the prop answers questions about the water and ANIMA decides what a body does about it. `depthAt` returning 0 outside is the whole "am I in the water" test, so there is no separate `contains`. Everything is in **world** coordinates and goes through `worldToLocal`, so a pool that has been moved or turned still knows where its own deep end is.
+
+| Style | Notes |
+|---|---|
+| `plunge` | a small stone plunge bath, one depth, steps all round |
+| `bathhouse` | mosaic-lined and shallow — a bathing hall, not a swimming pool |
+| `lido` | mid-century tile: lanes, 0.95 m → 2.4 m, ladder and springboard |
+| `infinity` | deck-level and brim-full, which is the entire point of one |
+
+The ladder publishes `bottom`, `top` and `rungSpacing` — structurally ANIMA's `Climbable`, exactly like `createLadder` — so **getting out of a pool is the climb code that already exists**.
+
+### A pool is a hole, and holes have rules
+
+The bathing track ended with three defects that were all the same defect: a solid where a hole belonged, none of which moved a number. So the ray-down test was written *before* this prop — cast a ray straight down and check the first mesh it meets is the water — and it runs over every style. It caught nothing, which is the first time in this effort that has happened.
+
+What it could not catch is that a pool **cannot be dropped onto a solid ground plane**. The first render of this view was four empty frames lying on the tarmac: every pool was there, correct, and completely hidden under the demo's own floor. Hence the `deck` apron — the prop brings its own surround so it reads the moment it is added to a scene. A caller with real ground still has to leave a hole for it, and the docs now say so.
+
+### Making water look like water
+
+Four things, in the order they mattered:
+
+- **Alpha follows the floor.** From above, depth is read almost entirely off how much of the bottom you can still see, so the surface's opacity is driven by `depthAt` rather than set to a constant. This is the single change that turned a blue rectangle into a pool with a deep end.
+- **Caustics live on the ZERO SET.** The bright net is the zero set of a product of two interference fields — the union of two families of curves. Thresholding the *peaks* instead lights up the extrema and gives a field of round blobs that reads as a dirty floor. That was the first version.
+- **They are projected downward,** so on a near-vertical wall the pattern barely changes over the whole height and comes out as vertical streaks. Fading them by the surface normal puts the light where it belongs.
+- **Fresnel.** Without it there is no evidence a surface is there at all — you see straight through to the tiles and the pool reads as a dry tank painted blue.
+
+One shader-plumbing trap worth writing down, because it cost a render cycle and produced *nothing on screen with no error anywhere*: `createSurface` patches `#include <map_fragment>` and then keeps working on `diffuseColor` for another twenty lines — mortar joints, cavity tint, per-cell jitter. Caustics injected at `map_fragment` are painted over by the grout of the very tiles they are supposed to be dancing on. `emissivemap_fragment` is the first hook after all of that, and `diffuseColor` is still in scope.
+
+And a matching trap in the vertex shader: the lining reads a vertex's height **in the pool's space**, so every lined mesh has its transform baked into the geometry and sits at the origin. Position one the ordinary way and the varying carries the *mesh's* own local y — a wall centred on its own middle reports heights either side of zero however deep it is sunk, so the waterline lands halfway up every wall independently.

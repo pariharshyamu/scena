@@ -39,6 +39,7 @@ import {
   createSteam,
   createShower,
   createTub,
+  createPool,
   createJacuzzi,
   createBasin,
   BASIN_ERAS,
@@ -70,6 +71,7 @@ import {
   type Steam,
   type Shower,
   type Tub,
+  type Pool,
   type Jacuzzi,
   type Basin,
   type PropSurface,
@@ -145,6 +147,7 @@ let steam: Steam | null = null;
 let tap = 1;
 const showers: Shower[] = [];
 const tubs: Tub[] = [];
+const pools: Pool[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -251,6 +254,37 @@ if (view === 'room') {
     scene.add(b.object);
     basins.push(b);
   });
+} else if (view === 'pool') {
+  // Four pools in a row. There is deliberately NO ground plane: a pool is a
+  // hole, and a solid floor laid across one is a lid over it — the first
+  // render of this view was four empty frames lying on the tarmac. Each pool
+  // brings its own apron, and here they butt together into one deck.
+  scene.add(new AmbientLight(0xffffff, 0.55));
+  const poolKey = new DirectionalLight(0xffffff, 1.35);
+  poolKey.position.set(4, 9, 5);
+  scene.add(poolKey);
+
+  const lido = createPool({ style: 'lido', seed: 2, palette });
+  scene.add(lido.object);
+  const plunge = createPool({ style: 'plunge', seed: 3, palette });
+  plunge.object.position.set(-10.6, 0, 0);
+  scene.add(plunge.object);
+  const bathhouse = createPool({ style: 'bathhouse', seed: 4, palette });
+  bathhouse.object.position.set(-10.6, 0, 7.6);
+  scene.add(bathhouse.object);
+  const infinity = createPool({ style: 'infinity', seed: 5, palette });
+  infinity.object.position.set(1.5, 0, 8.2);
+  scene.add(infinity.object);
+  pools.push(lido, plunge, bathhouse, infinity);
+  for (const p of pools) {
+    const m = p.object.children.find((c) => c.name === 'surface');
+    if (m) m.onAfterRender = () => { m.userData.drawn = ((m.userData.drawn as number) ?? 0) + 1; };
+  }
+  // Something in the water, so the ripples have a reason to exist.
+  lido.disturb(-2, 1, 1.2);
+  lido.disturb(3, -1.4, 0.9);
+  bathhouse.disturb(-10.6, 7.6, 1.2);
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -455,6 +489,9 @@ renderer.setAnimationLoop(() => {
     jacuzzi?.update(dt);
     for (const b of basins) b.update(dt);
   }
+  if (view === 'pool') {
+    for (const p of pools) p.update(dt);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -473,6 +510,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'bath') {
     camera.position.set(Math.sin(t * 0.08) * 1.4, 1.9, 4.6);
     camera.lookAt(0.2, 0.9, -0.4);
+  } else if (view === 'pool') {
+    camera.position.set(Math.sin(t * 0.08) * 3, 6.0, 12);
+    camera.lookAt(0, -0.4, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -500,6 +540,7 @@ declare global {
     galleryLook: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => void;
     galleryProbe: (x: number, y: number, w: number, h: number) => Record<string, unknown>;
     galleryTap: (open: number) => void;
+    galleryWater: (on: number) => void;
     galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
   }
@@ -539,6 +580,13 @@ window.galleryStep = (dt: number) => {
 };
 
 /** Drive the bathroom, for the headless run. */
+window.galleryWater = (on: number) => {
+  for (const p of pools) {
+    const m = p.object.children.find((c) => c.name === 'surface');
+    if (m) m.visible = on > 0.5;
+  }
+  renderer.render(scene, camera);
+};
 window.galleryBath = (on: number) => {
   for (const s of showers) s.setRunning(on > 0.5);
   for (const t2 of tubs) for (const tp of t2.taps) tp.set(on > 0.5);
@@ -642,6 +690,29 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    pool: pools.map((p) => ({
+      style: p.style,
+      surfaceY: Number(p.surfaceY.toFixed(3)),
+      shallow: Number(p.depthAt(p.object.position.x - p.length / 2 + 0.2, p.object.position.z).toFixed(2)),
+      deep: Number(p.depthAt(p.object.position.x + p.length / 2 - 0.2, p.object.position.z).toFixed(2)),
+      outside: p.depthAt(p.object.position.x + p.length, p.object.position.z),
+      ladder: p.ladder !== null,
+      edges: p.edges.length,
+      water: (() => {
+        const m = p.object.children.find((c) => c.name === 'surface') as
+          | (import('three').Mesh & { material: import('three').MeshStandardMaterial })
+          | undefined;
+        if (!m) return 'missing';
+        return {
+          visible: m.visible,
+          drawn: (m.userData.drawn as number) ?? 0,
+          opacity: m.material.opacity,
+          transparent: m.material.transparent,
+          color: m.material.color.getHexString(),
+          y: Number(m.getWorldPosition(new Vector3()).y.toFixed(3)),
+        };
+      })(),
+    })),
     bath: {
       showers: showers.map((s) => ({ state: s.state, spray: Number(s.spray.flow.toFixed(2)), steam: Number(s.steam.density.toFixed(3)) })),
       tubs: tubs.map((t2) => Number(t2.fill.level.toFixed(3))),

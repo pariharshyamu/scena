@@ -18,6 +18,7 @@ export {
   type Carryable,
   type CarryStyle,
   type Gathering,
+  type WaterBody,
 } from './core/types';
 
 // Materials
@@ -438,6 +439,13 @@ export {
   type Jacuzzi,
   type JacuzziOptions,
 } from './props/bathing';
+export {
+  createPool,
+  type Pool,
+  type PoolOptions,
+  type PoolStyle,
+  type PoolLadder,
+} from './props/pool';
 export {
   createBasin,
   createTap,
