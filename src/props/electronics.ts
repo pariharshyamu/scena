@@ -373,3 +373,82 @@ export function createScreenLight(
     },
   };
 }
+
+/**
+ * A phone. Portrait, unlike everything else here — modern handsets are about
+ * 19.5:9 the tall way, and a 16:9 landscape panel scaled down reads as a
+ * tiny television.
+ *
+ * It is a `Carryable` with a `Screen`, which means pick-up, carry, put-down
+ * and hand-off already work on it. Handing someone your phone to show them a
+ * photo needs no new verb: it is `handTo`.
+ */
+export function createPhone(options: ScreenPropOptions = {}): ScreenCarryable {
+  const palette = options.palette ?? DEFAULT_PALETTE;
+  const diagonal = options.diagonal ?? 0.155; // 6.1"
+  // 19.5:9 portrait: h = d·19.5/√(19.5²+9²), w = d·9/√(…).
+  const h = diagonal * 0.9083;
+  const w = diagonal * 0.4192;
+
+  const group = new Group();
+  group.name = 'phone';
+
+  const body = new Mesh(new BoxGeometry(w + 0.005, h + 0.005, 0.008), shell(palette, 0.55));
+  body.position.z = -0.004;
+  group.add(body);
+  // The camera island, which is most of what you see of the back of a phone.
+  const camera = new Mesh(
+    new BoxGeometry(w * 0.42, w * 0.42, 0.003),
+    new MeshStandardMaterial({ color: 0x121418, roughness: 0.4, metalness: 0.5 })
+  );
+  camera.position.set(-w * 0.24, h * 0.34, -0.0095);
+  group.add(camera);
+
+  const panel = attachPanel(group, w, h, {
+    mode: 'home',
+    brightness: 0.85,
+    ...options,
+  });
+  panel.surface.position.z = 0.0009;
+
+  return {
+    object: group,
+    obstacleRadius: 0,
+    // Held in one hand out in front — the same hold the tray pose gives,
+    // scaled down. ANIMA's PhoneUse overrides the grip per pose anyway.
+    carry: 'tray',
+    grip: { z: -0.004 },
+    screen: panel,
+  };
+}
+
+/**
+ * A smartwatch: the smallest screen the system draws, and a useful proof that
+ * one content shader covers a 55" television and a 40 mm watch face. Parent
+ * it to an ANIMA hand socket.
+ */
+export function createSmartwatch(options: ScreenPropOptions = {}): ScreenProp {
+  const palette = options.palette ?? DEFAULT_PALETTE;
+  const size = options.diagonal ?? 0.042;
+  const w = size * 0.82;
+  const h = size;
+
+  const group = new Group();
+  group.name = 'smartwatch';
+
+  const strap = new Mesh(
+    new BoxGeometry(w * 0.78, h * 2.4, 0.006),
+    createSurface('leather', { color: 0x2c2f36, roughness: 0.85 })
+  );
+  strap.position.z = -0.007;
+  group.add(strap);
+
+  const caseBody = new Mesh(new BoxGeometry(w + 0.004, h + 0.004, 0.009), shell(palette, 0.7));
+  caseBody.position.z = -0.004;
+  group.add(caseBody);
+
+  const panel = attachPanel(group, w, h, { mode: 'chart', brightness: 0.6, ...options });
+  panel.surface.position.z = 0.0011;
+
+  return { object: group, obstacleRadius: 0, screen: panel };
+}

@@ -270,3 +270,9 @@ Lights stay a budget, as everywhere else here: this is opt-in per panel. A room 
 `panel.glow` publishes the colour and level of what is being drawn *right now*, so a light that copies it flickers in time with the picture's own cuts.
 
 The shot list is deliberately uneven — cuts run 0.55–4 s, because a fixed cut length reads as a strobe and the room lighting gives it away long before the picture does. The CPU pushes each shot's colour and level into the shader as uniforms rather than letting the shader pick its own, so the light and the picture cannot drift apart: they are the same event.
+
+### Phones and watches
+
+`createPhone` is portrait — about 19.5:9 the tall way, because a 16:9 landscape panel scaled down reads as a tiny television. `createSmartwatch` is the smallest thing the system draws, and a useful proof that one content shader covers a 55" set and a 40 mm watch face.
+
+A phone is a `Carryable` with a `Screen`. Pick-up, carry, put-down and hand-off already work on it: handing someone your phone to show them a photo needs no new verb, it is `handTo`.

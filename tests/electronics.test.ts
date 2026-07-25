@@ -5,7 +5,9 @@ import {
   createMonitor,
   createScreenLight,
   createScreenPanel,
+  createPhone,
   createSmartDisplay,
+  createSmartwatch,
   createTablet,
   createTelevision,
   type ScreenProp,
@@ -218,6 +220,40 @@ describe('screen props', () => {
     tablet.screen.setMode('feed');
     tablet.screen.update(0.1);
     expect(tablet.screen.glow.intensity).toBeGreaterThan(0);
+  });
+
+  it('builds a phone PORTRAIT — a shrunken television is not a handset', () => {
+    const phone = createPhone({ diagonal: 0.155 });
+    expect(phone.screen.height).toBeGreaterThan(phone.screen.width);
+    expect(phone.screen.height / phone.screen.width).toBeCloseTo(19.5 / 9, 1);
+    expect(Math.hypot(phone.screen.width, phone.screen.height)).toBeCloseTo(0.155, 3);
+    // ...and it is a Carryable, so hand-off already works on it.
+    expect(phone.carry).toBe('tray');
+  });
+
+  it('keeps a phone screen visible from the front', () => {
+    const phone = createPhone();
+    phone.object.updateWorldMatrix(true, true);
+    const ray = new Raycaster();
+    ray.set(new Vector3(0, 0, 0.4), new Vector3(0, 0, -1));
+    const hits = ray.intersectObject(phone.object, true);
+    expect(hits[0]?.object.name).toBe('screen');
+  });
+
+  it('runs the same content shader down to a watch face', () => {
+    const watch = createSmartwatch();
+    expect(watch.screen.width).toBeLessThan(0.05);
+    watch.screen.setMode('call');
+    watch.screen.update(0.1);
+    expect(watch.screen.glow.intensity).toBeGreaterThan(0);
+    // A watch must not light a room the way a television does.
+    const tv = createTelevision({ mode: 'call' });
+    tv.screen.update(0.1);
+    const a = createScreenLight(watch.screen);
+    const b = createScreenLight(tv.screen);
+    a.update();
+    b.update();
+    expect(b.light.intensity).toBeGreaterThan(a.light.intensity * 8);
   });
 
   it('scrolls a feed only when asked to', () => {

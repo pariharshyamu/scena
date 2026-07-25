@@ -363,6 +363,8 @@ export {
   createLaptop,
   createSmartDisplay,
   createTablet,
+  createPhone,
+  createSmartwatch,
   createScreenLight,
   type ScreenProp,
   type ScreenPropOptions,
