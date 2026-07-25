@@ -475,6 +475,17 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createDeckedShip,
+  SHIP_ERAS,
+  type DeckedShip,
+  type DeckedShipOptions,
+  type ShipEra,
+  type ShipInput,
+  type DeckField,
+  type DeckLevel,
+  type Companionway,
+} from './props/deckedShip';
+export {
   createSmoke,
   createExtractor,
   createSmokeLayer,

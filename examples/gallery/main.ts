@@ -48,6 +48,8 @@ import {
   createWashUp,
   createDresser,
   createIngredient,
+  createDeckedShip,
+  createOcean,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -59,6 +61,7 @@ import {
   DRESSER_KINDS,
   INGREDIENT_KINDS,
   EXTRACTOR_ERAS,
+  SHIP_ERAS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -102,6 +105,8 @@ import {
   type WashUp,
   type Storage,
   type Ingredient,
+  type DeckedShip,
+  type Ocean,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -187,6 +192,11 @@ const washes: WashUp[] = [];
 const dressers: Storage[] = [];
 const foods: Ingredient[] = [];
 const vents: Extractor[] = [];
+const ships: DeckedShip[] = [];
+const oceans: Ocean[] = [];
+/** Markers standing on decks. `at` is written by NOTHING but `ride`. */
+const shipRiders: Array<{ ship: DeckedShip; at: Vector3; post: Mesh; z0: number }> = [];
+const UP = new Vector3(0, 1, 0);
 const plumes: SmokeSource[] = [];
 let smokeRoom: SmokeLayer | null = null;
 let foodChill: ColdStore | null = null;
@@ -621,6 +631,46 @@ if (view === 'room') {
     scene.add(bench);
   });
 
+} else if (view === 'ship') {
+  // Four eras of deck, all making way through the same swell, each with a
+  // marker standing on it that is NEVER moved by anything but `ride`. If the
+  // markers stay on their ships, the handshake works; if they trail off
+  // astern, it does not — and that is a thing you can see rather than a
+  // number you have to trust.
+  scene.add(new AmbientLight(0xffffff, 0.6));
+  const shipKey = new DirectionalLight(0xffffff, 1.15);
+  shipKey.position.set(4, 9, 6);
+  scene.add(shipKey);
+  const sea = createOcean({ amplitude: 0.85, wavelength: 24, size: 900, segments: 220 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  SHIP_ERAS.forEach((era, i) => {
+    const ship = createDeckedShip({ era, seed: i + 3, palette });
+    ship.object.position.set(-95 + i * 70, 0, 0);
+    ship.float((x, z) => sea.heightAt(x, z));
+    scene.add(ship.object);
+    ships.push(ship);
+
+    // One marker per deck, standing still. Nothing ever writes their x/z
+    // except `ride`.
+    ship.update(1 / 60, {});
+    for (const deck of ship.decks) {
+      if (deck.name === 'hold') continue;
+      const at = new Vector3(ship.object.position.x, 0, ship.object.position.z + deck.z);
+      const y = ship.deckAt(at.x, at.z);
+      if (y === null) continue;
+      at.y = y;
+      const post = new Mesh(
+        new BoxGeometry(0.5, 1.8, 0.5),
+        new MeshStandardMaterial({ color: 0xd8483a, flatShading: true })
+      );
+      post.name = `rider:${era}:${deck.name}`;
+      scene.add(post);
+      shipRiders.push({ ship, at, post, z0: at.z - ship.object.position.z });
+    }
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -848,6 +898,21 @@ renderer.setAnimationLoop(() => {
   if (view === 'dresser') {
     for (const d of dressers) d.update(dt);
   }
+  if (view === 'ship') {
+    for (const o of oceans) o.update(dt);
+    for (const s2 of ships) s2.update(dt, { speed: 5 });
+    for (const r of shipRiders) {
+      // THE HANDSHAKE, and the only thing that moves these markers:
+      r.ship.ride(r.at);
+      const y = r.ship.deckAt(r.at.x, r.at.z, r.at.y);
+      if (y !== null) r.at.y = y;
+      r.post.position.copy(r.at);
+      r.post.position.y += 0.9;
+      // Stand square to the deck rather than to the world.
+      const n = r.ship.normalAt(r.at.x, r.at.z);
+      r.post.quaternion.setFromUnitVectors(UP, n);
+    }
+  }
   if (view === 'smoke') {
     for (const v of vents) v.update(dt, 1);
     smokeRoom?.update(dt);
@@ -898,6 +963,11 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'smoke') {
     camera.position.set(Math.sin(t * 0.08) * 1.2, 1.75, 5.4);
     camera.lookAt(0, 1.5, -0.6);
+  } else if (view === 'ship') {
+    const lead = ships[1];
+    const f = lead ? lead.object.position : new Vector3();
+    camera.position.set(f.x + 22, 14, f.z - 26);
+    camera.lookAt(f.x, 3, f.z);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -971,6 +1041,16 @@ window.galleryStep = (dt: number) => {
   for (const w of washes) w.update(dt, true);
   for (const d of dressers) d.update(dt);
   for (const f of foods) f.update(dt, foodChill ?? undefined);
+  for (const o of oceans) o.update(dt);
+  for (const s2 of ships) s2.update(dt, { speed: 5 });
+  for (const r of shipRiders) {
+    r.ship.ride(r.at);
+    const y = r.ship.deckAt(r.at.x, r.at.z, r.at.y);
+    if (y !== null) r.at.y = y;
+    r.post.position.copy(r.at);
+    r.post.position.y += 0.9;
+    r.post.quaternion.setFromUnitVectors(UP, r.ship.normalAt(r.at.x, r.at.z));
+  }
   for (const v of vents) v.update(dt, 1);
   smokeRoom?.update(dt);
   for (const s of streams) s.update(dt);
@@ -1154,6 +1234,22 @@ window.galleryDebug = (t?: number) => {
         light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
       };
     }),
+    ships: ships.map((sh) => ({
+      era: sh.era,
+      decks: sh.decks.length,
+      ladders: sh.ladders.length,
+      pitch: Number(sh.pitch.toFixed(3)),
+      roll: Number(sh.roll.toFixed(3)),
+      motion: Number(sh.motion.toFixed(3)),
+      z: Number(sh.object.position.z.toFixed(1)),
+    })),
+    // Every marker's distance from the deck it started on. If `ride` works
+    // these stay ~0 forever; if it does not they grow without bound.
+    riders: shipRiders.map((r) => ({
+      on: r.post.name,
+      aboard: r.ship.deckAt(r.at.x, r.at.z, r.at.y) !== null,
+      lag: Number(Math.abs(r.at.z - r.ship.object.position.z - r.z0).toFixed(2)),
+    })),
     smoke: smokeRoom === null ? null : {
       level: Number(smokeRoom.level.toFixed(3)),
       descent: Number(smokeRoom.descent.toFixed(2)),

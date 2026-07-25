@@ -900,3 +900,51 @@ And the hood's filter **clogs**, chokes both numbers, and wants cleaning — the
 - **The probe was at the origin.** An extractor's origin is on its front face, which is the one place beneath a canopy that a fire never is — so a flue over a roaring hearth read 0 and never learned the fire was lit. Both `catches` and the heat sample now measure from the mouth, and the mouth is **published** as an anchor, because a caller measuring from the origin would have made the same mistake.
 - **The visible layer was seven stripes.** It was a stack of thin sheets, on the theory that lower ones fading in later would soften the underside. From across the room that is seven hard edges instead of one — the shelf problem seven times over rather than a fix for it. It is one box with a vertical alpha gradient now: one draw call, and no edges to be hard.
 - **A test that ran one hood through both halves of an experiment** measured a blocked extractor in the second half and came out backwards, reporting that a pan *under* the hood filled the room faster than a pan across the kitchen. Two scenes, not one hood run twice.
+
+## Vessels you can stand on — the deck as ground that moves
+
+`createBoat` and `createShip` already existed and are hulls that **bob**. `createDeckedShip` is the other half, and it is a different problem. Past about ten metres a ship stops being a vehicle and becomes a **place** — somewhere with work and rooms and other people, that happens to be moving.
+
+Every character controller in the trilogy assumes the floor is the world. `terrain.heightAt` never moves. A deck pitches, rolls **and translates**, so the fact that breaks everything is:
+
+> A character standing perfectly still on a moving deck has to change world position anyway.
+
+Nothing in ANIMA or GAMA does that, and no amount of walking code fixes it, because the character is not walking. So the handshake is a pair:
+
+```ts
+deckAt(x, z, near?): number | null   // walkable height in WORLD space
+ride(position): Vector3             // and where that point goes next
+```
+
+`deckAt` mirrors `terrain.heightAt` and returns **null** off the side, so "am I aboard" needs no separate query. `near` picks between stacked decks — without it a sailor in the hold is answered with the surface over his head and pops out on the poop.
+
+### `ride` is the whole track, and it is one matrix
+
+The vessel's transform this frame, times the inverse of its transform last frame. Feed a standing character through it and they come along; don't, and they walk out through the stern at whatever speed the ship is making. There is a test for each of those, and a third for a **turn** — because translation alone would be a subtraction, and it is a matrix precisely because a man on the bow of a turning ship travels sideways without taking a step.
+
+### The fifth spatial handshake, and the first that is a frame
+
+After `depthAt`, `heatAt`, `chillAt` and `smokeAt`. Those four answer *what is it like here*. This one answers *where is here going*.
+
+### `motion` is the rate, not the angle
+
+```ts
+readonly motion: number   // 0 (alongside) to 1 (hang on)
+```
+
+A ship heeled steadily at ten degrees under sail is easy to walk on; the same ten degrees arriving twice a second is not, and **a number taken off the angle cannot tell those two apart**. So it comes off the rate of change of attitude plus the heave. There is a test that gives one ship a permanently sloping sea and another a moving swell: comparable angles, an order of magnitude apart on `motion`.
+
+| Era | roll in a 1.1 m swell | `motion` |
+|---|---|---|
+| `galley` | ~10° | 0.89 → 1.0 |
+| `carrack` | ~6° | 0.73 |
+| `steamer` | ~3° | 0.21 |
+| `liner` | ~0.06° | 0.11 |
+
+That hundredfold spread is `gain` and `ease` — but **the beam does much of it for free and correctly**: `deckAt` samples the sea at port and starboard, and a 24 m beam spans more of a wavelength than a 3.6 m one, so a wide hull averages the swell out before `gain` is applied. That fell out of the maths rather than being put in.
+
+### One rendering fault worth recording
+
+The raised decks were built as planks with rails on three sides. From three metres away that reads as a **stack of separate rafts** with daylight under each one, not as a ship. They need the fourth rail and, more importantly, the vertical face they stand on. Every number was right; only the picture said so.
+
+A vessel's `obstacleRadius` is **0**. It is not something to steer around — it is the ground.
