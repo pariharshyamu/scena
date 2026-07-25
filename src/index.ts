@@ -475,6 +475,18 @@ export {
   type PrepKind,
 } from './props/prep';
 export {
+  createWashUp,
+  createTrough,
+  createKitchenSink,
+  createDishwasher,
+  SINK_ERAS,
+  type WashUp,
+  type SinkOptions,
+  type SinkEra,
+  type SinkDoor,
+  type WashQueue,
+} from './props/sink';
+export {
   createColdStore,
   createLarder,
   createIcebox,

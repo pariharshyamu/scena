@@ -742,3 +742,48 @@ The one reading deliberately left invisible is `running`. A fridge cycling its c
 `spoilRate(°C)` is exported on its own. Q10: bacteria and the chemistry roughly halve for every ten degrees off. That alone would make a freezer only twelve times better than a worktop, which is nonsense — frozen food keeps for a year — so freezing is modelled as what it actually is, a **phase change** rather than more of the same, smoothed over the two degrees below zero so a fridge hovering there does not flicker between regimes.
 
 Shelves are published as `surfaces`, so `dress` fills a fridge with no special case. They **span** the cavity rather than marching up from the bottom: dividing by the shelf count instead of the gaps left a third of every cabinet empty above the top shelf and squeezed the lower ones close enough together that a bottle stood on one went through the next.
+
+## The sink, and the washing-up
+
+`createBasin` already existed and this is deliberately not it. A basin is about **water**: taps, a level, a plug. A sink is about the **pile of dishes** — the water is only what makes the pile go down, and how good the water is decides how fast.
+
+So `createWashUp` is a `WorkStation` like the chopping block and the prep bench, with one difference that makes it a track rather than another loop: **the cycle time is not a constant.** Every other work station in the library grinds at a fixed rate forever. Here the rate is a product of what is in the bowl:
+
+```
+rate = (water > 0) × (1 − soil × 0.75) × (0.5 + hot × 0.5)
+```
+
+No water and nothing happens at all. Fresh hot water is about four times faster than a cold grey bowlful, every plate makes the water a little worse, and each one uses some of it up — so at some point you stop, pull the plug and run another lot. **That decision is the game.** `fill()` *mixes* rather than replaces, so topping up a filthy bowl helps a little and never as much as emptying it; there is a test named for that.
+
+```ts
+const sink = createWashUp({ era: 'sink' });
+sink.load(10);
+sink.taps[0].set(true);
+sink.onYield = (n) => console.log('washed', n);
+game.onUpdate((t) => sink.update(t.delta, cook.atSink));
+```
+
+| Era | What you have to do | Bowlfuls |
+|---|---|---|
+| `trough` | no tap and no plug — water is carried in and baled out, and there is nowhere to stack anything | 6 items |
+| `scullery` | one tap, and it runs **cold**: hot water is a kettle off the stove | 10 items |
+| `sink` | mixer, hot on demand, a ribbed drainer | 14 items |
+| `dishwasher` | load it, shut it, `start()`, walk away | — |
+
+The era ends the way the stove's and the cold store's do: the modern one **takes the loop away**. A dishwasher is not a faster sink, it is a door, a capacity and a wait. It will not run with the door open or with nothing in it, and **opening it mid-cycle aborts** — half-washed is dirty.
+
+`WashQueue` is deliberately a **count**, not a list of objects. What a game wants from the sink is "are the dishes done", and making the caller hand over twelve `Carryable`s to get twelve back is ceremony around a number. The drainer is published as a `surface`, so `dress` can put things on it.
+
+### The hole, for the sixth time
+
+The first build made a solid counter box and placed the bowl at its centre — which put the bowl *inside* solid geometry. From above, four sinks that were four worktops. Every test passed, because every test was about water and dishes.
+
+The worktop is a **frame around a hole**: solid below the bowl floor, solid on all four sides of the aperture, and nothing in the aperture at all. The bowl's own liner still has to be built, because the frame's faces point outward and are invisible from where you are standing. Pot, pool, oven, sunken bath, fridge, sink.
+
+### Three more the render caught, none of which a number would have
+
+- **Stainless steel goes black.** `steel` is `metalness: 0.92` and there is no environment map in this library, so a worktop renders near-black at any glancing angle — the same trap the cast-iron range hit. The double sink came out as a slab of tarmac with a tap on it. Dropped to 0.4.
+- **Clean plates scattered across the drainer are a white smear.** Spread out, the count is unreadable; piled up, *the height of the pile is the count*. It is now a stack.
+- **The dishwasher emptied its own rack.** Showing only `dirty` meant that the instant the cycle finished the dishes vanished — the payoff for waiting forty-five seconds was an empty machine. Washed dishes are still in the rack until somebody unloads them.
+
+And one on the suds: a flat white lid on the water is indistinguishable from the water. Foam is a handful of clumps at different heights, and it thins out as the water tires — a bowl still frothing after twelve plates is a bowl nobody has used.

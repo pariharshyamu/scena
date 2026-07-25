@@ -45,8 +45,10 @@ import {
   createCookware,
   createPrepStation,
   createColdStore,
+  createWashUp,
   PREP_KINDS,
   COLD_ERAS,
+  SINK_ERAS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -87,6 +89,7 @@ import {
   type Jacuzzi,
   type Basin,
   type ColdStore,
+  type WashUp,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -165,6 +168,7 @@ const stoves: HeatSource[] = [];
 const pans: Cookware[] = [];
 const preps: PrepStation[] = [];
 const colds: ColdStore[] = [];
+const washes: WashUp[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -422,6 +426,33 @@ if (view === 'room') {
     scene.add(jar.object);
   });
 
+} else if (view === 'sink') {
+  // Four eras of washing-up, all loaded and all being worked. The row is the
+  // argument: a trough with no tap and nowhere to stack, a butler sink whose
+  // tap runs cold, a double bowl with a drainer, and a machine that needs
+  // nobody standing at it at all.
+  scene.add(new AmbientLight(0xffffff, 0.46));
+  const sinkKey = new DirectionalLight(0xffffff, 1.05);
+  sinkKey.position.set(3, 7, 5);
+  scene.add(sinkKey);
+  const sinkFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x504a44, roughness: 0.9 })
+  );
+  sinkFloor.rotation.x = -Math.PI / 2;
+  scene.add(sinkFloor);
+  SINK_ERAS.forEach((era, i) => {
+    const w = createWashUp({ era, seed: i + 3, palette });
+    w.object.position.set(-2.6 + i * 1.75, 0, 0);
+    scene.add(w.object);
+    // Loaded, watered and part-way through — a sink photographed empty is a
+    // worktop with a hole in it.
+    w.load(era === 'dishwasher' ? 9 : 7);
+    if (era !== 'dishwasher') w.fill(0.85, era === 'scullery' ? 0.35 : 0.95);
+    else w.start();
+    washes.push(w);
+  });
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -643,6 +674,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'cold') {
     for (const st of colds) st.update(dt);
   }
+  if (view === 'sink') {
+    for (const w of washes) w.update(dt, true);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -673,6 +707,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'cold') {
     camera.position.set(Math.sin(t * 0.1) * 1.4, 1.5, 3.6);
     camera.lookAt(0, 0.85, 0);
+  } else if (view === 'sink') {
+    camera.position.set(Math.sin(t * 0.1) * 1.3, 1.45, 3.2);
+    camera.lookAt(0, 0.8, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -704,6 +741,7 @@ declare global {
     galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
     galleryDoors: (open: number) => void;
+    gallerySinks: (fresh: number) => void;
   }
 }
 
@@ -741,6 +779,7 @@ window.galleryStep = (dt: number) => {
   for (let i = 0; i < pans.length; i++) pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
   for (const st of preps) st.update(dt, true);
   for (const st of colds) st.update(dt);
+  for (const w of washes) w.update(dt, true);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -753,6 +792,18 @@ window.galleryStep = (dt: number) => {
   if (basin) {
     basin.fillBy(tap * dt * 0.22);
     basin.update(dt);
+  }
+};
+
+/** Refill every sink and open the machine, for the headless run. */
+window.gallerySinks = (fresh: number) => {
+  for (const w of washes) {
+    if (w.era === 'dishwasher') w.door?.set(fresh > 0.5);
+    else if (fresh > 0.5) {
+      w.empty();
+      w.fill(0.9, 1);
+      w.load(6);
+    }
   }
 };
 
@@ -905,6 +956,20 @@ window.galleryDebug = (t?: number) => {
         light: st.light ? Number(st.light.intensity.toFixed(2)) : null,
       };
     }),
+    sinks: washes.map((w) => ({
+      era: w.era,
+      dirty: w.dirty,
+      clean: w.clean,
+      water: Number(w.water.toFixed(2)),
+      soil: Number(w.soil.toFixed(2)),
+      hot: Number(w.hot.toFixed(2)),
+      progress: Number(w.progress.toFixed(2)),
+      running: w.running,
+      cycle: Number(w.cycle.toFixed(2)),
+      taps: w.taps.length,
+      board: w.board !== null,
+      steam: Number(w.steam.density.toFixed(2)),
+    })),
     pans: pans.map((w) => ({
       kind: w.kind,
       state: w.state,
