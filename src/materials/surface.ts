@@ -71,6 +71,7 @@ export type SurfaceKind =
   | 'corten'
   | 'teak'
   | 'porcelain'
+  | 'glaze'
   | 'mosaic'
   | 'parquet'
   | 'patternedTile';
@@ -502,6 +503,17 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
     tile: 1, tileW: 1.2, tileH: 0.6, mortar: 0.005, bond: 0.5, round: 0,
     tileJitter: 0.06, mortarColor: 0xb0aca2, tileRelief: 0.03,
+  },
+  // Vitreous glaze: sanitaryware. Note it is NOT 'porcelain' — that preset is
+  // large-format porcelain FLOOR TILE, complete with grout, and a bath shell
+  // built from it comes out looking like a tiled box rather than one fired
+  // piece. Glaze is a single unbroken skin: glossy, almost no variation, and
+  // no tiling at all.
+  glaze: {
+    baseColor: 0xf2f0ea,
+    roughness: 0.12, metalness: 0, scale: 5.0, albedoVar: 0.02, tint: 0xc8c6be,
+    tintAmount: 0.05, ao: 0.07, bump: 0.008, roughVar: 0.03, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
   },
   // Glass mosaic: tiny gridded tesserae, strong per-chip variation, a share of
   // accent-tint chips, pale grout — pools and feature walls.

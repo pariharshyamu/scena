@@ -425,6 +425,20 @@ export {
   type Droplets,
 } from './materials/waterFlow';
 export {
+  createShower,
+  createTub,
+  createJacuzzi,
+  type Shower,
+  type ShowerOptions,
+  type ShowerStyle,
+  type ShowerState,
+  type Tub,
+  type TubOptions,
+  type TubStyle,
+  type Jacuzzi,
+  type JacuzziOptions,
+} from './props/bathing';
+export {
   createBasin,
   createTap,
   createEwer,

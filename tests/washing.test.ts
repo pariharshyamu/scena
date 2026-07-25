@@ -5,7 +5,6 @@ import {
   createBasin,
   createEwer,
   createTap,
-  type BasinEra,
   type TapStyle,
 } from '../src';
 

@@ -135,7 +135,8 @@ Thirteen Tier-4 presets take the same shader into the present day — for bungal
 | `paintedMetal` | powder-coat for gates, frames and railings — colour from the palette |
 | `corten` | the even architectural oxide bloom, calmer than `rust` |
 | `teak` | oiled decking/furniture wood under a varnish sheen |
-| `porcelain` | large-format slabs, hairline grout, offset courses |
+| `porcelain` | large-format floor **tile**: big slabs, hairline grout, offset courses |
+| `glaze` | vitreous sanitaryware — one unbroken glossy skin, **no tiling**. Baths and basins |
 | `mosaic` | tiny gridded tesserae with **accent-tint chips** — pools, feature walls |
 | `parquet` | narrow varnished planks in alternating **±45° chevron bands** |
 | `patternedTile` | cream cement tiles each stamped with a **ring-and-dot motif** in the tint |

@@ -519,3 +519,39 @@ Both of those came out backwards on the first attempt, and the fix was to **swee
 - **Less forearm bend drops the hand below the elbow**, not more: 0.8 puts it 11 cm under, 1.4 puts it 5 cm over.
 
 The first version used the widest, highest combination of both and produced a pose that failed six tests at once.
+
+## Showers, tubs and hot tubs
+
+The state machine is the point. A shower does not produce hot water the instant you open it, and **that pause is most of what makes one feel plumbed rather than switched** — so `Shower` runs `off → warming → running → cooling`, deliberately the same shape as GAMA's `Device`, and a device graph drives one with nothing importing anything.
+
+Two things fall out of that shape and both matter on screen:
+
+- **Water arrives at once; heat does not.** The spray is at full flow a frame after you open it while `steam.density` is still zero. A shower whose steam appears with the water is a special effect.
+- **The steam outlives the water.** A room that clears the instant the tap shuts is an extractor fan.
+
+```ts
+const shower = createShower({ style: 'enclosure', warmUp: 3.5 });
+shower.onState = (s) => console.log(s);   // 'warming' … 'running'
+shower.setRunning(true);
+game.onUpdate((t) => shower.update(t.delta));
+```
+
+| Generator | Notes |
+|---|---|
+| `createShower({ style })` | `enclosure` (frosted glass + tray), `overBath` (rail + stirring curtain), `open` (wet room) |
+| `createTub({ style })` | `clawfoot`, `modern`, `sunken`, `hip`. `hip` has **no taps** — you fill it from a ewer |
+| `createJacuzzi({ seats })` | a `Gathering`: seats round a rim with a shared focus |
+
+A hot tub is a `Gathering` because that is what one *is* socially, which means GAMA's `Occupancy` fills it and ANIMA's `Conversation` runs in it with nothing new written. Its jets agitate the surface for as long as they run, through the same `uFillStir` the taps use — a surface that settles while the jets are on is the giveaway.
+
+### The lesson this track actually taught
+
+Every defect in it was **a solid where a hole belonged**, and not one of them moved a number:
+
+- The clawfoot tub was a shell with a *smaller box inside it* for the hollow. The second box is invisible — it is hidden by the shell it sits in — so the tub rendered as a plain white block with taps on top. It is four **walls** around an inner floor now.
+- The sunken tub's deck was a slab across the whole footprint. That is a **lid**: it caps the very well it is meant to surround.
+- The hot tub's body was a default `CylinderGeometry`, which is **capped**, so the water, the jets and every seat rendered underneath a disc of shell material. Its liner was an open cylinder with the normals pointing *outward* — a mesh sitting inside the body with every face turned away from the only camera that could ever see it.
+
+Twenty-five numeric tests passed through all three. The test that catches the whole family is one line of geometry: **cast a ray straight down and check the first mesh it meets is the water.** It is in `tests/bathing.test.ts` and it runs over every style.
+
+Sanitaryware also got its own surface, `glaze`. It is emphatically not `porcelain` — that preset is large-format porcelain **floor tile**, grout and all, and a bath shell built from it comes out looking like a tiled box rather than one fired piece.

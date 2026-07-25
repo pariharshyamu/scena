@@ -274,7 +274,7 @@ export function createBasin(options: BasinOptions = {}): Basin {
     // Pedestal, oval bowl, splashback, and TWO taps — hot and cold arrived
     // separately and mixing them was the user's problem.
     rim = 0.84;
-    const ceramic = createSurface('porcelain', { color: 0xeeeae2, seed });
+    const ceramic = createSurface('glaze', { color: 0xeeeae2, seed });
     const pedestal = new Mesh(new CylinderGeometry(0.11, 0.16, rim - 0.14, 12), ceramic);
     pedestal.position.y = (rim - 0.14) / 2;
     group.add(pedestal);
@@ -324,7 +324,7 @@ export function createBasin(options: BasinOptions = {}): Basin {
     }
     const bowl = new Mesh(
       new CylinderGeometry(0.19, 0.15, 0.12, 18),
-      createSurface('porcelain', { color: 0xf4f2ee, seed })
+      createSurface('glaze', { color: 0xf4f2ee, seed })
     );
     bowl.position.y = counterH + 0.085;
     group.add(bowl);

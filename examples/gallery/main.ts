@@ -37,6 +37,11 @@ import {
   createSpray,
   createFill,
   createSteam,
+  createShower,
+  createTub,
+  createJacuzzi,
+  createBasin,
+  BASIN_ERAS,
   createPinboard,
   createWhiteboard,
   createPoster,
@@ -63,6 +68,10 @@ import {
   type Spray,
   type Fill,
   type Steam,
+  type Shower,
+  type Tub,
+  type Jacuzzi,
+  type Basin,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -134,6 +143,12 @@ let basin: Fill | null = null;
 let shower: Spray | null = null;
 let steam: Steam | null = null;
 let tap = 1;
+const showers: Shower[] = [];
+const tubs: Tub[] = [];
+const basins: Basin[] = [];
+let shower2: Shower | null = null;
+let tub: Tub | null = null;
+let jacuzzi: Jacuzzi | null = null;
 
 if (view === 'room') {
   // The longest clear run gets the salon hang: six pieces, graded, off a
@@ -194,6 +209,48 @@ if (view === 'room') {
       surfaces++;
     }
   }
+} else if (view === 'bath') {
+  // A bathroom: a shower warming up, a tub filling, a hot tub with the jets
+  // on, and a basin of each era.
+  scene.add(new AmbientLight(0xffffff, 0.6));
+  const key = new DirectionalLight(0xffffff, 1.2);
+  key.position.set(3, 6, 4);
+  scene.add(key);
+  const floor = new Mesh(
+    new PlaneGeometry(16, 16),
+    new MeshStandardMaterial({ color: 0x6a6560, roughness: 0.85 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  shower2 = createShower({ style: 'enclosure', seed: 2, warmUp: 3, palette });
+  shower2.object.position.set(-2.4, 0, 0);
+  scene.add(shower2.object);
+  const overBath = createShower({ style: 'overBath', seed: 5, warmUp: 2, palette });
+  overBath.object.position.set(-1.1, 0, 1.6);
+  scene.add(overBath.object);
+  showers.push(shower2, overBath);
+
+  tub = createTub({ style: 'clawfoot', seed: 3, rate: 0.5, palette });
+  tub.object.position.set(-0.1, 0, -0.4);
+  scene.add(tub.object);
+  const sunken = createTub({ style: 'sunken', seed: 4, palette });
+  sunken.object.position.set(1.9, 0, 1.5);
+  sunken.pour(0.9);
+  scene.add(sunken.object);
+  tubs.push(tub, sunken);
+
+  jacuzzi = createJacuzzi({ seats: 5, radius: 1.0, seed: 6, palette });
+  jacuzzi.object.position.set(2.4, 0, -1.2);
+  jacuzzi.setJets(1);
+  scene.add(jacuzzi.object);
+
+  BASIN_ERAS.forEach((era, i) => {
+    const b = createBasin({ era, seed: i + 2, rate: 0.35, palette });
+    b.object.position.set(-1.4 + i * 1.3, 0, -2.4);
+    scene.add(b.object);
+    basins.push(b);
+  });
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -392,6 +449,12 @@ renderer.setAnimationLoop(() => {
   }
   for (const c of clocks) c.update(dt);
   for (const c of stirs) c.update(dt);
+  if (view === 'bath') {
+    for (const s of showers) s.update(dt);
+    for (const t2 of tubs) t2.update(dt);
+    jacuzzi?.update(dt);
+    for (const b of basins) b.update(dt);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -407,6 +470,9 @@ renderer.setAnimationLoop(() => {
   if (view === 'room') {
     camera.position.set(Math.sin(t * 0.12) * 1.1, 1.62, 2.2);
     camera.lookAt(Math.sin(t * 0.08) * 0.8, 1.45, -2.6);
+  } else if (view === 'bath') {
+    camera.position.set(Math.sin(t * 0.08) * 1.4, 1.9, 4.6);
+    camera.lookAt(0.2, 0.9, -0.4);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -434,6 +500,7 @@ declare global {
     galleryLook: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => void;
     galleryProbe: (x: number, y: number, w: number, h: number) => Record<string, unknown>;
     galleryTap: (open: number) => void;
+    galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
   }
 }
@@ -456,6 +523,10 @@ declare global {
  */
 window.galleryStep = (dt: number) => {
   for (const s of streams) s.update(dt);
+  for (const s of showers) s.update(dt);
+  for (const t2 of tubs) t2.update(dt);
+  jacuzzi?.update(dt);
+  for (const b of basins) b.update(dt);
   shower?.update(dt);
   steam?.update(dt);
   for (const c of stirs) c.update(dt);
@@ -465,6 +536,14 @@ window.galleryStep = (dt: number) => {
     basin.update(dt);
   }
   renderer.render(scene, camera);
+};
+
+/** Drive the bathroom, for the headless run. */
+window.galleryBath = (on: number) => {
+  for (const s of showers) s.setRunning(on > 0.5);
+  for (const t2 of tubs) for (const tp of t2.taps) tp.set(on > 0.5);
+  jacuzzi?.setJets(on);
+  for (const b of basins) for (const tp of b.taps) tp.set(on > 0.5);
 };
 
 /** Turn the taps and the shower on or off, for the headless run. */
@@ -563,6 +642,13 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    bath: {
+      showers: showers.map((s) => ({ state: s.state, spray: Number(s.spray.flow.toFixed(2)), steam: Number(s.steam.density.toFixed(3)) })),
+      tubs: tubs.map((t2) => Number(t2.fill.level.toFixed(3))),
+      jets: jacuzzi ? jacuzzi.jets : null,
+      jacuzziSeats: jacuzzi ? jacuzzi.seats.length : null,
+      basins: basins.map((b) => ({ era: b.era, taps: b.taps.length, level: Number(b.fill.level.toFixed(3)) })),
+    },
     water: {
       tap: Number(tap.toFixed(2)),
       streams: streams.length,
