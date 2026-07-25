@@ -43,6 +43,8 @@ import {
   createPool,
   createHeatSource,
   createCookware,
+  createPrepStation,
+  PREP_KINDS,
   COOKWARE_KINDS,
   createJacuzzi,
   createBasin,
@@ -79,6 +81,7 @@ import {
   type HeatSource,
   type HeatEra,
   type Cookware,
+  type PrepStation,
   type Jacuzzi,
   type Basin,
   type PropSurface,
@@ -157,6 +160,7 @@ const tubs: Tub[] = [];
 const pools: Pool[] = [];
 const stoves: HeatSource[] = [];
 const pans: Cookware[] = [];
+const preps: PrepStation[] = [];
 const basins: Basin[] = [];
 let shower2: Shower | null = null;
 let tub: Tub | null = null;
@@ -355,6 +359,27 @@ if (view === 'room') {
     w.object.position.set(-1.6 + i * 0.8, benchTop, 2.3);
     scene.add(w.object);
     pans.push(w);
+  });
+
+} else if (view === 'prep') {
+  // Five prep stations in a row, all being worked. Each one publishes TWO
+  // hand anchors, which is the whole point: one hand works and the other
+  // holds the thing still.
+  scene.add(new AmbientLight(0xffffff, 0.62));
+  const prepKey = new DirectionalLight(0xffffff, 1.15);
+  prepKey.position.set(3, 7, 5);
+  scene.add(prepKey);
+  const prepFloor = new Mesh(
+    new PlaneGeometry(30, 30),
+    new MeshStandardMaterial({ color: 0x5d5852, roughness: 0.9 })
+  );
+  prepFloor.rotation.x = -Math.PI / 2;
+  scene.add(prepFloor);
+  PREP_KINDS.forEach((kind, i) => {
+    const st = createPrepStation({ kind, seed: i + 4, batch: 400, palette });
+    st.object.position.set(-2.8 + i * 1.4, 0, 0);
+    scene.add(st.object);
+    preps.push(st);
   });
 
 } else if (view === 'water') {
@@ -572,6 +597,9 @@ renderer.setAnimationLoop(() => {
       pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
     }
   }
+  if (view === 'prep') {
+    for (const st of preps) st.update(dt, true);
+  }
   if (view === 'water') {
     for (const s of streams) s.update(dt);
     shower?.update(dt);
@@ -596,6 +624,9 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'heat') {
     camera.position.set(Math.sin(t * 0.1) * 1.6, 1.75, 4.2);
     camera.lookAt(0, 0.7, 0);
+  } else if (view === 'prep') {
+    camera.position.set(Math.sin(t * 0.1) * 1.2, 1.5, 2.6);
+    camera.lookAt(0, 0.95, 0);
   } else if (view === 'water') {
     camera.position.set(Math.sin(t * 0.09) * 0.8, 1.3, 3.1);
     camera.lookAt(0.3, 0.95, 0);
@@ -661,6 +692,7 @@ window.galleryStep = (dt: number) => {
   for (const st of stoves) st.update(dt);
   for (const pl of pools) pl.update(dt);
   for (let i = 0; i < pans.length; i++) pans[i].update(dt, i < stoves.length ? stoves[i] : 0.7);
+  for (const st of preps) st.update(dt, true);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -787,6 +819,16 @@ window.galleryDebug = (t?: number) => {
     })),
     galleryCount,
     stirring: stirs.length,
+    preps: preps.map((st) => ({
+      kind: st.kind,
+      action: st.action,
+      remaining: Number(st.remaining.toFixed(2)),
+      progress: Number(st.progress.toFixed(2)),
+      gap: Number(
+        st.work.getWorldPosition(new Vector3())
+          .distanceTo(st.guide.getWorldPosition(new Vector3())).toFixed(3)
+      ),
+    })),
     pans: pans.map((w) => ({
       kind: w.kind,
       state: w.state,

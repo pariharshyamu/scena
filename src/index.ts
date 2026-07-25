@@ -468,6 +468,13 @@ export {
   type CookState,
 } from './props/cookware';
 export {
+  createPrepStation,
+  PREP_KINDS,
+  type PrepStation,
+  type PrepOptions,
+  type PrepKind,
+} from './props/prep';
+export {
   createBasin,
   createTap,
   createEwer,

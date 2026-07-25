@@ -670,3 +670,30 @@ And one modelling slip the tests found on their own: steam was keyed off `burnt`
 The gallery's headless `galleryStep` called `renderer.render` on every step. Stepping ninety seconds of stove time meant ninety seconds of *software* rasterisation for frames nobody ever looked at — a five-minute verification run that should take five seconds. Stepping and drawing are different jobs: `galleryLook` and `galleryDebug` both render, and a screenshot always follows one of them. The same run is now 5.6 s.
 
 The matching lesson from the demo itself: `getWorldPosition` on a freshly added object returns whatever the stale matrix says. Every pan came out hovering beside its stove instead of on the ring, because nothing had called `updateMatrixWorld` yet.
+
+## Prep stations: two hands, two jobs
+
+Every work loop the trilogy had was **one-handed or symmetric** — an axe, a pick, a saw, a spoon, a guitar. Preparing food is neither. One hand works and the other **holds the thing still and gets out of the way**, and that asymmetry is the entire read: a cook chopping an onion with two identical hands is a cook hammering an onion.
+
+So a prep station publishes two anchors rather than one:
+
+```ts
+station.work    // the knife, the pestle, the crank handle
+station.guide   // the hand holding it steady
+```
+
+Same division of labour as `heatAt` and `depthAt`: SCENA says where things are, ANIMA decides what a body does about it. Everything else is the `WorkStation` contract from the rhythmic-work track, so these drop straight into the existing slots, loops and yields.
+
+| Kind | Loop | The guide hand is… |
+|---|---|---|
+| `board` | `chopBoard` | **feeding** — it walks backwards along the vegetable |
+| `mortar` | `grind` | **bracing** — still, because a mortar nobody holds slides |
+| `quern` | `crank` | steadying the bed stone while the other sweeps a wide circle |
+| `trough` | `knead` | working too, half a cycle out of phase |
+| `bowl` | `whisk` | tipping the bowl toward you and holding it there |
+
+A station **runs out**: `remaining` falls with each cycle and stops the loop dead, because an empty board still throwing chips is a board with a hole in it. `load()` refills it.
+
+The quern's crank stands proud on purpose. A smooth stone turning about its own axis is pixel-identical to a stationary one — the knurled-knob trap for the third time — so the handle sweeps a visible circle, and there is a test that measures the circle rather than the rotation.
+
+One testing note worth keeping: `InstancedMesh` **does not override `.type`**, so it reports as a plain `'Mesh'`. The shared burst pool parks its dead particles at −9999, and a bounding-box helper that filtered on `type === 'Mesh'` let the pool straight through and made every station ten kilometres tall.

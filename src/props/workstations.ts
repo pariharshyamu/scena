@@ -59,13 +59,13 @@ export interface WorkStationOptions {
 
 // ------------------------------------------------------------- burst pool
 
-interface Burst {
+export interface Burst {
   mesh: InstancedMesh;
   emit(n: number): void;
   update(dt: number): void;
 }
 
-interface BurstOptions {
+export interface BurstOptions {
   origin: Vector3;
   color: number;
   count?: number;
@@ -84,7 +84,8 @@ interface BurstOptions {
  * (chips, sparks, dust) arcs under gravity and shrinks out; `rise` makes soft
  * steam that floats up and swells. Deterministic given a seeded Rng.
  */
-function makeBurst(rng: Rng, options: BurstOptions): Burst {
+/** Internal — shared with the prep stations; not part of the public API. */
+export function makeBurst(rng: Rng, options: BurstOptions): Burst {
   const count = options.count ?? 24;
   const size = options.size ?? 0.05;
   const speed = options.speed ?? 1.6;
@@ -161,14 +162,15 @@ function makeBurst(rng: Rng, options: BurstOptions): Burst {
 
 // ------------------------------------------------------------- the driver
 
-interface StationCore {
+export interface StationCore {
   action: string;
   progress: number;
   onYield?: (total: number) => void;
   update(dt: number, working?: boolean): void;
 }
 
-function drive(
+/** Internal — shared with the prep stations; not part of the public API. */
+export function drive(
   action: string,
   cycle: number,
   impactAt: number,
@@ -262,7 +264,8 @@ function makeSaw(seed: number): Object3D {
 
 // ------------------------------------------------------------- the props
 
-function workSlot(action: string, group: Group, x: number, z: number, rotY: number): PropSlot {
+/** Internal — shared with the prep stations; not part of the public API. */
+export function workSlot(action: string, group: Group, x: number, z: number, rotY: number): PropSlot {
   const s = createSlot('work', 'operate', group, x, 0, z, rotY);
   s.loop = action; // the worker layers the action loop over the stand
   return s;
@@ -386,7 +389,8 @@ export function createSawhorse(options: WorkStationOptions = {}): WorkStation {
 }
 
 /** Assemble the common WorkStation shape (and mount any extra effect meshes). */
-function finish(
+/** Internal — shared with the prep stations; not part of the public API. */
+export function finish(
   group: Group,
   obstacleRadius: number,
   slot: PropSlot,
