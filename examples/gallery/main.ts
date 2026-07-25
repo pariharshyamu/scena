@@ -4,7 +4,10 @@ import {
   Clock,
   Color,
   DirectionalLight,
+  Mesh,
+  MeshStandardMaterial,
   PerspectiveCamera,
+  PlaneGeometry,
   Scene,
   Vector2,
   Vector3,
@@ -23,6 +26,17 @@ import {
   createTablet,
   createVessel,
   createClutter,
+  createPlant,
+  createHangingPlant,
+  createWindowBox,
+  createCurtains,
+  createCushion,
+  createThrow,
+  createPinboard,
+  createWhiteboard,
+  createPoster,
+  createStickyNotes,
+  PLANT_SPECIES,
   VESSEL_STYLES,
   dress,
   placeOn,
@@ -39,6 +53,7 @@ import {
   type FrameStyle,
   type PictureStyle,
   type ClutterTheme,
+  type Curtains,
   type PropSurface,
   type WallArt,
 } from 'scena3d';
@@ -103,6 +118,8 @@ let galleryCount = 0;
 let dressed = 0;
 let surfaces = 0;
 let dressedSurface: PropSurface | null = null;
+let curtains: Curtains | null = null;
+const stirs: Curtains[] = [];
 
 if (view === 'room') {
   // The longest clear run gets the salon hang: six pieces, graded, off a
@@ -163,6 +180,53 @@ if (view === 'room') {
       surfaces++;
     }
   }
+} else if (view === 'decor') {
+  // M, O and P side by side: every plant species, curtains that stir, and
+  // the paper. Flat light, nothing else in the scene.
+  scene.add(new AmbientLight(0xffffff, 0.5));
+  const key = new DirectionalLight(0xffffff, 1.15);
+  key.position.set(2, 5, 4);
+  scene.add(key);
+  const floor = new Mesh(
+    new PlaneGeometry(12, 12),
+    new MeshStandardMaterial({ color: 0x6b6055, roughness: 0.95 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  PLANT_SPECIES.forEach((species, i) => {
+    const plant = createPlant({ species, seed: i + 3, palette });
+    plant.object.position.set((i - (PLANT_SPECIES.length - 1) / 2) * 0.62, 0, 0.5);
+    scene.add(plant.object);
+  });
+  const basket = createHangingPlant({ seed: 4, palette });
+  basket.object.position.set(-2.3, 1.9, 0.5);
+  scene.add(basket.object);
+  const trough = createWindowBox({ seed: 6, length: 0.9, palette });
+  trough.object.position.set(2.3, 0, 0.5);
+  scene.add(trough.object);
+
+  curtains = createCurtains({ width: 1.5, drop: 1.7, style: 'closed', seed: 3, palette });
+  curtains.object.position.set(-1.5, 2.1, -0.6);
+  scene.add(curtains.object);
+  const sheer = createCurtains({ width: 1.2, drop: 1.5, style: 'sheer', seed: 5, palette });
+  sheer.object.position.set(0.4, 2.1, -0.6);
+  scene.add(sheer.object);
+  stirs.push(curtains, sheer);
+
+  const cushion = createCushion({ seed: 2, palette });
+  cushion.object.position.set(1.8, 0, -0.2);
+  scene.add(cushion.object);
+  const rug = createThrow({ seed: 3, palette });
+  rug.object.position.set(2.6, 0.42, -0.2);
+  scene.add(rug.object);
+
+  const wall = createWallAnchor(scene, 0, 0, -1.2, 0, 8, 3);
+  hangOn(wall, createPinboard({ seed: 4, palette }), { height: 1.5, along: 2.3, tilt: 0.015 });
+  hangOn(wall, createWhiteboard({ seed: 2 }), { height: 1.5, along: 3.6, tilt: 0 });
+  hangOn(wall, createPoster({ seed: 3, taped: true, palette }), { height: 1.5, along: -2.6 });
+  hangOn(wall, createPoster({ seed: 8, style: 'notice', palette }), { height: 1.5, along: -3.3 });
+  hangOn(wall, createStickyNotes({ seed: 5, count: 7 }), { height: 1.1, along: -2.0, tilt: 0 });
 } else if (view === 'clutter') {
   // Every vessel style, and a dressed table of clutter beside them, lit
   // flatly. A lathe profile passes a raycast test and still renders as an
@@ -266,47 +330,18 @@ renderer.setAnimationLoop(() => {
     setTime(day);
   }
   for (const c of clocks) c.update(dt);
+  for (const c of stirs) c.update(dt);
   const t = clockDriver.elapsedTime;
   if (view === 'room') {
     camera.position.set(Math.sin(t * 0.12) * 1.1, 1.62, 2.2);
     camera.lookAt(Math.sin(t * 0.08) * 0.8, 1.45, -2.6);
+  } else if (view === 'decor') {
+    camera.position.set(Math.sin(t * 0.1) * 1.2, 1.4, 3.4);
+    camera.lookAt(0, 1.1, -0.3);
   } else if (view === 'clutter') {
-  // Every vessel style, and a dressed table of clutter beside them, lit
-  // flatly. A lathe profile passes a raycast test and still renders as an
-  // egg; this is the only way to know.
-  // Modest, or everything clips to white and every surface reads as the same
-  // washed-out cream.
-  scene.add(new AmbientLight(0xffffff, 0.5));
-  const key = new DirectionalLight(0xffffff, 1.15);
-  key.position.set(2, 5, 3);
-  scene.add(key);
-  const shelf = createTable({ style: 'trestle', seed: 2, palette });
-  scene.add(shelf.object);
-  VESSEL_STYLES.forEach((style, i) => {
-    const v = createVessel({ style, seed: i + 2, palette });
-    placeOn(shelf.surfaces![0], v, {
-      along: (i - (VESSEL_STYLES.length - 1) / 2) * 0.23,
-      across: 0.18,
-      turn: 0.2,
-    });
-  });
-  const themed = createClutter({
-    theme: (params.get('theme') as ClutterTheme) ?? 'study',
-    count: 8,
-    seed: 3,
-    palette,
-  });
-  themed.forEach((p, i) => {
-    placeOn(shelf.surfaces![0], p, {
-      along: (i - (themed.length - 1) / 2) * 0.24,
-      across: -0.22,
-      turn: 0.25,
-    });
-  });
-  dressed = VESSEL_STYLES.length + themed.length;
-  surfaces = 1;
-  dressedSurface = shelf.surfaces![0];
-} else if (view === 'table') {
+    camera.position.set(0, 1.15, 1.55);
+    camera.lookAt(0, 0.82, 0);
+  } else if (view === 'table') {
     camera.position.set(Math.sin(t * 0.2) * 0.8, 1.28, 1.5);
     camera.lookAt(0, 0.78, 0);
   } else {
@@ -402,6 +437,16 @@ window.galleryDebug = (t?: number) => {
       normal: [w.normal.x, w.normal.z],
     })),
     galleryCount,
+    stirring: stirs.length,
+    curtainTime: curtains
+      ? Number(
+          (
+            (curtains.object.children.find((c) => c.name === 'panel') as unknown as {
+              material: { userData: { waveUniforms: { uTime: { value: number } } } };
+            }).material.userData.waveUniforms.uTime.value
+          ).toFixed(3)
+        )
+      : null,
     surfaces,
     dressed,
     // What is actually sitting on the dressed surface, in ITS space — the

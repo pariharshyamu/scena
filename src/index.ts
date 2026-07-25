@@ -397,6 +397,7 @@ export {
   createPicture,
   pickPictureStyle,
   PICTURE_STYLES,
+  ALL_PICTURE_STYLES,
   type Picture,
   type PictureOptions,
   type PictureStyle,
@@ -416,6 +417,37 @@ export {
   type WallClockOptions,
   type TapestryOptions,
 } from './props/wallArt';
+export {
+  createPlant,
+  createHangingPlant,
+  createWindowBox,
+  PLANT_SPECIES,
+  type Plant,
+  type PlantOptions,
+  type PlantSpecies,
+  type HangingPlantOptions,
+  type WindowBoxOptions,
+} from './props/plants';
+export {
+  createCurtains,
+  createCushion,
+  createThrow,
+  type Curtains,
+  type CurtainsOptions,
+  type CurtainStyle,
+  type CushionOptions,
+  type ThrowOptions,
+} from './props/soft';
+export {
+  createPoster,
+  createPinboard,
+  createWhiteboard,
+  createStickyNotes,
+  type PosterOptions,
+  type PinboardOptions,
+  type WhiteboardOptions,
+  type StickyNotesOptions,
+} from './props/paper';
 export {
   createVessel,
   VESSEL_STYLES,

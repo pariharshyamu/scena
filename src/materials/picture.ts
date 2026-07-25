@@ -42,6 +42,10 @@ export type PictureStyle =
   | 'geometric'
   /** Desaturated, vignetted, a bright window and a dark subject. */
   | 'photo'
+  /** Flat colour field, a heavy band, and blocks where the type goes. */
+  | 'poster'
+  /** Mostly white with ruled lines of text and a stamp — a printed notice. */
+  | 'notice'
   /**
    * Not a picture at all: a pale gradient with a skewed bright patch where a
    * window would land. A real mirror is a second render pass per mirror,
@@ -59,6 +63,8 @@ const STYLE_ID: Record<PictureStyle, number> = {
   geometric: 4,
   photo: 5,
   mirror: 6,
+  poster: 7,
+  notice: 8,
 };
 
 export const PICTURE_STYLES: PictureStyle[] = [
@@ -68,6 +74,14 @@ export const PICTURE_STYLES: PictureStyle[] = [
   'abstract',
   'geometric',
   'photo',
+];
+
+/** Everything `createPicture` can draw, including the non-painting styles. */
+export const ALL_PICTURE_STYLES: PictureStyle[] = [
+  ...PICTURE_STYLES,
+  'mirror',
+  'poster',
+  'notice',
 ];
 
 export interface PictureOptions {
@@ -120,6 +134,9 @@ const PIC_HELPERS = /* glsl */ `
   float picBlob(vec2 uv, vec2 c, vec2 r, float soft, float aspect) {
     vec2 q = (uv - c) / max(r, vec2(1e-4));
     return 1.0 - smoothstep(1.0 - soft, 1.0 + soft, length(q));
+  }
+  float picStep(float v, float lo, float hi) {
+    return step(lo, v) * step(v, hi);
   }
   float picRect(vec2 uv, vec2 c, vec2 h, float soft) {
     vec2 d = abs(uv - c) - h;
@@ -329,6 +346,60 @@ const PIC_STYLES = /* glsl */ `
     return col;
   }
 
+  // Type, as TYPE — bands at the density a line of text has when you see it
+  // across a room, never glyph-shaped. There is no font here, and fake
+  // letterforms are the single most recognisable tell in a procedural scene:
+  // at any distance where you could tell they were letters, you can tell
+  // they are wrong.
+  float picType(vec2 uv, float top, float lines, float indent, float seed, float weight) {
+    float row = floor((top - uv.y) * lines);
+    if (row < 0.0 || row > lines - 1.0) return 0.0;
+    float band = fract((top - uv.y) * lines);
+    // Ink occupies the middle of each line's box, never the whole of it.
+    float ink = picStep(band, 0.28, 0.28 + weight);
+    // Ragged right edge: every line is a different length.
+    float len = 0.30 + picHash(vec2(row, seed)) * 0.62;
+    return ink * step(indent, uv.x) * step(uv.x, indent + len);
+  }
+
+  // A poster: one strong colour field, a heavy band, and type blocks.
+  vec3 picPoster(vec2 uv, float seed, float aspect) {
+    float hue = picHash1(seed);
+    vec3 ground = picPigment(hue, 0.45, 0.30 + picHash1(seed + 1.0) * 0.34);
+    vec3 col = ground;
+    // A band across, top or bottom, in a contrasting value.
+    float at = picHash1(seed + 3.0) > 0.5 ? 0.74 : 0.16;
+    vec3 bandCol = picPigment(hue + 0.45, 0.55, 0.72);
+    col = mix(col, bandCol, picRect(uv, vec2(0.5, at), vec2(0.6, 0.10), 0.004));
+    // A big shape: the poster's image.
+    col = mix(col, picPigment(hue + 0.18, 0.5, 0.20),
+      picBlob(uv, vec2(0.5, 0.5), vec2(0.26 / aspect, 0.26), 0.03, aspect));
+    // The headline: two heavy short bars, not letters.
+    vec3 ink = picPigment(hue + 0.5, 0.2, 0.12);
+    col = mix(col, ink, picRect(uv, vec2(0.32, at), vec2(0.16, 0.028), 0.003));
+    col = mix(col, ink, picRect(uv, vec2(0.26, at - 0.052), vec2(0.10, 0.016), 0.003));
+    // Small print at the foot.
+    col = mix(col, ink, picType(uv, at > 0.5 ? 0.14 : 0.92, 4.0, 0.16, seed, 0.34) * 0.75);
+    return col;
+  }
+
+  // A printed notice: white paper, a rule, a block of text, a stamp.
+  vec3 picNotice(vec2 uv, float seed, float aspect) {
+    vec3 col = vec3(0.80, 0.79, 0.75) * (0.94 + picHash1(seed) * 0.1);
+    vec3 ink = vec3(0.16, 0.15, 0.14);
+    // Heading, then a rule under it.
+    col = mix(col, ink, picRect(uv, vec2(0.5, 0.86), vec2(0.26, 0.026), 0.003));
+    col = mix(col, ink * 1.6, picRect(uv, vec2(0.5, 0.80), vec2(0.36, 0.004), 0.002));
+    // Body copy: ruled lines with a ragged right edge.
+    col = mix(col, ink, picType(uv, 0.74, 9.0, 0.14, seed, 0.3) * 0.85);
+    // A stamp or seal, off to one corner and never square to the page.
+    float d = length((uv - vec2(0.74, 0.20)) * vec2(aspect, 1.0));
+    vec3 stamp = picPigment(0.98, 0.55, 0.42);
+    col = mix(col, stamp, (1.0 - smoothstep(0.085, 0.095, d)) * 0.5);
+    col = mix(col, stamp, (1.0 - smoothstep(0.062, 0.07, d)) * 0.25);
+    return col;
+  }
+
   // A mirror, painted. Pale, cool, a skewed bright patch where a window
   // lands, and a darker lower half because the floor is darker than the sky.
   vec3 picMirror(vec2 uv, float seed, float aspect) {
@@ -364,9 +435,13 @@ const PIC_FRAG = /* glsl */ `
       picCol = picPhoto(picUv, uPicSeed, uPicAspect);
     } else if (uPicStyle == 6) {
       picCol = picMirror(picUv, uPicSeed, uPicAspect);
+    } else if (uPicStyle == 7) {
+      picCol = picPoster(picUv, uPicSeed, uPicAspect);
+    } else if (uPicStyle == 8) {
+      picCol = picNotice(picUv, uPicSeed, uPicAspect);
     }
 
-    if (uPicStyle != 6) {
+    if (uPicStyle < 6) {
       // Canvas weave: a fine cross-hatch in VALUE only. Visible close, and at
       // distance it just stops the picture looking like flat vector art.
       float weave = sin(picUv.x * 620.0 * uPicAspect) * sin(picUv.y * 620.0);
@@ -415,7 +490,8 @@ export function createPicture(
     color: 0xffffff,
     // Oil on canvas is matte; a mirror is not. This is the only PBR
     // difference between the two, and it is the one that sells it.
-    roughness: style === 'mirror' ? 0.12 : 0.86,
+    // Paper is flatter than canvas and glass is not matte at all.
+    roughness: style === 'mirror' ? 0.12 : style === 'notice' || style === 'poster' ? 0.94 : 0.86,
     metalness: style === 'mirror' ? 0.55 : 0,
   });
   // Force vUv: with no map three drops the varying and the layout has

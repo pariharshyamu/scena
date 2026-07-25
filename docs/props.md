@@ -408,3 +408,55 @@ dress(shelf.surfaces[0], createClutter({ theme: 'study', count: 7, seed: 2 }));
 Everything here is deliberately cheap — a book is one box, a stack is five. At the size these occupy on screen that is already more detail than survives, and the budget belongs to having *more different things* rather than better ones.
 
 One recurring trap worth naming, because it caught three props in a row: **a tilted box has to be lifted by its rotated half-extent, not its height.** A leaning book positioned at `h·cos(θ)/2` leaves its low corner `w·sin(θ)/2` under the shelf, and a book sunk into the wood is more obviously wrong than one that never leaned. The same arithmetic applies to the splayed leaves of an open book.
+
+## Houseplants
+
+One trap, and it is the only one that matters: **plants read by silhouette, not by colour.** Six species that are all "green ball on a stalk" in six different greens is one plant, six times, and no amount of leaf detail rescues it. So `createPlant`'s species differ *structurally*:
+
+| Species | Silhouette |
+|---|---|
+| `snake` | tall stiff blades fanning up |
+| `trailing` | a low crown with strands over the rim and down |
+| `fern` | a dense low mound of arcing fronds |
+| `cactus` | a bare column with a pad or two, and no leaves at all |
+| `ficus` | a thin visible trunk under a loose canopy |
+| `succulent` | a flat rosette, barely above the soil |
+
+There is a test that measures slenderness and mass distribution for every pair and fails if two species are within tolerance of each other on both.
+
+The pot is a `createVessel` lathe — a houseplant standing in a box would undo the whole vessel track. And a **trailing plant gets a tall pot**, deliberately: the species is defined by strands hanging down, and a plant with nothing to hang down past is a small bush. That single ratio is the difference between six silhouettes and five.
+
+`drop` controls how far foliage may hang below the soil. Potted, it defaults to the pot's own height — otherwise the strands go through the pot and out under the shelf, and every placement helper then lifts the whole plant to clear them and floats the pot in mid-air. `createWindowBox` and `createHangingPlant` set it themselves, because the host knows how deep it is.
+
+## Curtains, cushions and throws
+
+Curtains are the best value in the whole decoration set and cost almost nothing, because the hard part was built in 0.9: `clothWave` has driven the flags, banners and bunting ever since. A curtain is that same material **stood on its end** — fixed along the top edge, free at the hem — and a curtain stirring in a draught is one of the very few things that makes an interior read as alive rather than as a photograph of one.
+
+```ts
+const curtains = createCurtains({ width: 1.2, drop: 1.6, seed: 3 });
+game.onUpdate((t) => curtains.update(t.delta));
+```
+
+Two details that are load-bearing:
+
+- **`sag` is zero.** Sag pulls toward the free edge, which for a curtain is straight down; adding gravity to gravity stretches the hem into a spike.
+- **The cloth is wider than the gap it covers,** and pleats are baked into the geometry for the wave to ride on. A panel cut to the exact opening is a bedsheet nailed to the wall, however well it moves.
+
+`createCushion` is a box with its corner vertices pulled in and its face centres pushed out — a box is a brick. It needs an **even** segment count, because with three there is no centre vertex to plump and you get a box with slightly rounded corners. `createThrow` lies flat, folds over an edge and hangs down the front with an uneven hem, because a throw with a straight edge is a tablecloth.
+
+Neither uses the `canvas` surface. That shader's grain is scaled for a tent, and on a 40 cm cushion it reads as sandstone.
+
+## Paper and notices
+
+One hard rule: **no letterforms.** There is no font here, and fake glyphs are the single most recognisable tell in a procedural scene — at any distance where you could tell they were letters, you can tell they are the wrong ones. What goes on these is type at the density type has when you see it across a room: ruled bands with ragged right edges, heavy blocks where a headline sits, nothing glyph-shaped. (`createSign` is the exception and earns it: a signpost is read deliberately and has a real vector font behind it.)
+
+Two new `PictureStyle`s carry it — `poster` (a flat colour field, a heavy band, headline bars) and `notice` (white paper, a rule, ruled body copy, a stamp off in one corner) — and both skip the canvas weave and varnish, because paper is not oil.
+
+| Generator | Notes |
+|---|---|
+| `createPoster({ style, taped, seed })` | a bare sheet on the wall; tape is crooked, pins are not |
+| `createPinboard({ count, seed })` | cork board with **overlapping** notices, photos and flyers |
+| `createWhiteboard({ fill, seed })` | strokes, a boxed diagram, an arrow, a pen tray — and a blank patch |
+| `createStickyNotes({ count, seed })` | a cluster, never an even scatter |
+
+The **overlap** is the whole pinboard. A board of neatly spaced non-touching notes is a spreadsheet; a real one has a photo half over a flyer with a corner of a receipt under both, everything at a different angle, and the notes stacked in z so the ones on top really are.
