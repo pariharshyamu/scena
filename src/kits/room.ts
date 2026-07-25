@@ -7,6 +7,7 @@ import {
   Matrix4,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   PointLight,
   Vector3,
 } from 'three';
@@ -53,6 +54,33 @@ export interface RoomHearth {
   normal: Vector3;
 }
 
+/**
+ * A clear run of interior wall — somewhere to hang things.
+ *
+ * Runs are **merged**: five wall cells in a line become one 6 m wall, not
+ * five 1.2 m panels, because "hang a picture halfway along the north wall"
+ * is the question anyone actually has. A window or a hearth splits a run,
+ * since you cannot hang a picture over either.
+ *
+ * Structurally a `HangSurface`, so it goes straight into `hangOn`.
+ */
+export interface RoomWall {
+  /**
+   * Anchor at the wall face, floor level, centred on the run: **+z points
+   * into the room, +x runs along the wall, +y is up**. Already parented into
+   * the room group.
+   */
+  anchor: Object3D;
+  /** Centre of the run at the interior face, room-local, y = 0. */
+  position: Vector3;
+  /** Unit vector pointing from the wall INTO the room. */
+  normal: Vector3;
+  /** Length of the clear run, in world units. */
+  length: number;
+  /** Wall height, in world units. */
+  height: number;
+}
+
 export interface Room {
   group: Group;
   /** One obstacle per wall/window/hearth cell — feed GAMA's ObstacleAvoidance. */
@@ -63,6 +91,8 @@ export interface Room {
   windows: RoomWindow[];
   /** Fireplaces (already burning; their light honors `hearthLight`). */
   hearths: RoomHearth[];
+  /** Clear interior wall runs, longest first — feed these to `hangOn`. */
+  walls: RoomWall[];
   /** Centers of '~' rug cells (a woven rug is already laid on each). */
   rugs: Vector3[];
   /** Centers of 'D' doorway cells — `furnishRoom` keeps them clear. */
@@ -82,6 +112,14 @@ export interface Room {
 
 /** Characters that stand on a walkable floor tile. */
 const FLOORISH = new Set(['.', 'D', 'T', 'S', '~']);
+
+/** Wall-face directions, in order: -z, +z, +x, -x. Index is the `dir` id. */
+const FACE_DIRS: Array<[number, number]> = [
+  [0, -1],
+  [0, 1],
+  [1, 0],
+  [-1, 0],
+];
 
 /**
  * Assemble a furnished-ready interior from an ASCII map — the indoor
@@ -160,6 +198,7 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
   const openW = unit * 0.55;
 
   const wallCells: Array<{ x: number; z: number }> = [];
+  const wallFaces: Array<{ col: number; row: number; dir: number }> = [];
   const floorTiles: Array<{ x: number; z: number }> = [];
   const ceilingTiles: Array<{ x: number; z: number }> = [];
   const beamCells: Array<{ x: number; z: number }> = [];
@@ -191,6 +230,12 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
 
       if (cell === '#') {
         wallCells.push({ x, z });
+        // Any side of this block that faces open floor is an interior face,
+        // and therefore somewhere a picture could go.
+        for (let d = 0; d < 4; d++) {
+          const [dc, dr] = FACE_DIRS[d];
+          if (FLOORISH.has(cellAt(col + dc, row + dr))) wallFaces.push({ col, row, dir: d });
+        }
         obstacles.push({ center: new Vector3(x, wallHeight / 2, z), radius: unit * 0.71 });
         continue;
       }
@@ -273,12 +318,65 @@ export function createRoom(rows: string[], options: RoomOptions = {}): Room {
     instance(beamCells, new BoxGeometry(unit, 0.12, 0.18), beamWood, wallHeight - 0.06);
   }
 
+  // Merge the collected wall faces into runs. Grouped by direction and by
+  // the coordinate that stays fixed along that direction, then split wherever
+  // the cells stop being adjacent — which is what a window or a hearth does,
+  // and correctly so: neither is somewhere you can hang anything.
+  const walls: RoomWall[] = [];
+  const byRun = new Map<string, number[]>();
+  for (const face of wallFaces) {
+    const alongRow = face.dir <= 1; // -z / +z faces run along x (varying col)
+    const fixed = alongRow ? face.row : face.col;
+    const key = `${face.dir}:${fixed}`;
+    const list = byRun.get(key) ?? [];
+    list.push(alongRow ? face.col : face.row);
+    byRun.set(key, list);
+  }
+  for (const [key, cells] of byRun) {
+    const [dirStr, fixedStr] = key.split(':');
+    const dir = Number(dirStr);
+    const fixed = Number(fixedStr);
+    const alongRow = dir <= 1;
+    cells.sort((a, b) => a - b);
+    let start = cells[0];
+    for (let i = 0; i <= cells.length; i++) {
+      const contiguous = i < cells.length && cells[i] === cells[i - 1] + 1;
+      if (i > 0 && contiguous) continue;
+      if (i > 0) {
+        const end = cells[i - 1];
+        const mid = (start + end) / 2;
+        const col = alongRow ? mid : fixed;
+        const row = alongRow ? fixed : mid;
+        const { x, z } = { x: originX + col * unit, z: originZ + row * unit };
+        const normal = new Vector3(FACE_DIRS[dir][0], 0, FACE_DIRS[dir][1]);
+        const position = new Vector3(x, 0, z).addScaledVector(normal, unit * 0.5);
+        const anchor = new Object3D();
+        anchor.name = 'wall';
+        anchor.position.copy(position);
+        // Turn the anchor so its +z is the inward normal; its +x then runs
+        // along the wall, which is what `hangOn` walks along.
+        anchor.rotation.y = Math.atan2(normal.x, normal.z);
+        group.add(anchor);
+        walls.push({
+          anchor,
+          position,
+          normal,
+          length: (end - start + 1) * unit,
+          height: wallHeight,
+        });
+      }
+      start = cells[i];
+    }
+  }
+  walls.sort((a, b) => b.length - a.length);
+
   return {
     group,
     obstacles,
     spawns,
     windows,
     hearths,
+    walls,
     rugs,
     doors,
     unit,

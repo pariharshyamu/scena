@@ -297,3 +297,48 @@ One thing worth stealing: the casing is **light grey**. It started near-black, w
 The origin is at the wall face with the device facing +z, so placement is a position and a height. Ones you touch (switch, thermostat, doorbell) carry a slot; a ceiling camera does not, because you do not walk up and press it.
 
 `createDeskSet` is a keyboard, mouse and mug — what a character actually puts their hands on, which the monitors and laptops did not give them. It publishes a `keyboard` anchor at the home row so ANIMA's desk poses aim at something real. The keyboard is never quite square to the desk, because nobody's is.
+
+## Wall art
+
+Every room in this kit used to have bare walls, and in every screenshot that was the loudest thing wrong with it: furniture, characters and lighting all read, and then the background was a flat sheet of colour that no inhabited room has ever had.
+
+| Generator | Notes |
+|---|---|
+| `createPainting({ width, style, frame, age, seed })` | a picture with a moulding; proportion and subject are seeded, so a wall is not a grid of squares |
+| `createFramedPhoto({ size, standing, seed })` | small, glazed, matted; `standing` moves the origin to the **base** so it sits on a shelf rather than half inside one |
+| `createMirror({ width, height, frame })` | a painted reflection — see below |
+| `createWallClock({ diameter, time, rate })` | the only piece here that moves; `update(dt)` runs the hands |
+| `createTapestry({ width, height, rod })` | hanging cloth with a sagging drop; the **rod** is the origin, so it hangs below it |
+
+### The picture is drawn, not fetched
+
+`createPicture` is `createScreenPanel`'s twin: procedural content in the fragment shader from the panel's own UVs, nothing loaded, every picture unique. Styles are `landscape`, `portrait`, `stillLife`, `abstract`, `geometric`, `photo` and `mirror`.
+
+The one structural difference matters more than everything else. A screen writes into **emissive radiance** — it is a light source, and the day cycle must not dim it. A picture writes into **base colour**. It has no light of its own, so it dims with the room exactly as the plaster does. A picture that keeps glowing at midnight is the loudest possible tell that a wall has been decorated with screenshots.
+
+Content is not representational in any detail. What reads at the size a picture actually occupies on screen is **value structure** — where the light is, where the dark mass is, what the subject's silhouette does. Paint that correctly and the eye supplies a landscape.
+
+Two things learned the hard way, both only visible in a render:
+
+- **A disc on a blob is a snowman.** Both the portrait and the photo first drew a figure as a circle sitting on a soft dome, and at every size and in every palette that reads as a snowman. Shoulders have to *widen as they fall* and then stop — a spread that keeps growing is a pyramid, which is no better. `picBust` is shared by both for exactly this reason.
+- **Everything has to sit on a real value ladder.** The first portrait had ground, clothes, hair and face all inside one narrow band of value; the result was a ring of near-identical greys where a head should be. Every unit test passed.
+
+### Mirrors are painted
+
+A real mirror is a second render pass each, which is an absurd price for set dressing, and a metal surface with no environment map renders black. `PictureStyle.mirror` paints a pale gradient with a skewed bright patch where a window would land and a dark mass low down where the floor is. It reads correctly at any distance you would actually film a room from.
+
+## Hanging things up
+
+Prop generators say what a thing *is*. `hangOn` says where it *goes*, and for decoration that is the larger half of the problem: the difference between a decorated room and an undecorated one is a few meshes, but the difference between a decorated room and a showroom is entirely placement.
+
+```ts
+hangOn(room.walls[0], painting, { height: 1.55, seed: 3 });
+hangGallery(room.walls[1], [a, b, c, d, e], { seed: 7 });
+```
+
+`createRoom` now publishes `walls` — clear interior runs, **merged**, so five wall cells in a line become one 6 m wall rather than five 1.2 m panels, because "halfway along the north wall" is the question anyone actually has. A window or a hearth splits a run, since you cannot hang a picture over either. Each wall carries an anchor oriented **+z into the room, +x along the run, +y up from the floor**, so anything with that shape works — `createWallAnchor` builds one for a wall you made yourself.
+
+Two defaults are doing most of the work:
+
+- **Nothing hangs level.** `tilt` defaults to about a degree of *roll*, and that single value is most of the difference between a prop on a wall and a picture in a room. It is roll and not yaw or pitch because a picture hangs from one point and swings in its own plane; tilting in any other axis drives a corner into the plaster. Set `tilt: 0` for things actually screwed on, like a clock.
+- **A wall of pictures is not a row of pictures.** `hangGallery` hangs a group off a **spine** — an invisible horizontal line that pieces touch with their centre, their top edge or their bottom edge — with uneven gaps. It returns what it actually placed; overflow is left off rather than crammed in or silently overlapped.

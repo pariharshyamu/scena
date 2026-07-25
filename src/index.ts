@@ -233,6 +233,7 @@ export {
   type RoomOptions,
   type RoomWindow,
   type RoomHearth,
+  type RoomWall,
 } from './kits/room';
 export {
   createInteriorLight,
@@ -388,3 +389,36 @@ export {
   type FixtureStyle,
   type DeskSet,
 } from './props/fixtures';
+
+// Decoration — wall art, and where a person would actually put it
+export {
+  createPicture,
+  pickPictureStyle,
+  PICTURE_STYLES,
+  type Picture,
+  type PictureOptions,
+  type PictureStyle,
+} from './materials/picture';
+export {
+  createPainting,
+  createFramedPhoto,
+  createMirror,
+  createWallClock,
+  createTapestry,
+  type WallArt,
+  type FrameStyle,
+  type PaintingOptions,
+  type FramedPhotoOptions,
+  type MirrorOptions,
+  type WallClock,
+  type WallClockOptions,
+  type TapestryOptions,
+} from './props/wallArt';
+export {
+  hangOn,
+  hangGallery,
+  createWallAnchor,
+  type HangSurface,
+  type HangOptions,
+  type GalleryOptions,
+} from './core/place';
