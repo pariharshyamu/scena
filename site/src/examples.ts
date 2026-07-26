@@ -621,6 +621,87 @@ game.start();`,
   },
 
   {
+    id: 'craft',
+    title: 'Small craft & swamping',
+    group: 'Worldbuilding',
+    code: `// A SMALL BOAT IS NOT LOST TO STABILITY. SHE IS LOST TO FREEBOARD.
+// And it is a runaway: water aboard means less side left, which means more
+// water aboard. Nothing else in this library does that — a boiler finds a
+// pressure, a sea finds a height, a hull finds a list. This one has a tipping
+// point, and the threshold is twice her freeboard.
+//
+// Four identical boats, and the only difference is what happens to the water
+// once it is in them.
+import { createSmallCraft, createOcean, createSky, createLightingRig,
+         livesIn, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+// AN ORDINARY SHORT SEA — 1.1 m at 9 m long is one in eight, steep and NOT
+// breaking. Nothing here is a gale; these boats are lost in weather a ship
+// would not notice. The amplitude is half the height on purpose, so the water
+// she is drawn on and the water \`meet\` is told about are the same water.
+const H = 1.1;
+const LEN = 9;
+const sea = createOcean({ amplitude: H / 2, wavelength: LEN, size: 700, segments: 220 });
+scene.add(sea.mesh);
+
+const boats = [
+  ['open', 11], ['buoyant', 3.5], ['selfDraining', -4], ['selfRighting', -11.5],
+].map(([fit, z]) => {
+  const boat = createSmallCraft({ fit, seed: 3, palette });
+  boat.float((x, sz) => sea.heightAt(x, sz));
+  boat.object.position.set(0, 0, z);
+  scene.add(boat.object);
+  // THREE UP, SPREAD ALONG HER, which is the only way any of them is
+  // survivable. Heaped in the stern her transom is on the water and she is
+  // shipping it standing still — \`freeboard\` is measured at her LOWEST rail.
+  boat.seat('bow', 82, 0.55, 0);
+  boat.seat('midships', 88, 0, 0);
+  boat.seat('helm', 85, -0.5, 0);
+  return { boat, z };
+});
+
+// A man in the open boat bailing as hard as anybody can bail: about two kilos
+// a second, and it is not in it. A constant outflow cannot beat a growing one.
+boats[0].boat.bail(2);
+console.log('she can live in', livesIn(boats[0].boat.freeboard).toFixed(2), 'm');
+console.log('and this sea is', H, 'm — she has', boats[0].boat.swampsIn().toFixed(0), 's');
+
+let clock = 0;
+let rolled = false;
+let helped = false;
+game.onUpdate((t) => {
+  clock += t.delta;
+  // ONE BREAKER at twenty-five seconds, and it does four different things.
+  if (!rolled && clock >= 25) {
+    rolled = true;
+    for (const b of boats) b.boat.meet(1.5, 9);
+  }
+  // Hands on the gunwale for the one it is worth righting.
+  if (!helped && clock >= 31) {
+    helped = true;
+    boats[2].boat.right();
+  }
+  for (const b of boats) {
+    b.boat.meet(H, LEN);
+    b.boat.update(t.delta);
+    b.boat.object.position.set(0, b.boat.object.position.y, b.z);
+  }
+  // SQUARE OFF THE BEAM and high enough to see INTO them. Half a metre of
+  // freeboard is the entire subject, and what is standing inside her is the
+  // read — from wave height a nine-metre sea simply swallows them.
+  game.camera.position.set(-17.5, 9.5, 11);
+  game.camera.lookAt(-0.5, 0, -3);
+});
+game.start();`,
+  },
+
+  {
     id: 'gear',
     title: 'Working gear & girting',
     group: 'Worldbuilding',

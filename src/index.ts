@@ -547,6 +547,17 @@ export {
   type StabiliserKind,
 } from './props/stabiliser';
 export {
+  createSmallCraft,
+  livesIn,
+  isBreaking,
+  CRAFT_FITS,
+  type SmallCraft,
+  type SmallCraftOptions,
+  type CraftFit,
+  type CraftState,
+  type Hand,
+} from './props/smallCraft';
+export {
   createGear,
   listFor,
   GEAR_KINDS,

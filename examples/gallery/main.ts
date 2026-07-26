@@ -64,6 +64,8 @@ import {
   createSeaState,
   createGear,
   createBoat,
+  createSmallCraft,
+  livesIn,
   listFor,
   createSmoke,
   createExtractor,
@@ -134,6 +136,7 @@ import {
   type Stabilisers,
   type SeaState,
   type Gear,
+  type SmallCraft,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -166,6 +169,27 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  craft:
+    '<strong>SCENA — small craft</strong><br />' +
+    'Four identical boats in one sea, and the only difference between them is ' +
+    'what happens to the water once it is aboard. The sea is 1.1 m at 9 m ' +
+    'long: steep, ordinary, and <em>not</em> breaking. Nothing here is a gale ' +
+    '— these boats are lost in weather a ship would not notice. A small boat ' +
+    'is not lost to <em>stability</em>, she is lost to <em>freeboard</em>, and ' +
+    'it is a runaway: water aboard means less side left, which means more ' +
+    'water aboard. Nearest is an open boat with a man bailing as hard as ' +
+    'anybody can bail, and it makes no difference at all. Next has buoyancy ' +
+    'tanks and fills at the same rate — buoyancy buys no seconds whatever — ' +
+    'and is still floating at the end of it with everybody hanging onto her. ' +
+    'Third has holes in her transom and never fills, because the water goes ' +
+    'out faster than it comes in. Furthest is ballasted. At twenty-five ' +
+    'seconds one breaker comes through and rolls all four, and it does four ' +
+    'different things: the open boat is gone, the buoyant one lies on her ' +
+    'side afloat, the third is got back up by her crew and empties herself, ' +
+    'and the ballasted one comes back up with nobody doing anything at all. ' +
+    'Try <code>galleryCraftReport()</code>, or ' +
+    '<code>galleryCraftSea(0.8)</code> — under twice her freeboard, nothing ' +
+    'happens to any of them.',
   gear:
     '<strong>SCENA — working gear</strong><br />' +
     'Every other force in the boat arc acts through her centreline. A working ' +
@@ -384,6 +408,32 @@ let liner: {
   small: DeckedShip;
   smallPosts: Array<{ mesh: Mesh; at: Vector3; label: string }>;
 } | null = null;
+
+/**
+ * Four identical small boats in one sea, differing only in what happens to the
+ * water once it is in them.
+ *
+ * Sized differently they would not be comparable and the axis would be a
+ * catalogue instead of an argument — the same reason `?view=trim` is four
+ * identical steamers. The read is a still frame: two of them are full and one
+ * of those has gone, one is sitting at a level she found for herself, and one
+ * has been rolled right over and come back up on her own.
+ */
+// NOT BREAKING, and still fatal — which is the point. 1.1 m at 9 m is one in
+// eight, an ordinary short sea, and it is over her freeboard doubled.
+let CRAFT_H = 1.1;
+let CRAFT_L = 9;
+/** The one breaker, and the four different things it does to them. */
+let craftRolled = false;
+let craftHelped = false;
+
+const craft: Array<{
+  boat: SmallCraft;
+  label: string;
+  x0: number;
+  z0: number;
+}> = [];
+let craftClock = 0;
 
 /**
  * The working boats, and the only view in the arc where a boat is lost.
@@ -1123,6 +1173,72 @@ if (view === 'room') {
     boats.push({ ship, x0: x, z0: -20, label });
   }
   seaState = { sea: st, boats, clock: 0 };
+
+} else if (view === 'craft') {
+  // FOUR IDENTICAL BOATS IN ONE SEA, and the only difference between them is
+  // what happens to the water once it is aboard.
+  //
+  //   A  open          — nothing at all, and a man bailing with a bucket
+  //   B  buoyant       — tanks under the benches
+  //   C  selfDraining  — a sole above the waterline and holes in the transom
+  //   D  selfRighting  — ballast on the keel, and she comes back on her own
+  //
+  // A is gone inside half a minute. B fills at exactly the same rate, because
+  // buoyancy buys no seconds whatever — and is still floating at the end of it,
+  // awash, with everybody hanging onto her. C never fills at all, because the
+  // water goes out faster than it comes in. D is rolled right over and comes
+  // back up with nobody aboard doing anything, which is where the crew stops
+  // being her stability and where the whole boat arc ends.
+  scene.background = new Color(0x8ea9c2);
+  camera.far = 1200;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.85));
+  const key = new DirectionalLight(0xffffff, 1.6);
+  key.position.set(-12, 18, 14);
+  scene.add(key);
+
+  // A SHORT SEA, AND NOT A BIG ONE. 1.1 m at 9 m long is one in eight — steep,
+  // ordinary, and not breaking. That is the whole point of the view: nothing
+  // here is a gale, and these boats are lost in weather a ship would not
+  // notice.
+  //
+  // The amplitude is HALF the height on purpose, so the water she is drawn on
+  // and the water `meet` is told about are the same water. Tuned separately
+  // they drift apart and the boat is filling from a sea nobody can see — which
+  // is exactly what the ocean did in the sea-state track.
+  const sea = createOcean({
+    amplitude: CRAFT_H / 2, wavelength: CRAFT_L, size: 700, segments: 240,
+  });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const put = (
+    z: number,
+    fit: 'open' | 'buoyant' | 'selfDraining' | 'selfRighting',
+    label: string,
+    seed: number
+  ): void => {
+    const boat = createSmallCraft({ fit, seed, palette });
+    boat.float((sx, sz) => sea.heightAt(sx, sz));
+    boat.object.position.set(0, 0, z);
+    scene.add(boat.object);
+    // THREE UP, SPREAD ALONG HER, which is the only way any of them is
+    // survivable at all. Heaped in the stern her transom is on the water and
+    // she is shipping it standing still.
+    boat.seat('bow', 82, 0.55, 0);
+    boat.seat('midships', 88, 0, 0);
+    boat.seat('helm', 85, -0.5, 0);
+    craft.push({ boat, label, x0: 0, z0: z });
+  };
+
+  put(11, 'open', 'open — bailing', 3);
+  put(3.5, 'buoyant', 'buoyancy tanks', 5);
+  put(-4, 'selfDraining', 'freeing ports', 7);
+  put(-11.5, 'selfRighting', 'ballasted, self-righting', 9);
+
+  // …and a man in the open boat bailing as hard as anybody can bail, which is
+  // about two kilos a second and is not in it.
+  craft[0].boat.bail(2);
 
 } else if (view === 'gear') {
   // FOUR BOATS, FOUR WIRES, AND ONE OF THEM IS LOST.
@@ -1899,6 +2015,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepGear(dt);
   }
+  if (view === 'craft') {
+    for (const o of oceans) o.update(dt);
+    stepCraft(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1957,6 +2077,8 @@ renderer.setAnimationLoop(() => {
     placeSeaCamera();
   } else if (view === 'gear') {
     placeGearCamera();
+  } else if (view === 'craft') {
+    placeCraftCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -2143,6 +2265,66 @@ const stepLiner = (dt: number): void => {
   };
   paint(posts, ship);
   paint(liner.smallPosts, liner.small);
+};
+
+/**
+ * One tick of four small boats in the same steep sea.
+ *
+ * `meet(height, length)` is the whole handshake into the sea state — two
+ * numbers, and she works out for herself whether it is breaking. There is no
+ * clock trick here and no rate multiplier: an open boat really is gone in half
+ * a minute, and that is why the view needs no speeding up.
+ */
+const stepCraft = (dt: number): void => {
+  if (!craft.length) return;
+  craftClock += dt;
+  // ONE BREAKER, at twenty-five seconds, and it does four different things.
+  //
+  // By then the open boat has already foundered, the buoyant one is floating
+  // awash and the two with ports have found a level and are dry. The breaker
+  // rolls all four — a sea steeper than one in seven and taller than six tenths
+  // of her beam does that whatever her stability is — and then: the open boat
+  // is gone, the buoyant one lies on her side afloat, the self-draining one is
+  // got back up BY HER CREW and empties herself, and the ballasted one comes
+  // back up with nobody doing anything at all. That is the axis, in one event.
+  if (!craftRolled && craftClock >= 25) {
+    craftRolled = true;
+    for (const c of craft) c.boat.meet(1.5, 9);
+  }
+  if (!craftHelped && craftClock >= 31) {
+    craftHelped = true;
+    // Hands on the gunwale. She has the buoyancy to be worth righting and the
+    // ports to be worth anything once she is — which the boat next to her,
+    // with tanks and no ports, has not.
+    const drains = craft.find((c) => c.boat.fit === 'selfDraining');
+    drains?.boat.right();
+  }
+  for (const c of craft) {
+    const { boat } = c;
+    boat.meet(CRAFT_H, CRAFT_L);
+    boat.update(dt);
+    // Held on station, like every other hull in this file.
+    boat.object.position.x = c.x0;
+    boat.object.position.z = c.z0;
+  }
+};
+
+/**
+ * Frame the four from off the beam and LOW.
+ *
+ * Half a metre of freeboard is the entire subject. From above, a boat with her
+ * gunwale awash and a boat sitting up dry are the same outline with a different
+ * colour in the middle of it.
+ */
+const placeCraftCamera = (): void => {
+  if (!craft.length) return;
+  // SQUARE OFF THE BEAM, and high enough to see INTO them — half a metre of
+  // freeboard is the entire subject and what is standing inside her is the
+  // read. Angled down the row they rank in depth, overlap, and come out as
+  // wreckage rather than as four boats; down at wave height a nine-metre sea
+  // simply swallows them.
+  camera.position.set(-17.5, 9.5, 11);
+  camera.lookAt(-0.5, 0, -3);
 };
 
 /**
@@ -2548,6 +2730,8 @@ declare global {
     galleryLinerWay: (fraction: number) => void;
     galleryLinerReport: () => Record<string, unknown>;
     galleryGearReport: () => Record<string, unknown>;
+    galleryCraftReport: () => Record<string, unknown>;
+    galleryCraftSea: (height: number, length?: number) => void;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -2609,6 +2793,7 @@ window.galleryStep = (dt: number) => {
   stepLiner(dt);
   stepSea(dt);
   stepGear(dt);
+  stepCraft(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -2830,6 +3015,64 @@ window.galleryLinerWay = (fraction: number) => {
   if (!liner) return;
   liner.plant.setRegulator(Math.max(0, Math.min(1, fraction)));
   liner.plant.setLink(fraction > 0.02 ? 0.45 : 0);
+};
+
+/**
+ * Four boats, one sea, and what each of them is doing about it.
+ *
+ * `swampsIn` is the number the whole track is about: seconds until she is
+ * full, which is not the same as seconds until she is lost — read `state` for
+ * that, and the difference between the two is the entire era axis.
+ */
+window.galleryCraftReport = () => {
+  if (!craft.length) return {};
+  const deg = (r: number): number => Number(((r * 180) / Math.PI).toFixed(2));
+  return {
+    clock: Number(craftClock.toFixed(1)),
+    seaM: CRAFT_H,
+    seaLengthM: CRAFT_L,
+    steepness: `1 in ${(CRAFT_L / CRAFT_H).toFixed(1)}`,
+    boats: craft.map((c) => ({
+      at: c.label,
+      fit: c.boat.fit,
+      state: c.boat.state,
+      crew: c.boat.crew,
+      waterKg: Number(c.boat.water.toFixed(0)),
+      capacityKg: Number(c.boat.capacity.toFixed(0)),
+      fullPct: Number(((c.boat.water / c.boat.capacity) * 100).toFixed(0)),
+      freeboardM: Number(c.boat.freeboard.toFixed(3)),
+      // The sea she could live in, from her freeboard alone — and it mentions
+      // her length, her engine, her crew and her stability nowhere.
+      livesInM: Number(livesIn(c.boat.freeboard).toFixed(2)),
+      boardingKgS: Number(c.boat.boarding.toFixed(1)),
+      bailingKgS: Number(c.boat.bailing.toFixed(1)),
+      drainingKgS: Number(c.boat.draining.toFixed(1)),
+      swamping: c.boat.swamping,
+      swampsInS: c.boat.swampsIn() === Infinity ? 'never' : Number(c.boat.swampsIn().toFixed(0)),
+      gm: Number(c.boat.gm.toFixed(2)),
+      freeSurface: Number(c.boat.freeSurface.toFixed(2)),
+      rollPeriodS: c.boat.rollPeriod === Infinity ? 'never' : Number(c.boat.rollPeriod.toFixed(2)),
+      trimDeg: deg(c.boat.loading.trim),
+      listDeg: deg(c.boat.loading.list),
+      capsized: c.boat.capsized,
+      // What the hull is SHOWING, not what the model worked out.
+      hullRollDeg: deg(c.boat.object.rotation.z),
+    })),
+  };
+};
+
+/** Put a different sea on all four and empty them, to watch the threshold. */
+window.galleryCraftSea = (height: number, length = CRAFT_L) => {
+  if (!craft.length) return;
+  CRAFT_H = Math.max(0, height);
+  CRAFT_L = Math.max(0.1, length);
+  craftClock = 0;
+  craftRolled = false;
+  craftHelped = false;
+  for (const c of craft) {
+    if (c.boat.capsized) c.boat.right();
+    c.boat.dry();
+  }
 };
 
 /**
@@ -3146,6 +3389,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'liner') placeLinerCamera();
   if (view === 'sea') placeSeaCamera();
   if (view === 'gear') placeGearCamera();
+  if (view === 'craft') placeCraftCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
