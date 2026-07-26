@@ -35,6 +35,22 @@ export interface OceanOptions {
   surge?: number;
   /** Terrain height sampler (`terrain.heightAt`): the ocean fades out over land and foams at the shore. */
   shore?: (x: number, z: number) => number;
+  /**
+   * A live sea state — `() => seaState.trains`.
+   *
+   * Structurally `SeaState.trains`, duck-typed like `storm`, so the ocean
+   * knows nothing about fetch or wind history. Given one, the four wave
+   * components SPLIT: two of them run with the wind sea and two with the
+   * swell, on their own headings and their own wavelengths. That is a cross
+   * sea, and it is what makes the surface stop looking like one wave train
+   * with some noise on it.
+   *
+   * It overrides `amplitude`, `wavelength`, `direction` and any `wind`.
+   */
+  sea?: () => {
+    windSea: { height: number; period: number; length: number; from: number };
+    swell: { height: number; period: number; length: number; from: number };
+  };
   /** Deep-water colour. Default 0x184a63. */
   deepColor?: number;
   /** Shallow / shoreward colour. Default 0x3f8fa6. */
@@ -199,6 +215,8 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   // Current absolute per-wave state, mirrored for the CPU heightAt().
   const curDir = Array.from({ length: N }, () => new Vector2(1, 0));
   const curAmp = new Float32Array(N);
+  const curW: number[] = new Array(N).fill(0);
+  const curSpd: number[] = new Array(N).fill(0);
 
   const uniforms = {
     uTime: { value: 0 },
@@ -217,6 +235,8 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   let curLevel = level;
 
   // Reproject the wave set for the current heading + wind strength + storm.
+  const seaSrc = options.sea;
+
   const retune = (): void => {
     let heading = ((options.direction ?? 30) * Math.PI) / 180;
     let ampScale = 1;
@@ -232,19 +252,50 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     uniforms.uStorm.value = sm;
     uniforms.uSurge.value = surge * sm;
     curLevel = level + surge * sm;
+    // TWO TRAINS, on their own headings, when a sea state is driving.
+    //
+    // The shader has always taken a direction PER WAVE; it was only this loop
+    // that put all four of them on one heading. Splitting them costs nothing
+    // and it is the difference between a sea and a wave.
+    const seaNow = seaSrc ? seaSrc() : null;
     for (let i = 0; i < N; i++) {
-      const a = heading + REL_ANGLE[i];
-      curDir[i].set(Math.cos(a), Math.sin(a));
+      let dirRad: number;
+      let amp: number;
+      let w: number;
+      let spd: number;
+      if (seaNow) {
+        // 0,1 the wind sea; 2,3 the swell. Each pair keeps its own little
+        // angular spread so neither train is a single mathematical line.
+        const t = i < 2 ? seaNow.windSea : seaNow.swell;
+        const sub = i % 2;
+        // `from` is where it COMES FROM, the way a sailor says it; a wave
+        // travels the other way, and getting this backwards makes every sea
+        // in the library run into the wind.
+        dirRad = ((t.from + 180) * Math.PI) / 180 + (sub === 0 ? 0 : REL_ANGLE[1] * 0.8);
+        // Significant height is the average of the highest third; the
+        // amplitude of one component is a good deal less than half of it.
+        amp = Math.max(0, t.height) * (sub === 0 ? 0.32 : 0.17) * stormAmp;
+        const len = Math.max(2, t.length || 26) * (sub === 0 ? 1 : 0.58);
+        w = (Math.PI * 2) / len;
+        spd = Math.sqrt(G / w) * w * speedMul;
+      } else {
+        dirRad = heading + REL_ANGLE[i];
+        amp = waves[i].amp * ampScale * stormAmp;
+        w = waves[i].w;
+        spd = waves[i].speed;
+      }
+      curDir[i].set(Math.cos(dirRad), Math.sin(dirRad));
       uWaveDir[i].copy(curDir[i]);
-      const amp = waves[i].amp * ampScale * stormAmp;
       curAmp[i] = amp;
+      curW[i] = w;
+      curSpd[i] = spd;
       // Steepness kept so Σ Q·w·A ≤ chop ≤ 1 (no self-intersection).
-      const q = Math.min(chop / (waves[i].w * amp * N || 1), 0.98 / (waves[i].w * amp || 1));
+      const q = Math.min(chop / (w * amp * N || 1), 0.98 / (w * amp || 1));
       const p = uniforms.uWaveParams.value[i] as { x: number; y: number; z: number; w: number };
-      p.x = waves[i].w;
+      p.x = w;
       p.y = amp;
       p.z = q;
-      p.w = waves[i].speed;
+      p.w = spd;
     }
   };
   retune();
@@ -316,7 +367,10 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     const t = time ?? uniforms.uTime.value;
     let y = 0;
     for (let i = 0; i < N; i++) {
-      y += curAmp[i] * Math.sin((curDir[i].x * x + curDir[i].y * z) * waves[i].w + t * waves[i].speed);
+      // curW and curSpd, NOT waves[i] — a sea state changes the wavelength as
+      // it builds, and reading the construction-time value here floats every
+      // boat on a sea nobody can see while the mesh shows another one.
+      y += curAmp[i] * Math.sin((curDir[i].x * x + curDir[i].y * z) * curW[i] + t * curSpd[i]);
     }
     return curLevel + y;
   };

@@ -61,6 +61,7 @@ import {
   createSteamPlant,
   createHold,
   createStabilisers,
+  createSeaState,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -128,6 +129,7 @@ import {
   type SteamPlant,
   type Hold,
   type Stabilisers,
+  type SeaState,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -148,6 +150,18 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  sea:
+    '<strong>SCENA — sea state</strong><br />' +
+    '<em>The sea remembers and the wind does not.</em> A wind gets up in ' +
+    'twenty minutes; the sea it raises takes sixteen hours to answer, and ' +
+    'days to die. So the sea you are in is almost never the sea the wind you ' +
+    'can feel would make. Here a big old swell is running from the ' +
+    'south-west, raised by a storm nobody in this scene will ever see, while ' +
+    'a fresh breeze from the north-west has only begun to raise anything — ' +
+    'and where the two cross, the sea is <em>confused</em>. The clock runs at ' +
+    'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
+    'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
+    'does not go with it.',
   liner:
     '<strong>SCENA — the liner</strong><br />' +
     'The whole boat arc in one hull: a hold that trims and sinks her, a ' +
@@ -317,6 +331,18 @@ const banks: Array<{ bank: OarBank; ship: DeckedShip; wake: Mesh }> = [];
  * ship trimmed two degrees by the head looks exactly like a ship that is not
  * once she has steamed out of frame.
  */
+/**
+ * The sea, and the fact that it does not forget.
+ *
+ * One state, one ocean driven by it, and three boats of different sizes on it
+ * — because the same sea is a different sea depending on what you are in.
+ */
+let seaState: {
+  sea: SeaState;
+  boats: Array<{ ship: DeckedShip; x0: number; z0: number; label: string }>;
+  clock: number;
+} | null = null;
+
 /**
  * The liner, and everything the boat arc built, in one hull.
  *
@@ -991,6 +1017,59 @@ if (view === 'room') {
     banks.push({ bank, ship, wake });
   });
 
+} else if (view === 'sea') {
+  // THE SEA REMEMBERS AND THE WIND DOES NOT.
+  //
+  // A gale gets up and blows for a day; the sea takes sixteen hours to answer
+  // it. Then the wind drops flat calm in ten minutes — and the sea does not
+  // go anywhere. It stops being wind sea, becomes swell, and is still running
+  // at four metres a day later under a sky with nothing in it.
+  //
+  // The view starts in the middle of that: a big old swell from the south-west
+  // that nothing here raised, and a fresh breeze from the north-west that has
+  // only just begun to raise anything. The two cross, and where they cross the
+  // sea is CONFUSED, which is the dangerous one.
+  scene.background = new Color(0xa8bccd);
+  camera.far = 3000;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.84));
+  const key = new DirectionalLight(0xffffff, 1.6);
+  key.position.set(-16, 20, 14);
+  scene.add(key);
+
+  const st = createSeaState({ kind: 'ocean' });
+  // Raised by a storm a thousand miles away that nobody in this scene will
+  // ever see. That is the whole idea: it did not come from the weather here.
+  st.swellIn(215, 3.6, 11);
+  st.setWind(13, 315);
+
+  // ONE surface, driven by the state. Two would be two seas, and a boat would
+  // float on the one nobody can see.
+  const sea = createOcean({
+    sea: () => st.trains,
+    size: 1600,
+    segments: 220,
+    choppiness: 0.85,
+  });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const boats: Array<{ ship: DeckedShip; x0: number; z0: number; label: string }> = [];
+  const SET: Array<[typeof SHIP_ERAS[number], number, string]> = [
+    ['galley', -110, 'open boat'],
+    ['carrack', -30, 'carrack'],
+    ['steamer', 70, 'steamer'],
+  ];
+  for (const [era, x, label] of SET) {
+    const ship = createDeckedShip({ era, seed: 31 + x, palette });
+    ship.float((qx, qz) => sea.heightAt(qx, qz));
+    ship.object.position.set(x, 0, -20);
+    ship.object.rotation.y = 0.5;
+    scene.add(ship.object);
+    boats.push({ ship, x0: x, z0: -20, label });
+  }
+  seaState = { sea: st, boats, clock: 0 };
+
 } else if (view === 'liner') {
   // THE PAYOFF. One ship, and every track in the boat arc doing its job at
   // once: a hold that trims and sinks her, a plant that drives her, fins that
@@ -1647,6 +1726,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepLiner(dt);
   }
+  if (view === 'sea') {
+    for (const o of oceans) o.update(dt);
+    stepSea(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1701,6 +1784,8 @@ renderer.setAnimationLoop(() => {
     placeTrimCamera();
   } else if (view === 'liner') {
     placeLinerCamera();
+  } else if (view === 'sea') {
+    placeSeaCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1788,6 +1873,42 @@ const stepOars = (dt: number): void => {
     bank.update(dt);
     ship.update(dt, { speed: bank.way, turn: bank.yaw * 0.25 });
   }
+};
+
+/**
+ * One tick of the sea, at SIXTY TIMES life.
+ *
+ * The thing this view is about takes a day and a half, and a gallery nobody
+ * watches for a day and a half has to be given a clock of its own. Sixty
+ * seconds of wall time is an hour of weather; the boats still move at their
+ * own speed, because a hull bobbing at 60× reads as a bug.
+ */
+const SEA_RATE = 60;
+const stepSea = (dt: number): void => {
+  if (!seaState) return;
+  seaState.clock += dt * SEA_RATE;
+  seaState.sea.update(dt * SEA_RATE);
+  for (const b of seaState.boats) {
+    b.ship.update(dt, { speed: 0 });
+    b.ship.object.position.x = b.x0;
+    b.ship.object.position.z = b.z0;
+  }
+};
+
+/**
+ * HIGH, and looking down the swell.
+ *
+ * From the deck a big ocean swell reads as nothing at all, and honestly so: a
+ * nine-metre sea three hundred metres long is a slope of three degrees. From
+ * fifteen metres up the water in this view was flat while the model and the
+ * mesh both correctly said nine metres. What you can see from up here is the
+ * INTERFERENCE — two trains crossing at sixty degrees, which is the thing
+ * this view exists to show and which no low camera can frame.
+ */
+const placeSeaCamera = (): void => {
+  if (!seaState) return;
+  camera.position.set(-232, 96, 196);
+  camera.lookAt(-20, 0, -28);
 };
 
 /**
@@ -2104,6 +2225,9 @@ declare global {
     galleryTrim: (level: number) => void;
     galleryTrimHole: (rate: number) => void;
     galleryTrimReport: () => Array<Record<string, unknown>>;
+    gallerySeaWind: (speed: number, from?: number) => void;
+    gallerySeaSwell: (from: number, height: number, period?: number) => void;
+    gallerySeaReport: () => Record<string, unknown>;
     gallerySteady: (out: number) => void;
     galleryLinerWay: (fraction: number) => void;
     galleryLinerReport: () => Record<string, unknown>;
@@ -2166,6 +2290,7 @@ window.galleryStep = (dt: number) => {
   stepSteam(dt);
   stepTrim(dt);
   stepLiner(dt);
+  stepSea(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -2313,6 +2438,68 @@ window.gallerySteamParts = () => {
   });
   out.big = kids;
   return out;
+};
+
+/** Order a wind: m/s and the direction it blows FROM. */
+window.gallerySeaWind = (speed: number, from?: number) => {
+  seaState?.sea.setWind(speed, from);
+};
+
+/** Send a swell in from a storm nobody here will see. */
+window.gallerySeaSwell = (from: number, height: number, period = 14) => {
+  seaState?.sea.swellIn(from, height, period);
+};
+
+/**
+ * What the sea is doing, and what it remembers.
+ *
+ * `spread` is measured off the actual SURFACE — the range of `heightAt` over
+ * a grid — because a sea state whose numbers are right and whose water is
+ * flat is the failure this whole library keeps finding.
+ */
+window.gallerySeaReport = () => {
+  if (!seaState) return {};
+  const { sea, boats, clock } = seaState;
+  const ocean = oceans[0];
+  let lo = Infinity;
+  let hi = -Infinity;
+  if (ocean) {
+    for (let i = 0; i < 900; i++) {
+      const y = ocean.heightAt(((i % 30) - 15) * 24, (Math.floor(i / 30) - 15) * 24);
+      lo = Math.min(lo, y);
+      hi = Math.max(hi, y);
+    }
+  }
+  return {
+    hours: Number((clock / 3600).toFixed(2)),
+    wind: Number(sea.wind.toFixed(1)),
+    windFrom: Number(sea.windFrom.toFixed(0)),
+    state: sea.state,
+    height: Number(sea.height.toFixed(2)),
+    limit: Number(sea.limit.toFixed(2)),
+    douglas: sea.douglas,
+    confusion: Number(sea.confusion.toFixed(2)),
+    windSea: {
+      h: Number(sea.windSea.height.toFixed(2)),
+      t: Number(sea.windSea.period.toFixed(1)),
+      from: Number(sea.windSea.from.toFixed(0)),
+    },
+    swell: {
+      h: Number(sea.swell.height.toFixed(2)),
+      t: Number(sea.swell.period.toFixed(1)),
+      from: Number(sea.swell.from.toFixed(0)),
+      len: Number(sea.swell.length.toFixed(0)),
+    },
+    buildingHours: Number.isFinite(sea.building) ? Number((sea.building / 3600).toFixed(1)) : 'never',
+    // Measured off the water, not off the model.
+    surfaceSpread: Number.isFinite(hi - lo) ? Number((hi - lo).toFixed(2)) : 0,
+    boats: boats.map((b) => ({
+      at: b.label,
+      motion: Number(b.ship.motion.toFixed(3)),
+      pitchDeg: Number(((b.ship.pitch * 180) / Math.PI).toFixed(2)),
+      rollDeg: Number(((b.ship.roll * 180) / Math.PI).toFixed(2)),
+    })),
+  };
 };
 
 /** Run her fins out, or house them. */
@@ -2595,6 +2782,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'steam') placeSteamCamera();
   if (view === 'trim') placeTrimCamera();
   if (view === 'liner') placeLinerCamera();
+  if (view === 'sea') placeSeaCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

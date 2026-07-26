@@ -547,6 +547,20 @@ export {
   type StabiliserKind,
 } from './props/stabiliser';
 export {
+  createSeaState,
+  fullyDeveloped,
+  fetchLimited,
+  periodFor,
+  lengthFor,
+  douglasFor,
+  SEA_KINDS,
+  type SeaState,
+  type SeaStateOptions,
+  type SeaKind,
+  type SeaCondition,
+  type Train,
+} from './environment/seaState';
+export {
   createPressureGauge,
   type PressureGauge,
   type PressureGaugeOptions,

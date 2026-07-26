@@ -555,6 +555,72 @@ game.start();`,
   },
 
   {
+    id: 'sea',
+    title: 'Sea state & swell',
+    group: 'Worldbuilding',
+    code: `// THE SEA REMEMBERS AND THE WIND DOES NOT. A wind gets up in twenty minutes;
+// the sea it raises takes sixteen hours to answer and DAYS to die. Here a big
+// old swell runs from the south-west, raised by a storm nobody in this scene
+// will ever see, while a fresh breeze from the north-west has only begun to
+// raise anything — and where the two cross the sea is confused.
+//
+// The clock runs at sixty times life. Bring a gale on and then take it away,
+// and watch what does not happen.
+import { createSeaState, createDeckedShip, createOcean, createSky,
+         createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const state = createSeaState({ kind: 'ocean' });
+state.swellIn(215, 3.6, 11);   // from somewhere else, days ago
+state.setWind(13, 315);        // …and a fresh breeze from here, just started
+
+// ONE surface, driven by the state. Two would be two seas, and a boat would
+// float on the one nobody can see.
+const sea = createOcean({
+  sea: () => state.trains, size: 1600, segments: 200, choppiness: 0.85,
+});
+scene.add(sea.mesh);
+
+// The same sea is a different sea depending on what you are in.
+const boats = [['galley', -110], ['carrack', -30], ['steamer', 70]].map(([era, x]) => {
+  const ship = createDeckedShip({ era, seed: 31 + x, palette });
+  ship.float((qx, qz) => sea.heightAt(qx, qz));
+  ship.object.position.set(x, 0, -20);
+  ship.object.rotation.y = 0.5;
+  scene.add(ship.object);
+  return { ship, x0: x, z0: -20 };
+});
+
+// Sixty seconds of wall time is an hour of weather — the thing this shows
+// takes a day and a half. The boats still bob at their own speed.
+const RATE = 60;
+let hours = 0;
+game.onUpdate((t) => {
+  hours += (t.delta * RATE) / 3600;
+  // A gale for sixteen hours, and then nothing at all.
+  if (hours > 2 && hours < 18) state.setWind(20, 315);
+  else if (hours >= 18) state.setWind(0);
+  state.update(t.delta * RATE);
+  sea.update(t.delta);
+  for (const b of boats) {
+    b.ship.update(t.delta, { speed: 0 });
+    b.ship.object.position.x = b.x0;
+    b.ship.object.position.z = b.z0;
+  }
+  // HIGH, and looking down the swell: from the deck a nine-metre sea three
+  // hundred metres long is a slope of three degrees and reads as nothing.
+  game.camera.position.set(-232, 96, 196);
+  game.camera.lookAt(-20, 0, -28);
+});
+game.start();`,
+  },
+
+  {
     id: 'liner',
     title: 'The liner',
     group: 'Worldbuilding',
