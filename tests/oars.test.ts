@@ -380,16 +380,44 @@ describe('the shape of it', () => {
     expect(spread, 'the handles swept across the whole boat').toBeLessThan(3);
   });
 
-  it('every seat has somewhere to sit, on the boat rather than in the sea', () => {
-    const bank = createOarBank({ kind: 'galley', seats: 4, beam: 5, gunwale: 1.2 });
+  it('EVERY SEAT IS WHERE HIS HANDS CAN REACH HIS OWN HANDLE', () => {
+    // Not a plausible-looking spot on a bench. The thwart is derived from
+    // where the handle actually is, because it has to be: the first cut put
+    // each rower a third of the beam to the FAR SIDE of the boat from his
+    // own oar, so a whole crew rowed two metres clear of a whole bank of
+    // handles with every phase and stroke number agreeing with itself.
+    const bank = createOarBank({ kind: 'longship', seats: 4, beam: 4, gunwale: 0.95 });
+    bank.update(1 / 240);
     bank.object.updateMatrixWorld(true);
     for (const oar of bank.oars) {
-      const at = oar.seatSlot.anchor.getWorldPosition(new Vector3());
-      // Inboard of his own rowlock, and below the gunwale.
-      expect(Math.abs(at.x)).toBeLessThan(2.5);
-      expect(at.y).toBeLessThan(1.2);
+      const seat = oar.seatSlot.anchor.getWorldPosition(new Vector3());
+      const handle = oar.grip.getWorldPosition(new Vector3());
+      // Same side of the boat as his oar…
+      expect(Math.sign(seat.x), `seat ${oar.seat}`).toBe(oar.side);
+      // …below the gunwale, not perched on the rail…
+      expect(seat.y).toBeLessThan(0.95);
+      expect(seat.y).toBeGreaterThan(0);
+      // …and near enough that a seated man's arms get to the handle.
+      expect(handle.distanceTo(seat), `seat ${oar.seat} to its handle`).toBeLessThan(1.1);
       expect(oar.seatSlot.kind).toBe('row');
     }
+  });
+
+  it('and the handle stays within reach of it all the way round a stroke', () => {
+    const bank = createOarBank({ kind: 'longship', seats: 2, beam: 4, gunwale: 0.95 });
+    const oar = bank.oars[0];
+    let furthest = 0;
+    for (let i = 0; i < 240; i++) {
+      bank.update(1 / 120);
+      bank.object.updateMatrixWorld(true);
+      furthest = Math.max(
+        furthest,
+        oar.grip
+          .getWorldPosition(new Vector3())
+          .distanceTo(oar.seatSlot.anchor.getWorldPosition(new Vector3()))
+      );
+    }
+    expect(furthest, 'the handle swept out of his reach').toBeLessThan(1.3);
   });
 
   it('oarGripAt agrees with the phase about where the hands go', () => {

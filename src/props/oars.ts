@@ -203,6 +203,29 @@ const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
 const wrap01 = (t: number): number => t - Math.floor(t);
 
 /**
+ * Where the handle of an oar sits relative to the thwart a rower is on.
+ *
+ * Published in the same spirit as ANIMA's `GRIPS`, and identical to that
+ * library's `ROW_GRIP`: the prop is built to the body's expectations rather
+ * than the body reaching for the prop, so an oar and a rowing pose meet
+ * without any runtime IK between them.
+ *
+ * `height` is what puts the thwart below the gunwale. An oar pivots at the
+ * rowlock, so cocking the blade down to reach the water swings the inboard
+ * end UP by half a metre — and if the handle is assumed to be low, the seat
+ * derived from it ends up above the sheerstrake with the rower perched on
+ * the rail.
+ */
+export const OAR_GRIP = {
+  /** Height of the handle above the thwart at the catch. */
+  height: 0.4,
+  /** How far in front of the chest the hands go at the catch. */
+  reach: 0.58,
+  /** …and how far past the body they come at the finish. */
+  finish: -0.16,
+} as const;
+
+/**
  * Smooth 0→1→0 over [0,1], for the shape of a pull.
  *
  * A rower does not apply full force the instant the blade touches, and the
@@ -277,6 +300,20 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
   const seats: PropSlot[] = [];
 
   /**
+   * How much of the oar is inboard of the rowlock — and it is NOT a choice.
+   *
+   * The handle has to travel exactly as far as a rower's hands do, and that
+   * distance is published: `OAR_GRIP.reach` to `OAR_GRIP.finish`. Given the
+   * sweep, the inboard length falls out of it. Pick a nice-looking fraction
+   * instead — a third, a quarter — and the handle swings half a metre
+   * further than any pair of arms goes, so a whole crew rows a whole bank
+   * of oars from a foot away and both libraries insist they agree.
+   */
+  const inboard = (OAR_GRIP.reach - OAR_GRIP.finish) / (2 * Math.sin(spec.reach));
+  const outboard = spec.loom - inboard;
+  const bury = Math.atan2(gunwale + 0.18, outboard);
+
+  /**
    * How far the loom is cocked down so the blade reaches the water.
    *
    * An oar runs DOWN and out from its rowlock — the thole is on the gunwale
@@ -285,8 +322,6 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
    * boats' worth of blades swept about in mid-air a metre above the sea and
    * she made way on nothing at all. Every number in the model was right.
    */
-  const outboard = spec.loom * (2 / 3);
-  const bury = Math.atan2(gunwale + 0.18, outboard);
 
   const sideList: Array<-1 | 1> = sides === 1 ? [-1] : [-1, 1];
   for (let i = 0; i < count; i++) {
@@ -310,24 +345,38 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
         timber
       );
       shaft.rotation.z = Math.PI / 2;
-      // A third of it inboard of the rowlock, two thirds out — which is
-      // what makes an oar a lever rather than a paddle.
-      shaft.position.x = side * (spec.loom / 2 - spec.loom / 3);
+      // A QUARTER of it inboard of the rowlock, three quarters out — what
+      // makes an oar a lever rather than a paddle, and the ratio also sets
+      // how far the inboard end swings UP when the blade is cocked down to
+      // the water. At a third, that rise put the thwart derived from it
+      // above the gunwale and the handle above the rower's own shoulders.
+      shaft.position.x = side * (spec.loom / 2 - inboard);
       loom.add(shaft);
 
       // A blade is a VERTICAL paddle — it pushes water sternward, so it
       // stands on edge in the water. Laid flat it is a spoon, and a bank of
       // spoons skims the surface without gripping anything.
       const blade = new Mesh(new BoxGeometry(spec.blade, 0.3, 0.045), bladeMat);
-      blade.position.x = side * (spec.loom * (2 / 3) + spec.blade * 0.4);
+      blade.position.x = side * (outboard + spec.blade * 0.4);
       loom.add(blade);
 
       const grip = new Object3D();
-      grip.position.x = -side * (spec.loom / 3);
+      grip.position.x = -side * inboard;
       loom.add(grip);
 
+      // WHERE HE SITS is not a free choice — it is wherever his hands can
+      // be on that handle. Derived from the handle's own mid-stroke
+      // position and `OAR_GRIP`, rather than picked to look reasonable:
+      // the first cut put every rower a third of the beam to the far side
+      // of the boat from his own oar, so fourteen men rowed two metres
+      // clear of fourteen handles while every phase, thrust and stroke
+      // number in the model agreed with itself.
       const thwart = new Object3D();
-      thwart.position.set((-side * beam) / 6, gunwale - 0.42, z);
+      thwart.position.set(
+        side * (beam / 2 - inboard + 0.07),
+        gunwale + inboard * Math.sin(bury) - OAR_GRIP.height - 0.04,
+        z + 0.21
+      );
       group.add(thwart);
       const slot: PropSlot = {
         kind: 'row',
@@ -452,7 +501,7 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
       // How fast a blade is travelling sternward through the water. Arc
       // length over the time the drive takes — so it rises with the rate,
       // which is the whole reason rating up makes a boat go faster.
-      const arc = 2 * spec.reach * spec.loom * (2 / 3);
+      const arc = 2 * spec.reach * outboard;
       const bladeSpeed = rate > 0 ? (arc * rate) / (60 * spec.drive) : 0;
 
       let sum = 0;
@@ -539,7 +588,14 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
           ? ease(p / spec.drive)
           : 1 - ease((p - spec.drive) / (1 - spec.drive));
         const reach = 0.62 + 0.12 * Math.abs(effort);
-        b.pivot.rotation.y = b.side * (reach * (swing - 0.5) * 2) * -1;
+        // The blade starts FORWARD at the catch and goes aft through the
+        // drive — it pushes water sternward, which is what drives her
+        // ahead. This was the other way round for the whole of the first
+        // version: an entire fleet rowing itself backwards while the
+        // thrust, the rate and the way were all computed from the phase and
+        // all agreed. Nothing found it until a body was put on the handle
+        // and its hands came out a whole stroke-length adrift.
+        b.pivot.rotation.y = b.side * (reach * (swing - 0.5) * 2);
         // Lift: buried through the drive, clear of the water on the way
         // forward. Without this the blades scythe through the sea in both
         // directions and she should be going nowhere.
@@ -565,22 +621,6 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
   };
   return api;
 }
-
-/**
- * Where the handle of an oar sits relative to the thwart a rower is on.
- *
- * Published in the same spirit as ANIMA's `GRIPS`: the prop is built to the
- * body's expectations rather than the body reaching for the prop, so an oar
- * and a rowing pose meet without any runtime IK between them.
- */
-export const OAR_GRIP = {
-  /** Height of the handle above the thwart at the catch. */
-  height: 0.42,
-  /** How far in front of the chest the hands go at the catch. */
-  reach: 0.58,
-  /** …and how far past the body they come at the finish. */
-  finish: -0.16,
-} as const;
 
 /** Where the handle should be, for a given phase, in the rower's own frame. */
 export function oarGripAt(phase: number, out = new Vector3()): Vector3 {
