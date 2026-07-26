@@ -69,6 +69,7 @@ import {
   createBoat,
   createSmallCraft,
   createSeamark,
+  createPlumbing,
   livesIn,
   NM,
   listFor,
@@ -143,6 +144,7 @@ import {
   type Gear,
   type SmallCraft,
   type Seamark,
+  type Plumbing,
   type MarkKind,
   type SmokeLayer,
   type Extractor,
@@ -176,6 +178,27 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  plumbing:
+    '<strong>SCENA — plumbing</strong><br />' +
+    'The first thing in this library where <em>what you get depends on what ' +
+    'somebody else is doing</em>. Everything up to here is local: a boiler ' +
+    'makes steam out of its own fire, a hull floats on its own displacement, ' +
+    'a light is a fact about one observer. A water supply is a <em>network</em>. ' +
+    'Four houses, and somebody in the shower in each, having turned it by ' +
+    'feel to forty degrees with the house quiet. At twelve seconds somebody ' +
+    'else flushes the lavatory. The bucket house does not notice, because ' +
+    'there is no network to share. The gravity house loses the <em>flow</em> ' +
+    '— a loft cistern is a third of a bar and has nothing to spare. The mains ' +
+    'house loses the <em>temperature</em> and scalds: a WC draws from the ' +
+    'cold branch only, so the cold through the mixer falls and the hot does ' +
+    'not, and the same hot with less cold is a hotter mixture. Nothing in ' +
+    'that shower changed and nobody touched the mixer. The thermostatic house ' +
+    'gives up flow and holds forty. The posts are the people, and there are ' +
+    'three colours because there are two different ways for this to go wrong ' +
+    'and they are not interchangeable: green is a shower, <em>amber</em> is a ' +
+    'shower gone weak, <em>red</em> is one gone dangerous. The thermostatic ' +
+    'house gives up flow precisely so that it never goes red. Try ' +
+    '<code>galleryPlumbingReport()</code> or <code>galleryFlush()</code>.',
   coast:
     '<strong>SCENA — the lit coast</strong><br />' +
     'The first thing in this library whose whole purpose is to be seen from ' +
@@ -447,6 +470,34 @@ let liner: {
  * of those has gone, one is sitting at a level she found for herself, and one
  * has been rolled right over and come back up on her own.
  */
+/**
+ * Four houses on one clock, and the only difference is the supply.
+ *
+ * Somebody is in the shower in each of them, having set it by feel to forty
+ * degrees. At twelve seconds somebody else in the same house flushes the
+ * lavatory, and four different things happen — which is the first time in this
+ * library that one object has done anything to another without either of them
+ * knowing the other exists.
+ */
+/**
+ * Every view's stepper, in ONE list.
+ *
+ * There used to be two: the animation loop called them from inside a
+ * `view === '…'` branch, and `galleryStep` called them again in a flat run at
+ * the bottom of the file. Adding a track meant editing both, the two lines
+ * looked identical, and three separate tracks in a row went in with the new
+ * stepper wired only to the animation loop — so the live page moved and every
+ * headless check saw a scene frozen at t = 0 and reported it as passing.
+ *
+ * A stepper that runs is now the same object in both places, and half-wiring
+ * one is not something the file can express.
+ */
+const STEPPERS: Array<(dt: number) => void> = [];
+
+const houses: Array<{ plumb: Plumbing; label: string; post: Mesh; x: number }> = [];
+let houseClock = 0;
+let flushed = false;
+
 /**
  * The lit coast at night, and the first thing in this library whose entire
  * purpose is to be seen from somewhere else.
@@ -1215,6 +1266,71 @@ if (view === 'room') {
     boats.push({ ship, x0: x, z0: -20, label });
   }
   seaState = { sea: st, boats, clock: 0 };
+
+} else if (view === 'plumbing') {
+  // FOUR HOUSES, ONE CLOCK, AND SOMEBODY IN THE SHOWER IN EACH.
+  //
+  // Each has set it by feel to forty degrees, with the house quiet. At twelve
+  // seconds somebody else flushes the lavatory, and four different things
+  // happen:
+  //
+  //   bucket        nothing. There is no network, so there is nothing to share.
+  //   gravity       the FLOW goes. A loft cistern has nothing to spare.
+  //   mains         the TEMPERATURE goes, and it scalds. There was flow to
+  //                 spare, so the contention arrives the other way.
+  //   thermostatic  a little flow goes, and the temperature holds.
+  //
+  // The post over each one is the person: green while what they are standing
+  // under is worth standing under, and red the instant it is not — which is a
+  // number about somebody in another room.
+  scene.background = new Color(0xa8b3bd);
+  camera.far = 200;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.9));
+  const key = new DirectionalLight(0xffffff, 1.5);
+  key.position.set(-8, 14, 9);
+  scene.add(key);
+  const floor = new Mesh(
+    new PlaneGeometry(80, 40),
+    new MeshStandardMaterial({ color: 0x6d7a80, roughness: 0.95 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  const raise = (
+    x: number,
+    supply: 'bucket' | 'gravity' | 'mains' | 'thermostatic',
+    label: string,
+    seed: number
+  ): void => {
+    const plumb = createPlumbing({ kind: supply, seed, palette });
+    plumb.object.position.set(x, 0, 0);
+    scene.add(plumb.object);
+    // A bathroom on the first floor: the shower high, the basin and the WC
+    // below it. On gravity those heights are the whole story.
+    plumb.outlet('shower', { kind: 'shower', at: new Vector3(2.6, 2.6, 0.4), height: 2.6 });
+    plumb.outlet('basin', { kind: 'tap', at: new Vector3(2.2, 1.5, -1.1), height: 1.5 });
+    plumb.outlet('wc', { kind: 'wc', at: new Vector3(3.1, 1.1, -1.6), height: 1.1 });
+    plumb.open('shower');
+    plumb.update(0.1);
+    // TURNED UNTIL IT FELT RIGHT, with the house quiet — and then left alone.
+    plumb.setTarget('shower', 40);
+
+    // The person under it. Big, because a scalar field has no other way of
+    // being in a photograph.
+    const post = new Mesh(
+      new BoxGeometry(0.5, 1.75, 0.5),
+      new MeshStandardMaterial({ color: 0x53b06a, emissive: 0x0a0a0a, flatShading: true })
+    );
+    post.position.set(x + 2.6, 0.875, 0.4);
+    scene.add(post);
+    houses.push({ plumb, label, post, x });
+  };
+
+  raise(-13.5, 'bucket', 'bucket — no network', 2);
+  raise(-4.5, 'gravity', 'gravity — loses the flow', 4);
+  raise(4.5, 'mains', 'mains — loses the temperature', 6);
+  raise(13.5, 'thermostatic', 'thermostatic — holds it', 8);
 
 } else if (view === 'coast') {
   // THE LIT COAST, AT NIGHT — because a light view in daylight is a view of a
@@ -2106,46 +2222,12 @@ renderer.setAnimationLoop(() => {
     for (const v of vents) v.update(dt, 1);
     smokeRoom?.update(dt);
   }
-  if (view === 'sail') {
-    for (const o of oceans) o.update(dt);
-    stepSail(dt);
-  }
-  if (view === 'berth') {
-    for (const o of oceans) o.update(dt);
-    stepBerth(dt);
-  }
-  if (view === 'oars') {
-    for (const o of oceans) o.update(dt);
-    stepOars(dt);
-  }
-  if (view === 'steam') {
-    for (const o of oceans) o.update(dt);
-    stepSteam(dt);
-  }
-  if (view === 'trim') {
-    for (const o of oceans) o.update(dt);
-    stepTrim(dt);
-  }
-  if (view === 'liner') {
-    for (const o of oceans) o.update(dt);
-    stepLiner(dt);
-  }
-  if (view === 'sea') {
-    for (const o of oceans) o.update(dt);
-    stepSea(dt);
-  }
-  if (view === 'gear') {
-    for (const o of oceans) o.update(dt);
-    stepGear(dt);
-  }
-  if (view === 'craft') {
-    for (const o of oceans) o.update(dt);
-    stepCraft(dt);
-  }
-  if (view === 'coast') {
-    for (const o of oceans) o.update(dt);
-    stepCoast(dt);
-  }
+  if (view === 'sail') for (const o of oceans) o.update(dt);
+  // THE SAME LIST `galleryStep` RUNS. Only the views that built something have
+  // anything in `oceans` or in their own arrays, so every stepper is a no-op
+  // for the views it is not about, and there is no per-view wiring to forget.
+  for (const o of oceans) o.update(dt);
+  for (const step of STEPPERS) step(dt);
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -2208,6 +2290,8 @@ renderer.setAnimationLoop(() => {
     placeCraftCamera();
   } else if (view === 'coast') {
     placeCoastCamera();
+  } else if (view === 'plumbing') {
+    placePlumbingCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -2296,6 +2380,7 @@ const stepOars = (dt: number): void => {
     ship.update(dt, { speed: bank.way, turn: bank.yaw * 0.25 });
   }
 };
+STEPPERS.push(stepOars);
 
 /**
  * One tick of the sea, at SIXTY TIMES life.
@@ -2316,6 +2401,7 @@ const stepSea = (dt: number): void => {
     b.ship.object.position.z = b.z0;
   }
 };
+STEPPERS.push(stepSea);
 
 /**
  * HIGH, and looking down the swell.
@@ -2395,6 +2481,80 @@ const stepLiner = (dt: number): void => {
   paint(posts, ship);
   paint(liner.smallPosts, liner.small);
 };
+STEPPERS.push(stepLiner);
+
+/**
+ * One tick of four houses, at life speed.
+ *
+ * `setTarget` was called once, with the house quiet, and nothing touches the
+ * mixer again — because nobody in a shower adjusts anything in the second
+ * before it goes wrong. Everything after that is other people.
+ */
+const stepPlumbing = (dt: number): void => {
+  if (!houses.length) return;
+  const was = houseClock;
+  houseClock += dt;
+  // ONE FLUSH, at twelve seconds, in all four houses at once.
+  if (!flushed && was < 12 && houseClock >= 12) {
+    flushed = true;
+    // A tap AND a flush, which is what a household morning actually is — and
+    // what it takes to put a gravity supply under what is worth standing in.
+    for (const h of houses) {
+      h.plumb.open('wc');
+      h.plumb.open('basin');
+    }
+  }
+  // …and the cistern is full again forty seconds later, which is the only
+  // reason this is survivable in real life.
+  if (flushed && houseClock >= 52) {
+    flushed = false;
+    houseClock = 0;
+    for (const h of houses) {
+      h.plumb.close('wc');
+      h.plumb.close('basin');
+    }
+  }
+  for (const h of houses) {
+    h.plumb.update(dt);
+    const d = h.plumb.drawAt('shower');
+    const mat = h.post.material as MeshStandardMaterial;
+    if (!d) continue;
+    // Green while it is worth standing under, red the instant it is not —
+    // and there are two entirely different ways for it to stop being worth
+    // standing under, which is the whole view.
+    // A BUCKET IS NOT BEING JUDGED. Nobody is standing under anything, so
+    // 'unusable' is not a failure — it is the absence of the question, and
+    // painting it red says the one house that cannot go wrong has.
+    if (h.plumb.kind === 'bucket') {
+      mat.color.setRGB(0.55, 0.56, 0.58);
+      mat.emissive.setRGB(0.02, 0.02, 0.02);
+      continue;
+    }
+    // THREE COLOURS, because there are two different ways for it to go wrong
+    // and they are not interchangeable. Green is a shower; AMBER is a shower
+    // that has gone weak; RED is one that has gone dangerous. Collapsed into
+    // one 'bad' the thermostatic house — which gives up flow precisely so that
+    // it never goes red — looks exactly like the one that scalded you.
+    if (d.scalding) {
+      mat.color.setRGB(0.86, 0.19, 0.14);
+      mat.emissive.setRGB(0.42, 0.03, 0.02);
+    } else if (!d.usable) {
+      mat.color.setRGB(0.88, 0.62, 0.16);
+      mat.emissive.setRGB(0.22, 0.12, 0.01);
+    } else {
+      mat.color.setRGB(0.16, 0.72, 0.34);
+      mat.emissive.setRGB(0.02, 0.06, 0.02);
+    }
+  }
+};
+STEPPERS.push(stepPlumbing);
+
+/** Frame the four from the front, low enough to see the pipework. */
+const placePlumbingCamera = (): void => {
+  if (!houses.length) return;
+  camera.position.set(-1, 5.4, 17);
+  camera.lookAt(0.8, 2.6, 0);
+};
 
 /**
  * One tick of a dark coast, with a boat standing in across the sectors.
@@ -2415,6 +2575,7 @@ const stepCoast = (dt: number): void => {
     markBoat.object.rotation.y = Math.cos(t) * 0.9;
   }
 };
+STEPPERS.push(stepCoast);
 
 /**
  * Frame it from above and to seaward, at chart scale.
@@ -2474,6 +2635,7 @@ const stepCraft = (dt: number): void => {
     boat.object.position.z = c.z0;
   }
 };
+STEPPERS.push(stepCraft);
 
 /**
  * Frame the four from off the beam and LOW.
@@ -2618,6 +2780,7 @@ const stepGear = (dt: number): void => {
     }
   }
 };
+STEPPERS.push(stepGear);
 
 /**
  * Frame the four from off the bow quarter and LOW.
@@ -2660,6 +2823,7 @@ const stepTrim = (dt: number): void => {
     t.ship.object.position.z = t.z0;
   }
 };
+STEPPERS.push(stepTrim);
 
 /**
  * Frame the four from off the bow quarter, and LOW.
@@ -2711,6 +2875,7 @@ const stepSteam = (dt: number): void => {
     st.ship.object.position.z = st.z0;
   }
 };
+STEPPERS.push(stepSteam);
 
 /**
  * Frame the three boats from ahead and to one side.
@@ -2794,6 +2959,7 @@ const stepBerth = (dt: number): void => {
     s.post.visible = y !== null;
   }
 };
+STEPPERS.push(stepBerth);
 
 /**
  * Frame the fleet, wherever their own courses have taken them.
@@ -2861,6 +3027,7 @@ const stepSail = (dt: number): void => {
     label.rotation.z = -rig.heelForce * 0.5;
   }
 };
+STEPPERS.push(stepSail);
 
 // --- headless verification ---------------------------------------------
 
@@ -2900,6 +3067,8 @@ declare global {
     galleryCraftSea: (height: number, length?: number) => void;
     galleryCoastReport: (heightOfEye?: number) => Record<string, unknown>;
     galleryCoastFog: (nauticalMiles: number) => void;
+    galleryPlumbingReport: () => Record<string, unknown>;
+    galleryFlush: (on?: boolean) => void;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -2953,16 +3122,7 @@ window.galleryStep = (dt: number) => {
   }
   for (const v of vents) v.update(dt, 1);
   smokeRoom?.update(dt);
-  stepSail(dt);
-  stepBerth(dt);
-  stepOars(dt);
-  stepSteam(dt);
-  stepTrim(dt);
-  stepLiner(dt);
-  stepSea(dt);
-  stepGear(dt);
-  stepCraft(dt);
-  stepCoast(dt);
+  for (const step of STEPPERS) step(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -3184,6 +3344,60 @@ window.galleryLinerWay = (fraction: number) => {
   if (!liner) return;
   liner.plant.setRegulator(Math.max(0, Math.min(1, fraction)));
   liner.plant.setLink(fraction > 0.02 ? 0.45 : 0);
+};
+
+/**
+ * Four houses, one flush, and what each person is standing under.
+ *
+ * `scalding` and `usable` are the two ways it goes wrong and they are not the
+ * same way — which is the whole era axis, and the reason the report carries
+ * both rather than one comfort score.
+ */
+window.galleryPlumbingReport = () => {
+  if (!houses.length) return {};
+  return {
+    clock: Number(houseClock.toFixed(1)),
+    flushed,
+    houses: houses.map((h) => {
+      const d = h.plumb.drawAt('shower')!;
+      return {
+        at: h.label,
+        supply: h.plumb.kind,
+        coldBar: Number(h.plumb.pressure.toFixed(2)),
+        hotBar: Number(h.plumb.hotPressure.toFixed(2)),
+        atOutletBar: Number(d.pressure.toFixed(2)),
+        showerLmin: Number(d.flow.toFixed(1)),
+        hotLmin: Number(d.hot.toFixed(1)),
+        tempC: Number(d.temp.toFixed(1)),
+        scalding: d.scalding,
+        usable: d.usable,
+        demandLmin: Number(h.plumb.demand.toFixed(1)),
+        state: h.plumb.state,
+        cylinderL: Number(h.plumb.hot.toFixed(0)),
+        cylinderC: Number(h.plumb.hotTemp.toFixed(0)),
+        hotLastsMin:
+          h.plumb.hotLastsFor() === Infinity
+            ? 'for ever'
+            : Number((h.plumb.hotLastsFor() / 60).toFixed(0)),
+        reheatMin: Number((h.plumb.reheatTakes() / 60).toFixed(0)),
+      };
+    }),
+  };
+};
+
+/** Flush every lavatory in the row, now. */
+window.galleryFlush = (on = true) => {
+  flushed = on;
+  houseClock = on ? 12 : 0;
+  for (const h of houses) {
+    if (on) {
+      h.plumb.open('wc');
+      h.plumb.open('basin');
+    } else {
+      h.plumb.close('wc');
+      h.plumb.close('basin');
+    }
+  }
 };
 
 /**
@@ -3608,6 +3822,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'gear') placeGearCamera();
   if (view === 'craft') placeCraftCamera();
   if (view === 'coast') placeCoastCamera();
+  if (view === 'plumbing') placePlumbingCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

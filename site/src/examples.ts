@@ -624,6 +624,83 @@ game.start();`,
   },
 
   {
+    id: 'plumbing',
+    title: 'Plumbing, pressure & the scald',
+    group: 'Worldbuilding',
+    code: `// THE FIRST THING IN THIS LIBRARY THAT IS SOMEBODY ELSE'S FAULT.
+// Everything else here is local: a boiler makes steam out of its own fire, a
+// hull floats on its own displacement. A water supply is a NETWORK, and a
+// network is shared.
+//
+// Four houses, somebody in the shower in each, set by feel to 40 C with the
+// house quiet. At twelve seconds somebody else flushes the lavatory.
+import { createPlumbing, createSky, createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Vector3, Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+const floor = new Mesh(new PlaneGeometry(80, 40),
+  new MeshStandardMaterial({ color: 0x6d7a80, roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+const houses = [
+  [-13.5, 'bucket'], [-4.5, 'gravity'], [4.5, 'mains'], [13.5, 'thermostatic'],
+].map(([x, kind]) => {
+  const plumb = createPlumbing({ kind, seed: 4, palette });
+  plumb.object.position.set(x, 0, 0);
+  scene.add(plumb.object);
+  // A bathroom on the first floor. On gravity those heights are the story.
+  plumb.outlet('shower', { kind: 'shower', at: new Vector3(2.6, 2.6, 0.4), height: 2.6 });
+  plumb.outlet('basin', { kind: 'tap', at: new Vector3(2.2, 1.5, -1.1), height: 1.5 });
+  plumb.outlet('wc', { kind: 'wc', at: new Vector3(3.1, 1.1, -1.6), height: 1.1 });
+  plumb.open('shower');
+  plumb.update(0.1);
+  // TURNED UNTIL IT FELT RIGHT, with the house quiet — and then left alone.
+  // Nobody sets a shower to 'sixty per cent hot'.
+  plumb.setTarget('shower', 40);
+
+  const post = new Mesh(new BoxGeometry(0.5, 1.75, 0.5),
+    new MeshStandardMaterial({ color: 0x2ab85a, flatShading: true }));
+  post.position.set(x + 2.6, 0.875, 0.4);
+  scene.add(post);
+  return { plumb, post };
+});
+
+let clock = 0;
+let flushed = false;
+game.onUpdate((t) => {
+  const was = clock;
+  clock += t.delta;
+  if (!flushed && was < 12 && clock >= 12) {
+    flushed = true;
+    for (const h of houses) { h.plumb.open('wc'); h.plumb.open('basin'); }
+  }
+  if (flushed && clock >= 52) {
+    flushed = false; clock = 0;
+    for (const h of houses) { h.plumb.close('wc'); h.plumb.close('basin'); }
+  }
+  for (const h of houses) {
+    h.plumb.update(t.delta);
+    const d = h.plumb.drawAt('shower');
+    const mat = h.post.material;
+    // THREE COLOURS, because there are two different ways for this to go wrong
+    // and they are not interchangeable. A bucket is not being judged at all.
+    if (h.plumb.kind === 'bucket') mat.color.setRGB(0.55, 0.56, 0.58);
+    else if (d.scalding) mat.color.setRGB(0.86, 0.19, 0.14);
+    else if (!d.usable) mat.color.setRGB(0.88, 0.62, 0.16);
+    else mat.color.setRGB(0.16, 0.72, 0.34);
+  }
+  game.camera.position.set(-1, 5.4, 17);
+  game.camera.lookAt(0.8, 2.6, 0);
+});
+game.start();`,
+  },
+
+  {
     id: 'coast',
     title: 'Lights, sectors & the horizon',
     group: 'Worldbuilding',

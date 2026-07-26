@@ -547,6 +547,22 @@ export {
   type StabiliserKind,
 } from './props/stabiliser';
 export {
+  createPlumbing,
+  headPressure,
+  orificeFlow,
+  mixedAt,
+  mixFor,
+  SUPPLY_KINDS,
+  SCALD,
+  type Plumbing,
+  type PlumbingOptions,
+  type SupplyKind,
+  type SupplyState,
+  type OutletKind,
+  type OutletOptions,
+  type Draw,
+} from './props/plumbing';
+export {
   createSeamark,
   geographicRange,
   luminousRange,
