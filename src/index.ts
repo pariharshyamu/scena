@@ -547,6 +547,15 @@ export {
   type StabiliserKind,
 } from './props/stabiliser';
 export {
+  createGear,
+  listFor,
+  GEAR_KINDS,
+  type Gear,
+  type GearOptions,
+  type GearKind,
+  type GearState,
+} from './props/gear';
+export {
   createSeaState,
   fullyDeveloped,
   fetchLimited,

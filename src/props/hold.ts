@@ -196,6 +196,18 @@ export interface Hold extends Prop {
   /** She has taken an angle of loll and is lying there. A boolean BESIDE the
    *  state, because a ship lolling is still `'lost'` by the same measure. */
   readonly lolling: boolean;
+  /**
+   * Hang an EXTERNAL heeling moment on her, tonne·metres, positive to
+   * starboard. Named, so several can be live at once and each updated on its
+   * own; pass 0 to take one off.
+   *
+   * A working boat is heeled by her gear rather than by her cargo, and the
+   * wire is not aboard her — but the arithmetic is identical the moment it
+   * reaches her deck, and so is the angle past which she does not come back.
+   * Everything that capsizes a badly stowed ship capsizes a tug girted by her
+   * own tow, through this.
+   */
+  heel(name: string, tonneMetres: number): void;
   /** Past the angle of vanishing stability — over, and not coming back. */
   readonly capsized: boolean;
   /** Her angle of vanishing stability, radians. Published so a caller can
@@ -633,6 +645,10 @@ export function createHold(options: HoldOptions = {}): Hold {
     rollPeriod: 0,
   };
 
+  /** External heeling moments, t·m, by name — gear, a shifted deck cargo,
+   *  anything that pulls on her from outside the cargo model. */
+  const outside = new Map<string, number>();
+
   const solve = (): void => {
     const dw = deadweightOf();
     const disp = spec.lightship + dw;
@@ -662,6 +678,7 @@ export function createHold(options: HoldOptions = {}): Hold {
       mz += c.load * c.z;
       mx += c.load * (c.x + c.offset);
     }
+    for (const m of outside.values()) mx += m;
     const gml = L * 1.1;
     loading.trim = Math.atan(mz / Math.max(1e-6, disp * gml));
     // A negative GM does not give a negative list, it gives an ANGLE OF LOLL:
@@ -803,7 +820,6 @@ export function createHold(options: HoldOptions = {}): Hold {
 
   /** Tonnes still being walked from one hold to another. */
   let moving: { from: Cell; to: Cell; left: number } | null = null;
-
   const hold: Hold = {
     object: group,
     // Below decks is not something you steer around from outside.
@@ -910,6 +926,11 @@ export function createHold(options: HoldOptions = {}): Hold {
     },
     get lolling() {
       return read.gm <= 0.02 && Math.abs(loading.list) > 0.02;
+    },
+    heel(name: string, tonneMetres: number) {
+      if (!Number.isFinite(tonneMetres) || tonneMetres === 0) outside.delete(name);
+      else outside.set(name, tonneMetres);
+      settle();
     },
     get capsized() {
       return Math.abs(loading.list) >= spec.vanishing - 1e-6;

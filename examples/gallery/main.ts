@@ -62,6 +62,9 @@ import {
   createHold,
   createStabilisers,
   createSeaState,
+  createGear,
+  createBoat,
+  listFor,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -130,6 +133,7 @@ import {
   type Hold,
   type Stabilisers,
   type SeaState,
+  type Gear,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -162,6 +166,24 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  gear:
+    '<strong>SCENA — working gear</strong><br />' +
+    'Every other force in the boat arc acts through her centreline. A working ' +
+    'load does not: it acts at the end of a wire, and the further outboard ' +
+    'and the higher that point is, the more of your own engine goes into ' +
+    'laying her over instead of moving her. The two nearest hulls are the ' +
+    'same tug twice — same gear, same load, and the same snatch from a ' +
+    'sheering tow in the same second. One of them slipped the wire and one ' +
+    'of them did not, and that is the only difference there is. Beyond them, ' +
+    'a derrick with eighteen tonnes swung right outboard, on which ' +
+    '<code>slip()</code> does nothing at all because the weight has to be ' +
+    'put down somewhere; and a trawler whose net came fast on the bottom, ' +
+    'which will not lay a 290-tonne hull over — a trawler is pulled down by ' +
+    'the stern, not heeled. The small boat in front is carrying the same ' +
+    'three hundred kilos of pots that none of the big hulls would notice, ' +
+    'and it has her at twelve degrees. The gear runs at six times life; the ' +
+    'sea and every heel in the picture are at one to one. Try ' +
+    '<code>galleryGearReport()</code>.',
   liner:
     '<strong>SCENA — the liner</strong><br />' +
     'The whole boat arc in one hull: a hold that trims and sinks her, a ' +
@@ -362,6 +384,38 @@ let liner: {
   small: DeckedShip;
   smallPosts: Array<{ mesh: Mesh; at: Vector3; label: string }>;
 } | null = null;
+
+/**
+ * The working boats, and the only view in the arc where a boat is lost.
+ *
+ * Four hulls, four wires, one clock. Two of them are the same tug rigged the
+ * same way and given the same snatch in the same second, and the only
+ * difference between them is whether anybody pulls the release — which is the
+ * whole argument for a towing hook that opens.
+ *
+ * `over` is a LATCH. Past the angle of vanishing stability she is not coming
+ * back, and the hold solves an equilibrium rather than remembering one, so
+ * when the surge decays it would quietly stand her up again and the
+ * screenshot would be of two upright tugs and no story.
+ */
+const boats: Array<{
+  ship: DeckedShip;
+  hold: Hold;
+  gear: Gear;
+  label: string;
+  /** Does anybody pull the release on this one? */
+  releases: boolean;
+  over: boolean;
+  /** Seconds she has been past her angle of vanishing stability. */
+  pastFor: number;
+  /** Her tow is sheering off across her, right now. */
+  sheering: boolean;
+  x0: number;
+  z0: number;
+}> = [];
+/** The same string of pots, on something a string of pots is heavy for. */
+let creel: { gear: Gear; cradle: Object3D } | null = null;
+let gearClock = 0;
 
 const trims: Array<{
   hold: Hold;
@@ -1070,6 +1124,117 @@ if (view === 'room') {
   }
   seaState = { sea: st, boats, clock: 0 };
 
+} else if (view === 'gear') {
+  // FOUR BOATS, FOUR WIRES, AND ONE OF THEM IS LOST.
+  //
+  //   A  trawl   — a net astern, and it comes fast on the bottom
+  //   B  tow     — girted, snatched, and SLIPPED
+  //   C  tow     — girted, snatched, and nobody at the release
+  //   D  derrick — a weight swung out on a boom, and no way to let go at all
+  //
+  // B and C are the same hull, the same gear, the same load, the same second.
+  // The only difference is a lever, and after twenty-five seconds one of them
+  // is working and the other is on her beam ends — which is why every tug
+  // ever built has a hook that opens and why that is the only verb on this
+  // object that exists because of a way of dying.
+  scene.background = new Color(0x8faec8);
+  camera.far = 3000;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.84));
+  const key = new DirectionalLight(0xffffff, 1.7);
+  key.position.set(-18, 26, 20);
+  scene.add(key);
+
+  // A short sea. These are small craft, and a swell of a liner's wavelength
+  // would lift all four together and take the heel out of the picture.
+  const sea = createOcean({ amplitude: 0.3, wavelength: 34, size: 1600, segments: 200 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const rig = (
+    x: number,
+    z: number,
+    kind: 'trawl' | 'tow' | 'derrick',
+    label: string,
+    releases: boolean,
+    seed: number
+  ): void => {
+    const ship = createDeckedShip({ era: 'carrack', seed, palette });
+    ship.float((sx, sz) => sea.heightAt(sx, sz));
+    ship.object.position.set(x, 0, z);
+    scene.add(ship.object);
+
+    // LOADED DOWN TO HER MARKS, which is also loaded down to a metacentric
+    // height she can be pulled over from. An empty boat cannot be girted and
+    // an empty boat is not working.
+    const hold = createHold({ kind: 'carrack', draft: ship.draft, seed, palette });
+    ship.object.add(hold.object);
+    for (const c of hold.compartments) if (!c.liquid && c.name !== 'bilge') hold.load(c.name, c.capacity);
+
+    // The gear takes HER dimensions, so every lever arm in it is a distance
+    // on this hull rather than a number out of a table.
+    const gear = createGear({
+      kind,
+      beam: ship.beam,
+      length: ship.length,
+      freeboard: ship.freeboard,
+      shot: true,
+      seed,
+      palette,
+    });
+    // ON HER DECK. y = 0 in a hull is her waterline; left there, the gallows
+    // stand inside her and the wire runs along the sea bed.
+    const deck = ship.decks
+      .filter((d) => d.name !== 'hold')
+      .reduce((a, c) => (c.length > a.length ? c : a));
+    gear.object.position.y = deck.y;
+    ship.object.add(gear.object);
+    if (kind === 'derrick') {
+      gear.setLoad(18);
+      gear.setOutreach(0);
+    }
+    boats.push({ ship, hold, gear, label, releases, over: false, pastFor: 0, sheering: false, x0: x, z0: z });
+  };
+
+  // GROUPED, not ruled out in a line. The two tugs are side by side and at
+  // the same range because they are the comparison; the other two sit back
+  // and off to one side. And both tugs are at the right-hand end, because a
+  // tow streams a hundred and fifty metres of wire abeam and it has to go
+  // somewhere that is not through another boat.
+  // SPREAD ALONG THEIR OWN HEADING, with the camera off the port beam.
+  //
+  // Ranked across the frame instead, every hull is bow-on and a boat lying at
+  // forty-five degrees looks exactly like a boat sitting up straight — the one
+  // thing this view exists to show is the one thing that framing hides. And
+  // broadside on the port side means every wire streams to starboard, away
+  // from the camera and out of the picture, instead of through the boat next
+  // door.
+  rig(0, 42, 'trawl', 'trawler', true, 3);
+  rig(2, 2, 'derrick', 'derrick', true, 9);
+  rig(0, -74, 'tow', 'tug — slips', true, 6);
+  rig(2, -36, 'tow', 'tug — does not', false, 6);
+
+  // AND THE SAME STRING OF POTS ON A BOAT A STRING OF POTS IS HEAVY FOR.
+  //
+  // Three hundred kilos over the rail is nothing to a twenty-six metre hull
+  // and it is most of what a creel boat has. The list is the same arithmetic
+  // — `listFor(moment, displacement, gm)` — done on five tonnes instead of
+  // two hundred and ninety, and it is the difference between a thing you can
+  // ignore and a thing that drowns people every winter.
+  const bx = -48;
+  const bz = -6;
+  const cradle = new Object3D();
+  cradle.position.set(bx, 0, bz);
+  scene.add(cradle);
+  const skiff = createBoat({ seed: 4, palette });
+  // Her sampler is offset to where she actually is, so she rides the wave
+  // under her rather than the wave under the origin of her cradle.
+  skiff.float((sx, sz) => sea.heightAt(sx + bx, sz + bz));
+  cradle.add(skiff.object);
+  const pots = createGear({ kind: 'pots', shot: true, seed: 4, palette });
+  skiff.object.add(pots.object);
+  creel = { gear: pots, cradle };
+
 } else if (view === 'liner') {
   // THE PAYOFF. One ship, and every track in the boat arc doing its job at
   // once: a hold that trims and sinks her, a plant that drives her, fins that
@@ -1730,6 +1895,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepSea(dt);
   }
+  if (view === 'gear') {
+    for (const o of oceans) o.update(dt);
+    stepGear(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1786,6 +1955,8 @@ renderer.setAnimationLoop(() => {
     placeLinerCamera();
   } else if (view === 'sea') {
     placeSeaCamera();
+  } else if (view === 'gear') {
+    placeGearCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1972,6 +2143,151 @@ const stepLiner = (dt: number): void => {
   };
   paint(posts, ship);
   paint(liner.smallPosts, liner.small);
+};
+
+/**
+ * One tick of four working boats, on a clock six times life.
+ *
+ * The gear runs fast and the sea does not. Shooting a trawl takes two real
+ * minutes and getting it back takes five, which are honest numbers and which
+ * make a sixty-second demonstration impossible; the hulls, the swell and
+ * every heel in the picture are at one to one.
+ *
+ * The whole handshake is one line: `hold.heel('gear', gear.moment)`. A wire
+ * outside the ship becomes a tonne-metre on her deck, and from there it is
+ * the identical arithmetic that capsizes a badly stowed steamer, down to the
+ * same angle of vanishing stability.
+ */
+const GEAR_RATE = 6;
+const GEAR_CYCLE = 40;
+const gearFired = new Set<string>();
+const stepGear = (dt: number): void => {
+  if (!boats.length) return;
+  const was = gearClock;
+  gearClock += dt;
+  /** Did this instant just go past? Once per cycle, however coarse the step. */
+  const at = (t: number): boolean => was < t && gearClock >= t;
+  const once = (name: string, t: number): boolean => {
+    if (!at(t) || gearFired.has(name)) return false;
+    gearFired.add(name);
+    return true;
+  };
+
+  for (const b of boats) {
+    const { gear, hold, ship } = b;
+
+    if (!b.over) {
+      if (gear.kind === 'trawl') {
+        gear.setWay(3.4);
+        // Not quite dead astern — a net tows a little off the quarter, because
+        // that is where the gallows is. And once it is foul of the bottom the
+        // boat keeps going and the wire comes round onto her quarter, which is
+        // the only thing about coming fast that shows in a photograph. Her
+        // nine tonnes of bollard pull will not lay a 290-tonne hull over; a
+        // trawler is not lost by heeling, she is pulled down by the stern.
+        gear.setAngle(gear.fast ? 0.22 + Math.min(1, (gearClock - 10) / 4) * 0.74 : 0.22);
+        if (once('fast', 10)) gear.comeFast();
+        if (once('trawlSlip', 17.6)) gear.slip();
+      } else if (gear.kind === 'tow') {
+        gear.setWay(4.2);
+        // THE WIRE COMES ROUND. Fourteen seconds from dead astern to right
+        // abeam, which is about how long a sheer takes.
+        gear.setAngle((Math.min(1, gearClock / 14) * Math.PI) / 2);
+        // Held on, because a tow does not snatch once and let go — she sheers,
+        // and stays out there.
+        b.sheering = gearClock >= 16 && gearClock < 17.4;
+        // THREE TENTHS OF A SECOND to get to the release. That is the whole
+        // difference between these two hulls.
+        if (b.releases && once('towSlip', 16.3)) {
+          gear.slip();
+          b.sheering = false;
+        }
+      } else {
+        // The boom swings out with eighteen tonnes on it, and `slip` is called
+        // on it like everything else and does nothing whatever. That no-op is
+        // the era axis: the most capable gear here is the one with no way
+        // out, and the weight has to be put down somewhere.
+        gear.setOutreach(Math.min(1, gearClock / 14) * ship.beam * 0.9);
+        if (once('derrickSlip', 20)) gear.slip();
+      }
+      // A HUNDRED AND TWENTY TONNES — three times what this tug can pull, and
+      // that is the point of it: her own gear at its absolute worst gave her
+      // nine degrees.
+      //
+      // Applied on the same line it is read on, and not a step before it. Left
+      // to be decayed by `update` first, how much of it survives depends on
+      // the frame time, and this load is only just over what she can answer —
+      // so at 1/30 s she went over and at 1/10 s she did not. An event whose
+      // outcome is a function of the frame rate is not an event.
+      if (b.sheering) gear.snatch(120);
+      hold.heel('gear', gear.moment);
+
+      // …and once she is past it she is not coming back.
+      //
+      // But going over TAKES TIME, and that is not a nicety here — it is the
+      // whole view. Latched the instant `capsized` goes true, both tugs are
+      // gone within a frame of the snatch, the release is pulled on a boat
+      // that is already lost, and the picture is of two hulls on their beam
+      // ends with nothing to tell them apart. She has to be past it and STAY
+      // past it. The hold solves an equilibrium rather than remembering one,
+      // so without the latch the surge decays and she stands smartly back up.
+      b.pastFor = hold.capsized ? b.pastFor + dt : 0;
+      if (b.pastFor > 0.8) b.over = true;
+    }
+
+    // HER WIRE STAYS ON HER. The gear steps whether she is lost or not: the
+    // moment stops being handed to the hold, but the wire has to be placed
+    // every frame or it hangs in the air where she was two seconds ago. And
+    // her way is left where it was, because the wire holding a capsized tug
+    // over is bar-taut and not a slack rope lying on the water.
+    gear.update(dt * GEAR_RATE);
+
+    hold.update(dt);
+    ship.update(dt, { speed: 0, loading: hold.loading });
+    // Held on station, like every other hull in this file.
+    ship.object.position.x = b.x0;
+    ship.object.position.z = b.z0;
+  }
+
+  if (creel) {
+    creel.gear.update(dt * GEAR_RATE);
+    // THE SAME STRING OF POTS, and this is what it does to five tonnes. Same
+    // sum the hold does; the only thing that changed is what it is done to.
+    // Sign to match the hull: `rotation.z = roll − list`.
+    creel.cradle.rotation.z = -listFor(creel.gear.moment, 5, 0.6);
+  }
+
+  if (gearClock >= GEAR_CYCLE) {
+    gearClock = 0;
+    gearFired.clear();
+    for (const b of boats) {
+      // The one that went over stays gone. Nothing re-rigs her.
+      if (b.over) continue;
+      b.gear.clear();
+      b.gear.shoot();
+      b.gear.setAngle(0);
+      if (b.gear.kind === 'derrick') b.gear.setOutreach(0);
+    }
+  }
+};
+
+/**
+ * Frame the four from off the bow quarter and LOW.
+ *
+ * The read is which of them is lying over, and from above a boat on her beam
+ * ends and a boat sitting up straight are very nearly the same picture.
+ */
+const placeGearCamera = (): void => {
+  if (!boats.length) return;
+  // HIGH ENOUGH TO SEE HER DECK. From near the water a hull leaning forty-five
+  // degrees away and a hull sitting up straight are both a flat slab with a
+  // lip on it, and the whole read is which is which.
+  // AND OFF THE AXIS THE WIRES RUN DOWN. Square on the port beam, every wire
+  // and every derrick boom points straight away from the camera and
+  // foreshortens to nothing — four boats and not a wire in the picture, which
+  // is the one thing in it.
+  camera.position.set(-96, 40, 30);
+  camera.lookAt(2, 3, -22);
 };
 
 /** Frame her from off the bow quarter and LOW, so the swell is a swell. */
@@ -2231,6 +2547,7 @@ declare global {
     gallerySteady: (out: number) => void;
     galleryLinerWay: (fraction: number) => void;
     galleryLinerReport: () => Record<string, unknown>;
+    galleryGearReport: () => Record<string, unknown>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -2291,6 +2608,7 @@ window.galleryStep = (dt: number) => {
   stepTrim(dt);
   stepLiner(dt);
   stepSea(dt);
+  stepGear(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -2512,6 +2830,50 @@ window.galleryLinerWay = (fraction: number) => {
   if (!liner) return;
   liner.plant.setRegulator(Math.max(0, Math.min(1, fraction)));
   liner.plant.setLink(fraction > 0.02 ? 0.45 : 0);
+};
+
+/**
+ * Four wires and what each of them is doing to the boat it is made fast to.
+ *
+ * `moment` is the handshake and `list` is what the hull did with it — and the
+ * two tugs are the same row twice, with one word different.
+ */
+window.galleryGearReport = () => {
+  if (!boats.length) return {};
+  const deg = (r: number): number => Number(((r * 180) / Math.PI).toFixed(2));
+  return {
+    clock: Number(gearClock.toFixed(1)),
+    boats: boats.map((b) => ({
+      at: b.label,
+      state: b.gear.state,
+      out: Number(b.gear.out.toFixed(2)),
+      wireDeg: deg(b.gear.angle),
+      strainT: Number(b.gear.strain.toFixed(1)),
+      surgeT: Number(b.gear.surge.toFixed(1)),
+      momentTm: Number(b.gear.moment.toFixed(0)),
+      girting: b.gear.girting,
+      fast: b.gear.fast,
+      dragMs: Number(b.gear.drag.toFixed(2)),
+      dispT: Number(b.hold.displacement.toFixed(0)),
+      gm: Number(b.hold.gm.toFixed(2)),
+      listDeg: deg(b.hold.loading.list),
+      vanishingDeg: deg(b.hold.vanishing),
+      capsized: b.hold.capsized,
+      lostForGood: b.over,
+      pastFor: Number(b.pastFor.toFixed(2)),
+      // What the hull is actually SHOWING, not what the hold worked out.
+      hullRollDeg: deg(b.ship.object.rotation.z),
+    })),
+    creel: creel
+      ? {
+          strainT: Number(creel.gear.strain.toFixed(2)),
+          momentTm: Number(creel.gear.moment.toFixed(2)),
+          // The same moment, on five tonnes instead of two hundred and ninety.
+          listDeg: deg(listFor(creel.gear.moment, 5, 0.6)),
+          onACarrackDeg: deg(listFor(creel.gear.moment, 290, 2.23)),
+        }
+      : null,
+  };
 };
 
 /**
@@ -2783,6 +3145,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'trim') placeTrimCamera();
   if (view === 'liner') placeLinerCamera();
   if (view === 'sea') placeSeaCamera();
+  if (view === 'gear') placeGearCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

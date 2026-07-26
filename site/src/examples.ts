@@ -621,6 +621,101 @@ game.start();`,
   },
 
   {
+    id: 'gear',
+    title: 'Working gear & girting',
+    group: 'Worldbuilding',
+    code: `// A WORKING LOAD ACTS AT THE END OF A WIRE, AND IT CAN PULL YOU OVER.
+// Every other force in the boat arc acts through her centreline. This one
+// does not: the further outboard and the higher it acts, the more of your own
+// engine goes into laying her over instead of moving her.
+//
+// The same tug twice. Same gear, same load, the same snatch from a sheering
+// tow in the same second — and a lever pulled on one of them.
+import { createGear, createHold, createDeckedShip, createOcean, createSky,
+         createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const sea = createOcean({ amplitude: 0.3, wavelength: 34, size: 1200, segments: 180 });
+scene.add(sea.mesh);
+
+const rig = (z, releases) => {
+  const ship = createDeckedShip({ era: 'carrack', seed: 6, palette });
+  ship.float((x, sz) => sea.heightAt(x, sz));
+  ship.object.position.set(0, 0, z);
+  scene.add(ship.object);
+
+  // Loaded down to her marks — which is also loaded down to a metacentric
+  // height she can be pulled over from. An empty boat cannot be girted, and
+  // an empty boat is not working.
+  const hold = createHold({ kind: 'carrack', draft: ship.draft, seed: 6, palette });
+  ship.object.add(hold.object);
+  for (const c of hold.compartments) {
+    if (!c.liquid && c.name !== 'bilge') hold.load(c.name, c.capacity);
+  }
+
+  const gear = createGear({
+    kind: 'tow', beam: ship.beam, length: ship.length,
+    freeboard: ship.freeboard, shot: true, seed: 6, palette,
+  });
+  // ON HER DECK. y = 0 in a hull is her waterline, and left there the hook is
+  // a freeboard down inside her and the wire runs along the sea bed.
+  const deck = ship.decks
+    .filter((d) => d.name !== 'hold')
+    .reduce((a, c) => (c.length > a.length ? c : a));
+  gear.object.position.y = deck.y;
+  ship.object.add(gear.object);
+  return { ship, hold, gear, releases, over: false, pastFor: 0, z };
+};
+const tugs = [rig(0, true), rig(40, false)];
+
+// The gear runs at six times life; the sea and every heel is at one to one.
+let clock = 0;
+game.onUpdate((t) => {
+  const was = clock;
+  clock += t.delta;
+  for (const b of tugs) {
+    if (!b.over) {
+      b.gear.setWay(4.2);
+      // The wire comes round: fourteen seconds from dead astern to right
+      // abeam, which is about how long a sheer takes.
+      b.gear.setAngle((Math.min(1, clock / 14) * Math.PI) / 2);
+      // THREE TENTHS OF A SECOND to get to the release, and that is the only
+      // difference between these two hulls.
+      if (b.releases && was < 16.3 && clock >= 16.3) b.gear.slip();
+      b.gear.update(t.delta * 6);
+      // A hundred and twenty tonnes — three times what she can pull. Applied
+      // on the same line it is read on: left to be decayed by \`update\` first,
+      // how much survives depends on the frame time, and an event whose
+      // outcome is a function of the frame rate is not an event.
+      if (clock >= 16 && clock < 17.4 && b.gear.out > 0.5) b.gear.snatch(120);
+      b.hold.heel('gear', b.gear.moment);
+      // Past her angle of vanishing stability she is not coming back — but
+      // going over takes TIME. Latched the instant \`capsized\` goes true, both
+      // tugs are gone within a frame and the release is pulled on a boat that
+      // is already lost.
+      b.pastFor = b.hold.capsized ? b.pastFor + t.delta : 0;
+      if (b.pastFor > 0.8) b.over = true;
+    } else {
+      b.gear.update(t.delta * 6);   // her wire is still on her
+    }
+    b.hold.update(t.delta);
+    b.ship.update(t.delta, { speed: 0, loading: b.hold.loading });
+    b.ship.object.position.set(0, b.ship.object.position.y, b.z);
+  }
+  // HIGH ENOUGH TO SEE HER DECK: from near the water a hull leaning forty-five
+  // degrees away and one sitting up straight are both a slab with a lip on it.
+  game.camera.position.set(-88, 38, 46);
+  game.camera.lookAt(0, 3, 14);
+});
+game.start();`,
+  },
+
+  {
     id: 'liner',
     title: 'The liner',
     group: 'Worldbuilding',
