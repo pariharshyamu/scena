@@ -131,6 +131,26 @@ export interface ShipInput {
    * after her own update leaves her crew standing where she used to be.
    */
   drift?: { x: number; z: number };
+  /**
+   * How she is loaded — trim, list, sinkage, and how hard she snaps back.
+   *
+   * Structurally `Hold.loading`, and duck-typed rather than imported so the
+   * hull knows nothing about cargo. It is the first thing in this channel
+   * that is a **state of the vessel** rather than a force on her: a drift
+   * stops when the tide slackens, and a list does not stop.
+   *
+   * It is a BIAS on the sea-driven attitude and not a target for it. The
+   * hull eases toward the waves because she has mass; she does not ease
+   * toward her own trim, because her trim is not somewhere she is going.
+   */
+  loading?: {
+    /** Positive is DOWN BY THE HEAD, the way it is said aboard. */
+    trim?: number;
+    /** Positive is a list to STARBOARD. */
+    list?: number;
+    sink?: number;
+    stiffness?: number;
+  };
 }
 
 export interface DeckedShip extends Prop, DeckField {
@@ -514,15 +534,28 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
         const wantY = (bow + stern + port + starboard) / 4;
         const wantPitch = Math.atan2(stern - bow, L * 0.8) * spec.gain;
         const wantRoll = Math.atan2(port - starboard, B) * spec.gain;
-        const k = Math.min(1, dt * spec.ease);
+        // A stiff ship answers the sea FASTER. That is the same claim as a
+        // short roll period, seen from the hull's side.
+        const k = Math.min(1, dt * spec.ease * (input.loading?.stiffness ?? 1));
         const prevPitch = pitch;
         const prevRoll = roll;
         const prevY = group.position.y;
         pitch += (wantPitch - pitch) * k;
         roll += (wantRoll - roll) * k;
         group.position.y += (wantY - group.position.y) * k;
-        group.rotation.x = pitch;
-        group.rotation.z = roll;
+        // The load is a BIAS, added after the easing rather than eased toward.
+        // Ease her toward her own trim and a ship loaded down by the head
+        // spends thirty seconds getting there and then reads correctly for
+        // ever, which looks exactly like a ship that was always trimmed.
+        // OPPOSITE SIGNS, and not by accident. A positive rotation.x carries
+        // +z toward −y, so it puts the BOW DOWN; a positive rotation.z carries
+        // +x toward +y, so it lifts the STARBOARD side. "Down by the head" and
+        // "list to starboard" are both the sailor's positive, and they
+        // therefore need different signs here. Guessed either way round it
+        // reads back out of the model perfectly and puts her stem in the air.
+        group.rotation.x = pitch + (input.loading?.trim ?? 0);
+        group.rotation.z = roll - (input.loading?.list ?? 0);
+        group.position.y -= input.loading?.sink ?? 0;
 
         // How hard it is to stand up: the RATE, not the angle. A vessel
         // heeled steadily at ten degrees under sail is easy to walk on; the

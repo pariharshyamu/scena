@@ -555,6 +555,78 @@ game.start();`,
   },
 
   {
+    id: 'trim',
+    title: 'Trim & the free surface',
+    group: 'Worldbuilding',
+    code: `// A HOLD FULL OF WATER IS SAFER THAN A HOLD HALF FULL OF IT. Four identical
+// steamers: one light, one with her cargo forward, one with hers stowed off
+// the centreline, and one loaded correctly with her ballast HALF pumped. The
+// last is the one with no stability left, because a free surface costs her by
+// the width of the surface cubed and not by how much liquid is in it.
+import { createHold, createDeckedShip, createOcean, createSky,
+         createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+// A SLIGHT swell: the read is the steady lean a load puts on her, and a metre
+// of sea puts the same amount on and takes it off twice a minute.
+const sea = createOcean({ amplitude: 0.12, wavelength: 40, size: 1600, segments: 170 });
+scene.add(sea.mesh);
+
+const SET = [
+  { label: 'light', colour: 0x7a8b99, cargo: {} },
+  { label: 'by the head', colour: 0xd8483a, cargo: { fore: 300, main: 160 } },
+  { label: 'listed', colour: 0xe0a531, cargo: { main: 380, aft: 180 }, off: 0.34 },
+  { label: 'slack tanks', colour: 0x53b06a, cargo: { fore: 220, main: 300, aft: 180 } },
+];
+
+const fleet = SET.map((it, i) => {
+  const ship = createDeckedShip({ era: 'steamer', seed: i + 21, palette });
+  ship.float((x, z) => sea.heightAt(x, z));
+  ship.object.position.set(-108 + i * 72, 0, -34);
+  scene.add(ship.object);
+
+  const hold = createHold({ kind: 'steamer', seed: i + 5, palette });
+  ship.object.add(hold.object);
+  // THE SIDE IS PART OF THE STOWAGE. Move the cargo's mesh and leave its
+  // tonnage on the centreline and she reads as laden with a list of 0.00°.
+  for (const [name, tonnes] of Object.entries(it.cargo)) {
+    hold.load(name, tonnes, it.off ?? 0);
+  }
+  if (it.label === 'slack tanks') hold.pump('ballast', 0.5);
+
+  const flag = new Mesh(new BoxGeometry(0.6, 9, 0.6),
+    new MeshStandardMaterial({ color: it.colour, emissive: it.colour,
+      emissiveIntensity: 0.35, flatShading: true }));
+  const deck = ship.decks.filter((d) => d.name !== 'hold')
+    .reduce((a, b) => (b.y > a.y ? b : a));
+  flag.position.set(0, deck.y + 5, 22);
+  ship.object.add(flag);
+  return { hold, ship, x0: ship.object.position.x, z0: ship.object.position.z };
+});
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  for (const f of fleet) {
+    f.hold.update(t.delta);
+    // ONE OBJECT WIDE, and it is not a force: \`loading\` is a state of the
+    // vessel. A drift stops when the tide slackens; a list does not.
+    f.ship.update(t.delta, { loading: f.hold.loading });
+    f.ship.object.position.x = f.x0;
+    f.ship.object.position.z = f.z0;
+  }
+  game.camera.position.set(-142, 21, 92);
+  game.camera.lookAt(6, 2, -34);
+});
+game.start();`,
+  },
+
+  {
     id: 'steam',
     title: 'Steam & cut-off',
     group: 'Worldbuilding',

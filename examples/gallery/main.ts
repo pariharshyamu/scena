@@ -59,6 +59,7 @@ import {
   createGangway,
   createOarBank,
   createSteamPlant,
+  createHold,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -124,6 +125,7 @@ import {
   type Carrier,
   type OarBank,
   type SteamPlant,
+  type Hold,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -144,6 +146,18 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  trim:
+    '<strong>SCENA — trim &amp; the free surface</strong><br />' +
+    'Four identical steamers, loaded four ways. Grey has nothing aboard: she ' +
+    'rides high, her screw is half out and she is <em>stiff</em> — an empty ' +
+    'ship is not a safe ship. Red has her cargo in the fore hold and is down ' +
+    'by the head; yellow has hers stowed off the centreline and is listed. ' +
+    'Green is the one to look at: she is the only one with the right weight ' +
+    'in the right place, and she has the least stability of the four, ' +
+    'because her ballast tank is <em>half</em> pumped. A hold full of water ' +
+    'is safer than a hold half full of it, and the penalty goes as the ' +
+    'width of the surface <em>cubed</em>. Try ' +
+    '<code>galleryTrim(1)</code> to press every tank up.',
   steam:
     '<strong>SCENA — steam</strong><br />' +
     '<em>Full ahead is not her fastest.</em> Two identical triples: the red ' +
@@ -280,6 +294,21 @@ const banks: Array<{ bank: OarBank; ship: DeckedShip; wake: Mesh }> = [];
  * engine in her, while her gauge, her crank and her funnel all report a
  * perfectly plausible plant that is doing nothing whatever.
  */
+/**
+ * Four hulls loaded four ways, and one lever between them.
+ *
+ * Held on station like the steamers: the read is how each of them SITS, and a
+ * ship trimmed two degrees by the head looks exactly like a ship that is not
+ * once she has steamed out of frame.
+ */
+const trims: Array<{
+  hold: Hold;
+  ship: DeckedShip;
+  x0: number;
+  z0: number;
+  label: string;
+}> = [];
+
 const plants: Array<{
   plant: SteamPlant;
   ship: DeckedShip;
@@ -926,6 +955,84 @@ if (view === 'room') {
     banks.push({ bank, ship, wake });
   });
 
+} else if (view === 'trim') {
+  // FOUR STEAMERS, IDENTICAL, LOADED FOUR WAYS.
+  //
+  //   A  light        — nothing aboard, riding high, screw half out, and STIFF
+  //   B  down by head — the whole cargo in the fore hold
+  //   C  listed       — the same tonnage, and all of it out to starboard
+  //   D  slack tanks  — properly loaded, and her ballast half pumped
+  //
+  // D is the one to look at. She is the only one carrying the right weight in
+  // the right place, and she is the one with no stability left — because a
+  // hundred and thirty tonnes of water free to run the width of her costs her
+  // more than any of the other three paid.
+  scene.background = new Color(0x9dbad2);
+  camera.far = 2200;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.88));
+  const key = new DirectionalLight(0xffffff, 1.7);
+  key.position.set(-9, 16, 11);
+  scene.add(key);
+  // A SLIGHT swell, on purpose. The read here is the STEADY lean a load puts
+  // on her, and a metre of sea puts the same amount on and takes it off again
+  // twice a minute — four ships pitching is four ships you cannot compare.
+  const sea = createOcean({ amplitude: 0.12, wavelength: 40, size: 1600, segments: 190 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const SET: Array<{ label: string; colour: number; cargo: Record<string, number>; off?: number }> = [
+    { label: 'light', colour: 0x7a8b99, cargo: {} },
+    { label: 'by the head', colour: 0xd8483a, cargo: { fore: 300, main: 160 } },
+    { label: 'listed', colour: 0xe0a531, cargo: { main: 380, aft: 180 }, off: 0.34 },
+    { label: 'slack tanks', colour: 0x53b06a, cargo: { fore: 220, main: 300, aft: 180 } },
+  ];
+
+  SET.forEach((it, i) => {
+    const ship = createDeckedShip({ era: 'steamer', seed: i + 21, palette });
+    ship.float((x, z) => sea.heightAt(x, z));
+    // Clear of one another: they are 58 m long, and at 44 m centres four
+    // hulls seen from any quarter are one long smear of black.
+    // ABREAST, and well apart. Stepping them back in z as well puts them
+    // along the camera's own axis and the near one hides the other three;
+    // 72 m centres on 58 m hulls, seen from off the quarter, keeps all four
+    // clear while showing both her trim and her heel at once.
+    ship.object.position.set(-108 + i * 72, 0, -34);
+    scene.add(ship.object);
+
+    const hold = createHold({ kind: 'steamer', seed: i + 5, palette });
+    ship.object.add(hold.object);
+    // Loaded through `load` and never through `cargo`, because THE SIDE IS
+    // PART OF THE STOWAGE. The first cut of this view moved the yellow ship's
+    // cargo geometry out to starboard and left her tonnage on the centreline:
+    // she looked laden, her holds looked wrong, and her list read 0.00°.
+    for (const [name, tonnes] of Object.entries(it.cargo)) {
+      hold.load(name, tonnes as number, it.off ?? 0);
+    }
+    if (it.label === 'slack tanks') hold.pump('ballast', 0.5);
+
+    const flag = new Mesh(
+      new BoxGeometry(0.6, 9, 0.6),
+      new MeshStandardMaterial({
+        color: it.colour,
+        emissive: it.colour,
+        emissiveIntensity: 0.35,
+        flatShading: true,
+      })
+    );
+    const deck = ship.decks.filter((d) => d.name !== 'hold').reduce((a, b) => (b.y > a.y ? b : a));
+    flag.position.set(0, deck.y + 5, 22);
+    ship.object.add(flag);
+
+    trims.push({
+      hold,
+      ship,
+      x0: ship.object.position.x,
+      z0: ship.object.position.z,
+      label: it.label,
+    });
+  });
+
 } else if (view === 'steam') {
   // Four plants, three decisions and one state.
   //
@@ -1381,6 +1488,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepSteam(dt);
   }
+  if (view === 'trim') {
+    for (const o of oceans) o.update(dt);
+    stepTrim(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1431,6 +1542,8 @@ renderer.setAnimationLoop(() => {
     placeOarCamera();
   } else if (view === 'steam') {
     placeSteamCamera();
+  } else if (view === 'trim') {
+    placeTrimCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1518,6 +1631,34 @@ const stepOars = (dt: number): void => {
     bank.update(dt);
     ship.update(dt, { speed: bank.way, turn: bank.yaw * 0.25 });
   }
+};
+
+/**
+ * One tick of four differently loaded hulls.
+ *
+ * The handshake is one object wide and it is not a force: `loading` is a
+ * STATE of the vessel. A drift stops when the tide slackens; a list does not.
+ */
+const stepTrim = (dt: number): void => {
+  for (const t of trims) {
+    t.hold.update(dt);
+    t.ship.update(dt, { loading: t.hold.loading });
+    // Held on station, like the steamers — nothing here is a race.
+    t.ship.object.position.x = t.x0;
+    t.ship.object.position.z = t.z0;
+  }
+};
+
+/**
+ * Frame the four from off the bow quarter, and LOW.
+ *
+ * The whole read is how each of them is sitting in the water. From above, a
+ * two-degree list and a level ship are the same picture.
+ */
+const placeTrimCamera = (): void => {
+  if (!trims.length) return;
+  camera.position.set(-142, 21, 92);
+  camera.lookAt(6, 2, -34);
 };
 
 /**
@@ -1733,6 +1874,9 @@ declare global {
     gallerySteamFire: (draught: number) => void;
     gallerySteamReport: () => Array<Record<string, unknown>>;
     gallerySteamParts: () => Record<string, unknown>;
+    galleryTrim: (level: number) => void;
+    galleryTrimHole: (rate: number) => void;
+    galleryTrimReport: () => Array<Record<string, unknown>>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -1790,6 +1934,7 @@ window.galleryStep = (dt: number) => {
   stepBerth(dt);
   stepOars(dt);
   stepSteam(dt);
+  stepTrim(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1938,6 +2083,59 @@ window.gallerySteamParts = () => {
   out.big = kids;
   return out;
 };
+
+/** Pump every tank in the trim view to the same level. */
+window.galleryTrim = (level: number) => {
+  for (const t of trims) {
+    for (const c of t.hold.compartments) {
+      if (c.liquid && c.name !== 'bilge') t.hold.pump(c.name, level);
+    }
+  }
+};
+
+/** Hole them all, or stop the leak. */
+window.galleryTrimHole = (rate: number) => {
+  for (const t of trims) {
+    t.hold.holed(rate);
+    t.hold.pumpBilge(rate > 0);
+  }
+};
+
+/**
+ * How each of the four is sitting, and why.
+ *
+ * `heel` is measured off the HULL rather than read back out of the hold —
+ * a world-space up vector against a plumb one — because every number here
+ * agreeing with itself is exactly the failure this class of bug hides in.
+ */
+window.galleryTrimReport = () =>
+  trims.map(({ hold, ship, label }) => {
+    ship.object.updateMatrixWorld(true);
+    const up = new Vector3(0, 1, 0).applyQuaternion(
+      ship.object.getWorldQuaternion(new Quaternion())
+    );
+    const bow = ship.object.localToWorld(new Vector3(0, 0, 20));
+    const stern = ship.object.localToWorld(new Vector3(0, 0, -20));
+    return {
+      label,
+      state: hold.state,
+      dwt: Number(hold.deadweight.toFixed(0)),
+      draught: Number(hold.draught.toFixed(2)),
+      toMarks: Number(hold.toMarks.toFixed(2)),
+      gm: Number(hold.gm.toFixed(2)),
+      solidGm: Number(hold.solidGm.toFixed(2)),
+      freeSurface: Number(hold.freeSurface.toFixed(2)),
+      roll: Number.isFinite(hold.rollPeriod) ? Number(hold.rollPeriod.toFixed(1)) : 'never',
+      trimDeg: Number(((hold.loading.trim * 180) / Math.PI).toFixed(2)),
+      listDeg: Number(((hold.loading.list * 180) / Math.PI).toFixed(2)),
+      immersion: Number(hold.immersion.toFixed(2)),
+      lolling: hold.lolling,
+      slack: hold.compartments.filter((c) => c.slack).map((c) => c.name),
+      // Measured off the meshes, not off the model.
+      heelDeg: Number(((Math.acos(Math.min(1, up.y)) * 180) / Math.PI).toFixed(2)),
+      bowDown: Number((stern.y - bow.y).toFixed(2)),
+    };
+  });
 
 /** Put all four in the same gear, for the headless run. */
 window.gallerySteam = (link: number, regulator = 1) => {
@@ -2117,6 +2315,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'berth') placeBerthCamera();
   if (view === 'oars') placeOarCamera();
   if (view === 'steam') placeSteamCamera();
+  if (view === 'trim') placeTrimCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

@@ -527,6 +527,18 @@ export {
   type SteamControl,
 } from './props/steamPlant';
 export {
+  createHold,
+  freeSurfaceCost,
+  holdPoint,
+  HOLD_KINDS,
+  type Hold,
+  type HoldOptions,
+  type HoldKind,
+  type Compartment,
+  type Loading,
+  type TrimState,
+} from './props/hold';
+export {
   createPressureGauge,
   type PressureGauge,
   type PressureGaugeOptions,
