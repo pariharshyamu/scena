@@ -143,6 +143,16 @@ export interface ShipInput {
    * hull eases toward the waves because she has mass; she does not ease
    * toward her own trim, because her trim is not somewhere she is going.
    */
+  /**
+   * How much of her ROLL something is taking out, 0 (nothing) to 1 (all of it).
+   *
+   * Structurally `Stabilisers.damping`, duck-typed like everything else in
+   * this channel. It touches the roll and NOTHING ELSE — fins are wings that
+   * work athwartships, and a stabilised ship in a head sea pitches exactly as
+   * hard as an unstabilised one. That is not a simplification; it is the
+   * commonest complaint about them.
+   */
+  damping?: number;
   loading?: {
     /** Positive is DOWN BY THE HEAD, the way it is said aboard. */
     trim?: number;
@@ -186,6 +196,27 @@ export interface DeckedShip extends Prop, DeckField {
    * and a number taken off the angle cannot tell those apart.
    */
   readonly motion: number;
+  /**
+   * How hard it is to stand up AT A POINT on her, 0–1. A FIELD — the fourth
+   * in the trilogy, after `heightAt`, `depthAt` and the rest.
+   *
+   * `motion` is one number for the whole ship. This one is not, and the
+   * difference is the entire layout of a liner. Her pitch throws the bow and
+   * the stern up and down and leaves amidships almost alone; her roll throws
+   * the high decks and the wings of the bridge about and leaves the
+   * centreline low down almost alone. So the quietest place aboard is
+   * **amidships and low**, and that falls out of two lever arms rather than
+   * out of a price list — which is nonetheless exactly what a price list for
+   * cabins looks like.
+   *
+   * In vessel-local metres: `x` athwartships, `z` fore-and-aft, `y` above
+   * the waterline.
+   */
+  motionAt(x: number, z: number, y?: number): number;
+  /** Vertical speed of the deck under a point, m/s. What `motionAt` is made
+   *  of, published because a number in m/s is a thing you can reason about
+   *  and a number in 0–1 is not. */
+  heaveAt(x: number, z: number, y?: number): number;
   update(dt: number, input?: ShipInput): void;
 }
 
@@ -437,6 +468,12 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
   let pitch = 0;
   let roll = 0;
   let motion = 0;
+  // The three RATES, eased, kept apart. `motion` lumps them into one number
+  // for the whole ship; a point on her cares which is which, because they act
+  // through different lever arms.
+  let pitchRate = 0;
+  let rollRate = 0;
+  let heaveRate = 0;
   /**
    * The vessel's transform delta for this frame: current × inverse(previous).
    *
@@ -509,6 +546,30 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
     ride(position: Vector3) {
       return position.applyMatrix4(delta);
     },
+    heaveAt(x: number, z: number, y = 0) {
+      // Honestly vertical: pitch through the distance from amidships, roll
+      // through the distance from her centreline, plus the heave — which is
+      // the same everywhere aboard and is why height does not enter here.
+      void y;
+      return pitchRate * Math.abs(z) + rollRate * Math.abs(x) + heaveRate;
+    },
+    motionAt(x: number, z: number, y = 0) {
+      // NOT the same weighting as `heaveAt`, and that is the point. Heave is
+      // the whole ship going up and down together — slow, gentle, and the
+      // thing you notice least; it is the LEVER ARMS that throw you, and being
+      // high up adds a sideways throw that does not appear in a vertical speed
+      // at all. Weighted equally, heave swamps both arms and the bow, the
+      // bridge wing and the middle of the dining saloon all read the same,
+      // which is the one distinction this field exists to make.
+      const felt =
+        pitchRate * Math.abs(z) +
+        rollRate * Math.abs(x) +
+        rollRate * Math.abs(y) * 0.8 +
+        heaveRate * 0.25;
+      // Saturating rather than clamped: an open boat in a gale is worse than
+      // an open boat in a swell, and a clamp says they are the same.
+      return 1 - Math.exp(-felt / 0.55);
+    },
     update(dt: number, input: ShipInput = {}) {
       if (dt <= 0) return;
 
@@ -549,7 +610,9 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
         // about her load perfectly correct.
         const wantY = (bow + stern + port + starboard) / 4 - (input.loading?.sink ?? 0);
         const wantPitch = Math.atan2(stern - bow, L * 0.8) * spec.gain;
-        const wantRoll = Math.atan2(port - starboard, B) * spec.gain;
+        // Damping takes the ROLL out and nothing else.
+        const wantRoll =
+          Math.atan2(port - starboard, B) * spec.gain * (1 - clamp01(input.damping ?? 0));
         // A stiff ship answers the sea FASTER. That is the same claim as a
         // short roll period, seen from the hull's side.
         const k = Math.min(1, dt * spec.ease * (input.loading?.stiffness ?? 1));
@@ -580,6 +643,11 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
           (Math.abs(pitch - prevPitch) + Math.abs(roll - prevRoll)) / dt +
           Math.abs(group.position.y - prevY) / dt * 0.25;
         motion += (clamp01(rate * 1.6) - motion) * Math.min(1, dt * 3);
+
+        const k2 = Math.min(1, dt * 3);
+        pitchRate += (Math.abs(pitch - prevPitch) / dt - pitchRate) * k2;
+        rollRate += (Math.abs(roll - prevRoll) / dt - rollRate) * k2;
+        heaveRate += (Math.abs(group.position.y - prevY) / dt - heaveRate) * k2;
       }
 
       group.updateWorldMatrix(true, false);

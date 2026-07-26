@@ -539,6 +539,14 @@ export {
   type TrimState,
 } from './props/hold';
 export {
+  createStabilisers,
+  dampingAt,
+  STABILISER_KINDS,
+  type Stabilisers,
+  type StabiliserOptions,
+  type StabiliserKind,
+} from './props/stabiliser';
+export {
   createPressureGauge,
   type PressureGauge,
   type PressureGaugeOptions,

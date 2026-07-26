@@ -555,6 +555,102 @@ game.start();`,
   },
 
   {
+    id: 'liner',
+    title: 'The liner',
+    group: 'Worldbuilding',
+    code: `// THE WHOLE BOAT ARC IN ONE HULL — and a coaster beside her in the same sea.
+// A hold that trims and sinks her, a steam plant that drives her, and fins
+// that take her roll out ONLY WHILE SHE IS GOING SOMEWHERE: a fin is a wing,
+// so a stopped ship has no lift and rolls exactly as badly as one with none
+// fitted, while still paying the drag. The posts are people standing still,
+// coloured by how hard it is to stand where each of them is.
+import { createDeckedShip, createHold, createSteamPlant, createStabilisers,
+         createOcean, createSky, createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, MeshStandardMaterial, Vector3 } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+// A swell about half her length. At a wavelength near her own she meets it
+// bow and stern at the same phase and does not pitch at all.
+const sea = createOcean({ amplitude: 1.7, wavelength: 104, size: 2400, segments: 200 });
+scene.add(sea.mesh);
+
+const ship = createDeckedShip({ era: 'liner', seed: 12, palette });
+ship.float((x, z) => sea.heightAt(x, z));
+scene.add(ship.object);
+
+const hold = createHold({ kind: 'liner', draft: ship.draft, seed: 9, palette });
+ship.object.add(hold.object);
+hold.load('main', 3800); hold.load('fore', 1400); hold.load('aft', 1200);
+for (const c of hold.compartments) if (c.liquid && c.name !== 'bilge') hold.pump(c.name, 1);
+
+const plant = createSteamPlant({ kind: 'triple', funnelHeight: 26, seed: 7, palette });
+const top = ship.decks.filter((d) => d.name !== 'hold').reduce((a, b) => (b.y > a.y ? b : a));
+plant.object.position.set(0, top.y, top.z + top.length * 0.1);
+ship.object.add(plant.object);
+plant.setDraught(1); plant.setRegulator(1); plant.setLink(0.45);
+
+const fins = createStabilisers({ kind: 'activeFin', beam: ship.beam, deployed: true });
+ship.object.add(fins.object);
+
+// A coaster in the same sea: she is the control, and she is why a liner is
+// 180 metres long.
+const small = createDeckedShip({ era: 'steamer', seed: 15, palette });
+small.float((x, z) => sea.heightAt(x, z));
+small.object.position.set(-96, 0, -14);
+scene.add(small.object);
+
+const posts = [];
+const stand = (on, x, z, y, size) => {
+  const mesh = new Mesh(new BoxGeometry(size, size * 2.9, size),
+    new MeshStandardMaterial({ color: 0x53b06a, flatShading: true }));
+  mesh.position.set(x, y + size * 1.45, z);
+  on.object.add(mesh);
+  posts.push({ mesh, at: new Vector3(x, y, z), on });
+};
+const prom = ship.decks.reduce((lo, d) => (d.name === 'promenade' ? d : lo), ship.decks[0]);
+for (const z of [0.44, 0.26, 0, -0.26, -0.44]) stand(ship, 0, ship.length * z, prom.y, 2.6);
+stand(ship, -ship.beam * 0.46, 6, top.y, 2.6);
+stand(ship, ship.beam * 0.46, 6, top.y, 2.6);
+const sd = small.decks.filter((d) => d.name !== 'hold').reduce((a, b) => (b.length > a.length ? b : a));
+for (const z of [0.4, 0, -0.4]) stand(small, 0, small.length * z, sd.y, 2.2);
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  if (plant.bed < 0.85) plant.stoke();
+  plant.update(t.delta);
+  hold.update(t.delta);
+  fins.setWay(plant.way);          // she feeds her own stabilisers
+  fins.update(t.delta);
+  plant.setImmersion(hold.immersion);
+  const at = [ship.object.position.x, ship.object.position.z];
+  const sat = [small.object.position.x, small.object.position.z];
+  ship.update(t.delta, {
+    speed: Math.max(0, plant.way - fins.drag),   // comfort is not free
+    drift: plant.walk, loading: hold.loading, damping: fins.damping,
+  });
+  small.update(t.delta, { speed: 3.4 });
+  // Held on station: given way and left alone they are out of frame in
+  // minutes and the comparison becomes a picture of empty sea.
+  ship.object.position.x = at[0]; ship.object.position.z = at[1];
+  small.object.position.x = sat[0]; small.object.position.z = sat[1];
+
+  for (const p of posts) {
+    const m = p.on.motionAt(p.at.x, p.at.z, p.at.y);
+    const k = Math.max(0, Math.min(1, (m - 0.12) / 0.45));
+    p.mesh.material.color.setRGB(0.16 + k * 0.8, 0.78 - k * 0.68, 0.3 - k * 0.22);
+  }
+  game.camera.position.set(-186, 44, 150);
+  game.camera.lookAt(-38, 10, -6);
+});
+game.start();`,
+  },
+
+  {
     id: 'trim',
     title: 'Trim & the free surface',
     group: 'Worldbuilding',

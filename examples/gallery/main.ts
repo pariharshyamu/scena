@@ -60,6 +60,7 @@ import {
   createOarBank,
   createSteamPlant,
   createHold,
+  createStabilisers,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -126,6 +127,7 @@ import {
   type OarBank,
   type SteamPlant,
   type Hold,
+  type Stabilisers,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -146,6 +148,20 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  liner:
+    '<strong>SCENA — the liner</strong><br />' +
+    'The whole boat arc in one hull: a hold that trims and sinks her, a ' +
+    'steam plant that drives her, and fin stabilisers that take her roll out ' +
+    '— <em>and only while she is going somewhere</em>. A fin is a wing; stop ' +
+    'her and there is no water going past it, so she rolls exactly as badly ' +
+    'as a ship with none fitted while still paying the drag. The posts are ' +
+    'people standing perfectly still, coloured by how hard it is to stand ' +
+    'where each of them is: green amidships and low, red at the stem and out ' +
+    'on the bridge wings. That is the whole layout of a passenger ship, and ' +
+    'it falls out of two lever arms rather than a price list. Try ' +
+    '<code>gallerySteady(0)</code> to house the fins, or ' +
+    '<code>galleryLinerWay(0)</code> to stop her — the fins are still out, ' +
+    'and they have stopped working.',
   trim:
     '<strong>SCENA — trim &amp; the free surface</strong><br />' +
     'Four identical steamers, loaded four ways. Grey has nothing aboard: she ' +
@@ -301,6 +317,26 @@ const banks: Array<{ bank: OarBank; ship: DeckedShip; wake: Mesh }> = [];
  * ship trimmed two degrees by the head looks exactly like a ship that is not
  * once she has steamed out of frame.
  */
+/**
+ * The liner, and everything the boat arc built, in one hull.
+ *
+ * Her hold trims her and sinks her; her plant drives her; her fins take her
+ * roll out — and only while she is going somewhere. The posts are where the
+ * field is drawn: they are coloured by `motionAt`, which is what makes the
+ * quietest berth on the ship a thing you can SEE rather than a claim.
+ */
+let liner: {
+  ship: DeckedShip;
+  hold: Hold;
+  plant: SteamPlant;
+  fins: Stabilisers;
+  x0: number;
+  z0: number;
+  posts: Array<{ mesh: Mesh; at: Vector3; label: string }>;
+  small: DeckedShip;
+  smallPosts: Array<{ mesh: Mesh; at: Vector3; label: string }>;
+} | null = null;
+
 const trims: Array<{
   hold: Hold;
   ship: DeckedShip;
@@ -955,6 +991,118 @@ if (view === 'room') {
     banks.push({ bank, ship, wake });
   });
 
+} else if (view === 'liner') {
+  // THE PAYOFF. One ship, and every track in the boat arc doing its job at
+  // once: a hold that trims and sinks her, a plant that drives her, fins that
+  // steady her — and a field over her decks saying how hard it is to stand up
+  // in each place, which is the only one of the four you cannot photograph.
+  //
+  // So it is drawn. The posts are people standing perfectly still, coloured
+  // by `motionAt` where each of them is: green amidships and low, red at the
+  // bow and out on the bridge wings. That is not a decoration, it is the
+  // entire layout of a passenger ship, and it falls out of two lever arms.
+  scene.background = new Color(0x9cb8d0);
+  camera.far = 3000;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.86));
+  const key = new DirectionalLight(0xffffff, 1.75);
+  key.position.set(-14, 22, 16);
+  scene.add(key);
+  // A swell about half her length. At a wavelength near her own she takes it
+  // bow and stern at the same phase and does not pitch at all — correct, and
+  // a picture of a ship noticing nothing is a picture of nothing.
+  const sea = createOcean({ amplitude: 1.7, wavelength: 104, size: 2400, segments: 220 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const ship = createDeckedShip({ era: 'liner', seed: 12, palette });
+  ship.float((x, z) => sea.heightAt(x, z));
+  ship.object.position.set(0, 0, 0);
+  scene.add(ship.object);
+
+  const hold = createHold({ kind: 'liner', draft: ship.draft, seed: 9, palette });
+  ship.object.add(hold.object);
+  hold.load('main', 3800);
+  hold.load('fore', 1400);
+  hold.load('aft', 1200);
+  // PRESSED UP, not half. Four narrow tanks cost her almost nothing even
+  // slack, which is exactly why she is the ship people sleep on — but there
+  // is no reason to pay even that.
+  for (const c of hold.compartments) if (c.liquid && c.name !== 'bilge') hold.pump(c.name, 1);
+
+  const plant = createSteamPlant({ kind: 'triple', funnelHeight: 26, seed: 7, palette });
+  const top = ship.decks.filter((d) => d.name !== 'hold').reduce((a, b) => (b.y > a.y ? b : a));
+  plant.object.position.set(0, top.y, top.z + top.length * 0.1);
+  ship.object.add(plant.object);
+  plant.setDraught(1);
+  plant.setRegulator(1);
+  plant.setLink(0.45);
+
+  const fins = createStabilisers({
+    kind: 'activeFin',
+    beam: ship.beam,
+    deployed: true,
+    seed: 4,
+    palette,
+  });
+  ship.object.add(fins.object);
+
+  // Where people stand. Along her length on the promenade, and out on the
+  // wings of the highest deck she has.
+  const prom = ship.decks.reduce((lo, d) => (d.name === 'promenade' ? d : lo), ship.decks[0]);
+  const posts: Array<{ mesh: Mesh; at: Vector3; label: string }> = [];
+  const stand = (x: number, z: number, y: number, label: string): void => {
+    const mesh = new Mesh(
+      // BIG. A field drawn in colour is unreadable at a range where a 180 m
+      // ship fits in the frame unless the swatch is a few metres across.
+      new BoxGeometry(2.6, 7.5, 2.6),
+      new MeshStandardMaterial({ color: 0x53b06a, emissive: 0x0a0a0a, flatShading: true })
+    );
+    mesh.position.set(x, y + 3.75, z);
+    ship.object.add(mesh);
+    posts.push({ mesh, at: new Vector3(x, y, z), label });
+  };
+  for (const [z, name] of [
+    [ship.length * 0.44, 'stem'],
+    [ship.length * 0.26, 'fore'],
+    [0, 'amidships'],
+    [-ship.length * 0.26, 'aft'],
+    [-ship.length * 0.44, 'stern'],
+  ] as Array<[number, string]>) {
+    stand(0, z, prom.y, name);
+  }
+  stand(-ship.beam * 0.46, 6, top.y, 'port wing');
+  stand(ship.beam * 0.46, 6, top.y, 'stbd wing');
+  stand(0, 6, top.y, 'monkey island');
+
+  // AND A COASTER IN THE SAME SEA. One number over one ship is a number; the
+  // same number over two ships in one swell is the reason liners are 180 m
+  // long. Her posts are the same posts, and nothing about them is different.
+  const small = createDeckedShip({ era: 'steamer', seed: 15, palette });
+  small.float((x, z) => sea.heightAt(x, z));
+  small.object.position.set(-96, 0, -14);
+  small.object.rotation.y = 0.13;
+  scene.add(small.object);
+  const smallDeck = small.decks
+    .filter((d) => d.name !== 'hold')
+    .reduce((a, b) => (b.length > a.length ? b : a));
+  const smallPosts: Array<{ mesh: Mesh; at: Vector3; label: string }> = [];
+  for (const [z, name] of [
+    [small.length * 0.4, 'coaster stem'],
+    [0, 'coaster amidships'],
+    [-small.length * 0.4, 'coaster stern'],
+  ] as Array<[number, string]>) {
+    const mesh = new Mesh(
+      new BoxGeometry(2.2, 6.0, 2.2),
+      new MeshStandardMaterial({ color: 0x53b06a, emissive: 0x0a0a0a, flatShading: true })
+    );
+    mesh.position.set(0, smallDeck.y + 3.0, z);
+    small.object.add(mesh);
+    smallPosts.push({ mesh, at: new Vector3(0, smallDeck.y, z), label: name });
+  }
+
+  liner = { ship, hold, plant, fins, x0: 0, z0: 0, posts, small, smallPosts };
+
 } else if (view === 'trim') {
   // FOUR STEAMERS, IDENTICAL, LOADED FOUR WAYS.
   //
@@ -1495,6 +1643,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepTrim(dt);
   }
+  if (view === 'liner') {
+    for (const o of oceans) o.update(dt);
+    stepLiner(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1547,6 +1699,8 @@ renderer.setAnimationLoop(() => {
     placeSteamCamera();
   } else if (view === 'trim') {
     placeTrimCamera();
+  } else if (view === 'liner') {
+    placeLinerCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1634,6 +1788,76 @@ const stepOars = (dt: number): void => {
     bank.update(dt);
     ship.update(dt, { speed: bank.way, turn: bank.yaw * 0.25 });
   }
+};
+
+/**
+ * One tick of the whole boat arc.
+ *
+ * Four modules, four handshakes, and not one of them a throttle: the hold
+ * hands the hull a `loading`, the plant hands it a `way`, the fins hand it a
+ * `damping` — and the fins take their own input from the plant, because a
+ * wing with no water going past it is a bracket. The colour on the posts is
+ * `motionAt` at each of them, which is the fourth field in the trilogy.
+ */
+const stepLiner = (dt: number): void => {
+  if (!liner) return;
+  const { ship, hold, plant, fins, posts } = liner;
+  if (plant.bed < 0.85) plant.stoke();
+  plant.update(dt);
+  hold.update(dt);
+  // SHE FEEDS HER OWN STABILISERS. Nothing else in this file has a loop in it.
+  fins.setWay(plant.way);
+  fins.update(dt);
+  plant.setImmersion(hold.immersion);
+  ship.update(dt, {
+    // Comfort is not free, and this is where the bill is paid.
+    speed: Math.max(0, plant.way - fins.drag),
+    drift: plant.walk,
+    loading: hold.loading,
+    damping: fins.damping,
+  });
+  // Held on station, like the others: she does 20 knots and the read is what
+  // is happening ON her.
+  ship.object.position.x = liner.x0;
+  ship.object.position.z = liner.z0;
+
+  // The coaster: same sea, same posts, no fins and no hold — she is the
+  // control, and she is why the liner is 180 metres long. HELD ON STATION
+  // like everything else in this file; given way and left alone she is two
+  // kilometres downwind inside ten minutes and the comparison is a screenshot
+  // of one ship.
+  const sx = liner.small.object.position.x;
+  const sz = liner.small.object.position.z;
+  liner.small.update(dt, { speed: 3.4 });
+  liner.small.object.position.x = sx;
+  liner.small.object.position.z = sz;
+
+  // ONE scale for both ships. Two ranges, each normalised to its own hull,
+  // would make a coaster in a gale and a liner in a millpond the same colour
+  // and quietly delete the comparison the view exists for.
+  const paint = (list: typeof posts, on: DeckedShip): void => {
+    for (const p of list) {
+      const m = on.motionAt(p.at.x, p.at.z, p.at.y);
+      // Green where she is quiet, red where she is not. A scalar field has no
+      // other way of being in a photograph, and the caption says so.
+      // A FIXED scale, and one that spreads the band this actually lives in:
+      // quiet is around 0.15 and appalling is around 0.6, so a plain 0..1 ramp
+      // paints the whole ship the same olive and the field disappears into it.
+      const t = Math.max(0, Math.min(1, (m - 0.12) / 0.45));
+      const mat = p.mesh.material as MeshStandardMaterial;
+      mat.color.setRGB(0.16 + t * 0.8, 0.78 - t * 0.68, 0.3 - t * 0.22);
+      mat.emissive.setRGB(t * 0.5, (1 - t) * 0.26, 0.02);
+    }
+  };
+  paint(posts, ship);
+  paint(liner.smallPosts, liner.small);
+};
+
+/** Frame her from off the bow quarter and LOW, so the swell is a swell. */
+const placeLinerCamera = (): void => {
+  if (!liner) return;
+  camera.position.set(-186, 44, 150);
+  camera.lookAt(-38, 10, -6);
 };
 
 /**
@@ -1880,6 +2104,9 @@ declare global {
     galleryTrim: (level: number) => void;
     galleryTrimHole: (rate: number) => void;
     galleryTrimReport: () => Array<Record<string, unknown>>;
+    gallerySteady: (out: number) => void;
+    galleryLinerWay: (fraction: number) => void;
+    galleryLinerReport: () => Record<string, unknown>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -1938,6 +2165,7 @@ window.galleryStep = (dt: number) => {
   stepOars(dt);
   stepSteam(dt);
   stepTrim(dt);
+  stepLiner(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -2085,6 +2313,53 @@ window.gallerySteamParts = () => {
   });
   out.big = kids;
   return out;
+};
+
+/** Run her fins out, or house them. */
+window.gallerySteady = (out: number) => {
+  liner?.fins.deploy(out > 0.5);
+};
+
+/** Order her a speed: the regulator, and therefore the fins, follow it. */
+window.galleryLinerWay = (fraction: number) => {
+  if (!liner) return;
+  liner.plant.setRegulator(Math.max(0, Math.min(1, fraction)));
+  liner.plant.setLink(fraction > 0.02 ? 0.45 : 0);
+};
+
+/**
+ * What is happening on her, and where.
+ *
+ * `motionAt` per post is the point: one ship, one sea, one instant, and eight
+ * different answers to "how hard is it to stand up".
+ */
+window.galleryLinerReport = () => {
+  if (!liner) return {};
+  const { ship, hold, plant, fins, posts } = liner;
+  return {
+    knots: Number((ship ? plant.way * 1.94384 : 0).toFixed(2)),
+    coaster: liner.smallPosts.map((p) => ({
+      at: p.label,
+      motion: Number(liner!.small.motionAt(p.at.x, p.at.z, p.at.y).toFixed(3)),
+    })),
+    bar: Number(plant.pressure.toFixed(1)),
+    draught: Number(hold.draught.toFixed(2)),
+    gm: Number(hold.gm.toFixed(2)),
+    trimDeg: Number(((hold.loading.trim * 180) / Math.PI).toFixed(2)),
+    immersion: Number(hold.immersion.toFixed(2)),
+    finsOut: Number(fins.out.toFixed(2)),
+    damping: Number(fins.damping.toFixed(2)),
+    finDrag: Number(fins.drag.toFixed(2)),
+    biting: fins.biting,
+    rollDeg: Number(((ship.roll * 180) / Math.PI).toFixed(2)),
+    pitchDeg: Number(((ship.pitch * 180) / Math.PI).toFixed(2)),
+    motion: Number(ship.motion.toFixed(3)),
+    where: posts.map((p) => ({
+      at: p.label,
+      motion: Number(ship.motionAt(p.at.x, p.at.z, p.at.y).toFixed(3)),
+      heave: Number(ship.heaveAt(p.at.x, p.at.z, p.at.y).toFixed(3)),
+    })),
+  };
 };
 
 /** Pump every tank in the trim view to the same level. */
@@ -2319,6 +2594,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'oars') placeOarCamera();
   if (view === 'steam') placeSteamCamera();
   if (view === 'trim') placeTrimCamera();
+  if (view === 'liner') placeLinerCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
