@@ -58,6 +58,7 @@ import {
   moor,
   createGangway,
   createOarBank,
+  createSteamPlant,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -122,6 +123,7 @@ import {
   type Gangway,
   type Carrier,
   type OarBank,
+  type SteamPlant,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -142,6 +144,17 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  steam:
+    '<strong>SCENA — steam</strong><br />' +
+    '<em>Full ahead is not her fastest.</em> Two identical triples: the red ' +
+    'one is in full gear, the green one notched up to a cut-off she can ' +
+    'hold — <code>linkFor(3600)</code>. Red goes out in front and is then ' +
+    'overhauled, because the regulator spends a store the fire fills a ' +
+    'hundred times slower than the engine empties it. Yellow is banked: a ' +
+    'wisp, a needle at half, a crank that is not turning. Grey lit her fires ' +
+    'twenty minutes ago — black funnel, needle flat on its stop, dead in the ' +
+    'water, because below 100 °C there is no steam to have. Try ' +
+    '<code>gallerySteam(1)</code> to open them all right up.',
   oars:
     '<strong>SCENA — under oars</strong><br />' +
     'An oar is not a throttle, it is a <em>duty cycle</em>: the blade is in ' +
@@ -259,6 +272,22 @@ let moored: Mooring | null = null;
 let brow: Gangway | null = null;
 let berthShip: DeckedShip | null = null;
 const banks: Array<{ bank: OarBank; ship: DeckedShip; wake: Mesh }> = [];
+/**
+ * The four steam plants — in their OWN list, never in `ships`.
+ *
+ * `galleryStep` drives everything in `ships` at a flat five knots. Push a
+ * steamer in there and she makes way at exactly the speed of a ship with no
+ * engine in her, while her gauge, her crank and her funnel all report a
+ * perfectly plausible plant that is doing nothing whatever.
+ */
+const plants: Array<{
+  plant: SteamPlant;
+  ship: DeckedShip;
+  x0: number;
+  z0: number;
+  made: number;
+  label: string;
+}> = [];
 /**
  * People standing still on the three frames.
  *
@@ -897,6 +926,127 @@ if (view === 'room') {
     banks.push({ bank, ship, wake });
   });
 
+} else if (view === 'steam') {
+  // Four plants, three decisions and one state.
+  //
+  //   A  triple, FULL GEAR      — opened right up, and she will be beaten
+  //   B  triple, linkFor(1 h)   — notched up to a cut-off she can hold
+  //   C  compound, BANKED       — a wisp, a needle at half, a still crank
+  //   D  sidelever, COLD        — fires lit twenty minutes ago, dead in the water
+  //
+  // The whole module is in the gap between A and B, and the only way to see
+  // it is to let them run: A goes out in front and is then overhauled while
+  // her gauge sags and B's does not. The marker astern of each is where she
+  // started, so the race is a thing on the water rather than a number.
+  scene.background = new Color(0x9dbad2);
+  // Four ships that draw apart over two hours, plus a sixteen-metre funnel on
+  // each: the far plane is the reason four correct plants render as an empty
+  // sea, and this view is the third time in this file.
+  camera.far = 2600;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.86));
+  const key = new DirectionalLight(0xffffff, 1.7);
+  key.position.set(-10, 18, 12);
+  scene.add(key);
+  const sea = createOcean({ amplitude: 0.24, wavelength: 32, size: 1600, segments: 190 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const SET: Array<{
+    kind: 'sidelever' | 'compound' | 'triple' | 'launch';
+    label: string;
+    colour: number;
+    cold?: boolean;
+    banked?: boolean;
+    linked?: boolean;
+  }> = [
+    { kind: 'triple', label: 'full gear', colour: 0xd8483a },
+    { kind: 'triple', label: 'notched up', colour: 0x53b06a, linked: true },
+    { kind: 'compound', label: 'banked', colour: 0xe0a531, banked: true },
+    { kind: 'sidelever', label: 'cold', colour: 0x7a8b99, cold: true },
+  ];
+
+  SET.forEach((it, i) => {
+    const ship = createDeckedShip({ era: 'steamer', seed: i + 11, palette });
+    ship.float((x, z) => sea.heightAt(x, z));
+    ship.object.position.set(-72 + i * 48, 0, -40);
+    scene.add(ship.object);
+
+    const plant = createSteamPlant({
+      kind: it.kind,
+      pressure: it.cold ? 0 : undefined,
+      funnelHeight: 15,
+      seed: i + 3,
+      palette,
+    });
+    // ON THE UPPER DECK, WELL FORWARD — not where an engine actually lives.
+    //
+    // Her lowest deck is the honest place for a boiler and it is also inside
+    // the hull, behind the deckhouse, under the bulwark: the first cut of this
+    // view put it there and rendered a funnel sticking out of a black slab,
+    // with four and a half metres of boiler, a crankshaft and three cylinder
+    // blocks all correctly built and entirely invisible. The plant goes
+    // wherever the caller puts it; here it is on deck because the point of
+    // this view is the machine.
+    // The longest deck she has that is not her hold, and a berth on it with
+    // room fore and aft: the plant is eleven metres long, and hung off the
+    // end of a short deck it stands in mid-air over the sea while every
+    // number about it is right.
+    const open = ship.decks.filter((d) => d.name !== 'hold');
+    // A PADDLER WANTS HER PLANT LOW. Her wheels are on the ends of the same
+    // shaft the engine turns, so a sidelever set up on the boat deck spins two
+    // three-metre wheels in clear air a storey above the sea, at exactly the
+    // revolutions the model says — the geometry a metre out while every number
+    // agrees. Screw ships do not care.
+    const deck = it.kind === 'sidelever'
+      ? open.reduce((a, b) => (b.y < a.y ? b : a))
+      : open.reduce((a, b) => (b.length > a.length ? b : a));
+    plant.object.position.set(0, deck.y, deck.z + deck.length * 0.3);
+    ship.object.add(plant.object);
+
+    if (it.cold) {
+      // Fires lit twenty minutes ago: the funnel is already smoking and the
+      // needle has not stirred, because there is no steam below 100 °C.
+      plant.setDraught(1);
+      plant.settle(20 * 60);
+    } else if (it.banked) {
+      plant.bank();
+      // Long enough to ARRIVE. A banked boiler drifts down over hours, and a
+      // ship banked for one of them is still showing very nearly working
+      // pressure — which looks exactly like a ship with steam up.
+      for (let k = 0; k < 12; k++) {
+        plant.bunker();
+        plant.settle(4 * 3600);
+      }
+    } else {
+      plant.setDraught(1);
+      plant.setRegulator(1);
+      plant.setLink(it.linked ? plant.linkFor(3600) : 1);
+    }
+
+    // A coloured staff at her stem, so the four are tellable apart in a still
+    // and the caption can name them.
+    const flag = new Mesh(
+      new BoxGeometry(0.5, 7.0, 0.5),
+      new MeshStandardMaterial({
+        color: it.colour,
+        emissive: it.colour,
+        emissiveIntensity: 0.3,
+        flatShading: true,
+      })
+    );
+    flag.position.set(0, deck.y + 4.5, deck.z - deck.length * 0.34);
+    ship.object.add(flag);
+    plants.push({
+      plant,
+      ship,
+      x0: ship.object.position.x,
+      z0: ship.object.position.z,
+      made: 0,
+      label: it.label,
+    });
+  });
+
 } else if (view === 'berth') {
   // A steamer lying alongside a harbour wall, working against her lines in a
   // slight swell, with the brow over. The five posts are the whole view:
@@ -1227,6 +1377,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepOars(dt);
   }
+  if (view === 'steam') {
+    for (const o of oceans) o.update(dt);
+    stepSteam(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1275,6 +1429,8 @@ renderer.setAnimationLoop(() => {
     camera.lookAt(0, 1.5, -0.6);
   } else if (view === 'oars') {
     placeOarCamera();
+  } else if (view === 'steam') {
+    placeSteamCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1365,6 +1521,45 @@ const stepOars = (dt: number): void => {
 };
 
 /**
+ * One tick of four steam plants.
+ *
+ * The handshake is two numbers wide and neither is a throttle: `way` goes
+ * into the hull's speed and `walk` into its drift. Nothing else passes, and
+ * SCENA's ship knows nothing at all about boilers.
+ *
+ * Somebody has to keep the fires in, and he throws coal on WHEN THE BED IS
+ * DOWN rather than every frame. Stoke on every tick and `green` never decays,
+ * so all four funnels stream the black puff of a fresh shovelful for ever and
+ * the one read that separates a working stokehold from a hard-driven one is
+ * gone — while `firing`, `bed` and every other number stay perfectly right.
+ */
+const stepSteam = (dt: number): void => {
+  for (const st of plants) {
+    // A GOOD fireman keeps his bed up. Let it burn down to half and the
+    // firing rate averages well under what the damper is calling for, and
+    // the cold ship's light-up quietly stops happening at all.
+    if (st.plant.bed < 0.85) st.plant.stoke();
+    st.plant.update(dt);
+    st.ship.update(dt, { speed: st.plant.way, drift: st.plant.walk });
+    // …AND THEN HELD ON STATION.
+    //
+    // Four ships making four different speeds cannot share a frame. Ten
+    // minutes in, the two triples are a kilometre from the two that are not
+    // moving, the camera pulls back far enough to hold them all, and the view
+    // is an empty sea with four perfectly correct plants somewhere in it —
+    // which is precisely what the first cut of this view rendered.
+    //
+    // So she steams: the hull is handed `way` and `walk` and works out her own
+    // motion from them, which is the whole handshake. Then she is put back.
+    // `made` is the distance she really covered, integrated from the same
+    // number, and it is what the report publishes.
+    st.made += st.plant.way * dt;
+    st.ship.object.position.x = st.x0;
+    st.ship.object.position.z = st.z0;
+  }
+};
+
+/**
  * Frame the three boats from ahead and to one side.
  *
  * From dead abeam the near boat hides the other two; from dead ahead the
@@ -1381,6 +1576,19 @@ const placeOarCamera = (): void => {
   const back = 40 + spread * 0.95;
   camera.position.set(mid.x - back * 0.62, 6 + back * 0.24, mid.z + back * 0.78);
   camera.lookAt(mid.x, 0.5, mid.z);
+};
+
+/**
+ * Frame the four steamers from off the bow quarter.
+ *
+ * FIXED, because they are held on station — and close enough that a funnel,
+ * a gauge and a crank are things you can see rather than four specks on a
+ * kilometre of water.
+ */
+const placeSteamCamera = (): void => {
+  if (!plants.length) return;
+  camera.position.set(-92, 26, 40);
+  camera.lookAt(6, 12, -34);
 };
 
 /** Frame the berth. Shared by the render loop and `galleryDebug`. */
@@ -1521,6 +1729,10 @@ declare global {
     galleryBerthReport: () => Record<string, unknown>;
     galleryOars: (rate: number, port?: number, starboard?: number) => void;
     galleryOarReport: () => Array<Record<string, unknown>>;
+    gallerySteam: (link: number, regulator?: number) => void;
+    gallerySteamFire: (draught: number) => void;
+    gallerySteamReport: () => Array<Record<string, unknown>>;
+    gallerySteamParts: () => Record<string, unknown>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -1577,6 +1789,7 @@ window.galleryStep = (dt: number) => {
   stepSail(dt);
   stepBerth(dt);
   stepOars(dt);
+  stepSteam(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1686,6 +1899,87 @@ window.galleryOarReport = () =>
     buried: bank.oars.filter((o) => o.buried).length,
     of: bank.oars.length,
     made: Number((ship.object.position.z - wake.position.z).toFixed(1)),
+  }));
+
+/**
+ * Where the plant's parts actually ARE, in world space.
+ *
+ * Every screenshot of this view so far has had a white box in it that nobody
+ * could name from the code, and an engine that should have been four metres
+ * tall and was nowhere. Guessing at a render is how a metre of error survives
+ * six correct numbers.
+ */
+window.gallerySteamParts = () => {
+  const first = plants[0];
+  if (!first) return {};
+  first.ship.object.updateMatrixWorld(true);
+  const out: Record<string, unknown> = {};
+  const box = (o: Object3D): number[] => {
+    const b = new Box3().setFromObject(o);
+    return [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map((n) => +n.toFixed(2));
+  };
+  out.ship = box(first.ship.object);
+  out.plant = box(first.plant.object);
+  for (const name of ['crosshead', 'crankpin', 'dieBlock', 'firebox:fire', 'gauge']) {
+    const o = first.plant.object.getObjectByName(name);
+    out[name] = o ? box(o) : 'MISSING';
+  }
+  const kids: string[] = [];
+  first.plant.object.children.forEach((c, i) => {
+    const b = new Box3().setFromObject(c);
+    const size = b.getSize(new Vector3());
+    if (size.length() > 2) {
+      kids.push(
+        `${i}:${c.type}${c.name ? '/' + c.name : ''} ` +
+          `${size.x.toFixed(1)}x${size.y.toFixed(1)}x${size.z.toFixed(1)} @y${b.min.y.toFixed(1)}`
+      );
+    }
+  });
+  out.big = kids;
+  return out;
+};
+
+/** Put all four in the same gear, for the headless run. */
+window.gallerySteam = (link: number, regulator = 1) => {
+  for (const { plant } of plants) {
+    plant.setRegulator(regulator);
+    plant.setLink(link);
+  }
+};
+
+/** Damper on all four: 0 draws the fires, 1 is flat out. */
+window.gallerySteamFire = (draught: number) => {
+  for (const { plant } of plants) plant.setDraught(draught);
+};
+
+/**
+ * What the four plants are doing, and how far it has got them.
+ *
+ * `made` is real metres, integrated from the same `way` the hull is handed —
+ * published beside the model's own scalars for exactly the class of bug where
+ * every number is right and the meshes are a metre above the sea.
+ */
+window.gallerySteamReport = () =>
+  plants.map(({ plant, made, label }) => ({
+    label,
+    kind: plant.kind,
+    state: plant.state,
+    bar: Number(plant.pressure.toFixed(2)),
+    of: plant.working,
+    balance: Number(plant.balance.toExponential(2)),
+    readiness: Number(plant.readiness.toFixed(2)),
+    firing: Number(plant.firing.toFixed(2)),
+    link: Number(plant.link.toFixed(2)),
+    cutoff: Number(plant.cutoff.toFixed(3)),
+    rpm: Number((plant.rev * 60).toFixed(1)),
+    knots: Number((plant.way * 1.94384).toFixed(2)),
+    blowing: plant.blowing,
+    onCentre: plant.onCentre,
+    soot: Number(plant.plumes[0].rate.toFixed(2)),
+    grease: Number(plant.plumes[1].rate.toFixed(2)),
+    needle: Number(plant.gauge.value.toFixed(2)),
+    endurance: Number((plant.endurance / 3600).toFixed(1)),
+    made: Number(made.toFixed(1)),
   }));
 
 /** Make her fast or let her go, for the headless run. */
@@ -1822,6 +2116,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'sail') placeSailCamera();
   if (view === 'berth') placeBerthCamera();
   if (view === 'oars') placeOarCamera();
+  if (view === 'steam') placeSteamCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

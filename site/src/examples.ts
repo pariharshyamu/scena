@@ -555,6 +555,90 @@ game.start();`,
   },
 
   {
+    id: 'steam',
+    title: 'Steam & cut-off',
+    group: 'Worldbuilding',
+    code: `// FULL AHEAD IS NOT HER FASTEST. Two identical triples: one in full gear,
+// one notched up to a cut-off she can hold. The regulator spends a store the
+// fire fills a hundred times slower than the engine empties it, so the ship
+// that opened her up leads for a while and is then overhauled — and her gauge
+// tells you why long before the distance does.
+import { createSteamPlant, createDeckedShip, createOcean, createSky,
+         createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const sea = createOcean({ amplitude: 0.24, wavelength: 32, size: 1200, segments: 170 });
+scene.add(sea.mesh);
+
+const SET = [
+  { kind: 'triple', colour: 0xd8483a, link: 1 },        // full gear
+  { kind: 'triple', colour: 0x53b06a, link: null },     // linkFor(3600)
+  { kind: 'compound', colour: 0xe0a531, banked: true }, // simmering
+  { kind: 'sidelever', colour: 0x7a8b99, cold: true },  // fires lit 20 min ago
+];
+
+const fleet = SET.map((it, i) => {
+  const ship = createDeckedShip({ era: 'steamer', seed: i + 11, palette });
+  ship.float((x, z) => sea.heightAt(x, z));
+  ship.object.position.set(-72 + i * 48, 0, -40);
+  scene.add(ship.object);
+
+  const plant = createSteamPlant({
+    kind: it.kind, pressure: it.cold ? 0 : undefined,
+    funnelHeight: 15, seed: i + 3, palette,
+  });
+  // On deck, where you can see it — and a PADDLER low, or her wheels spin in
+  // clear air a storey above the sea at exactly the right revolutions.
+  const open = ship.decks.filter((d) => d.name !== 'hold');
+  const deck = it.kind === 'sidelever'
+    ? open.reduce((a, b) => (b.y < a.y ? b : a))
+    : open.reduce((a, b) => (b.length > a.length ? b : a));
+  plant.object.position.set(0, deck.y, deck.z + deck.length * 0.3);
+  ship.object.add(plant.object);
+
+  if (it.cold) { plant.setDraught(1); plant.settle(20 * 60); }
+  else if (it.banked) { plant.bank(); plant.settle(12 * 3600); }
+  else {
+    plant.setDraught(1);
+    plant.setRegulator(1);
+    plant.setLink(it.link ?? plant.linkFor(3600));
+  }
+
+  const flag = new Mesh(new BoxGeometry(0.5, 7, 0.5),
+    new MeshStandardMaterial({ color: it.colour, emissive: it.colour,
+      emissiveIntensity: 0.3, flatShading: true }));
+  flag.position.set(0, deck.y + 4.5, deck.z - deck.length * 0.34);
+  ship.object.add(flag);
+  return { plant, ship, x0: ship.object.position.x, z0: ship.object.position.z };
+});
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  for (const f of fleet) {
+    // Somebody has to keep the fires in — and on a launch this does nothing,
+    // which is the whole era axis in one call.
+    if (f.plant.bed < 0.85) f.plant.stoke();
+    f.plant.update(t.delta);
+    // Two numbers wide, and neither is a throttle.
+    f.ship.update(t.delta, { speed: f.plant.way, drift: f.plant.walk });
+    // …then held on station, so four ships making four different speeds can
+    // share one frame instead of steaming over the horizon in ten minutes.
+    f.ship.object.position.x = f.x0;
+    f.ship.object.position.z = f.z0;
+  }
+  game.camera.position.set(-92, 26, 40);
+  game.camera.lookAt(6, 12, -34);
+});
+game.start();`,
+  },
+
+  {
     id: 'surge',
     title: 'Storm surge',
     group: 'Worldbuilding',

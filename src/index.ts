@@ -513,6 +513,25 @@ export {
   type Oar,
 } from './props/oars';
 export {
+  createSteamPlant,
+  pressureFor,
+  tempFor,
+  expansionRatio,
+  steamPerWork,
+  firesVisibleFrom,
+  STEAM_KINDS,
+  type SteamPlant,
+  type SteamPlantOptions,
+  type SteamKind,
+  type SteamState,
+  type SteamControl,
+} from './props/steamPlant';
+export {
+  createPressureGauge,
+  type PressureGauge,
+  type PressureGaugeOptions,
+} from './props/gauge';
+export {
   createDeckedShip,
   SHIP_ERAS,
   type DeckedShip,
