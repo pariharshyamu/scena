@@ -624,6 +624,68 @@ game.start();`,
   },
 
   {
+    id: 'booth',
+    title: 'The booth, web radio & DJ tiles',
+    group: 'Worldbuilding',
+    code: `// THE FIRST PROP IN THIS LIBRARY THAT IS NOT ALL HERE.
+// Click the scene to operate the woofer: it plays REAL web radio (SomaFM),
+// and every further click tunes the next channel. Under the radio runs a
+// seeded BED — when the stream buffers, stalls or refuses (autoplay, CORS,
+// a dead station), the bed takes the floor and the DJ tiles never know.
+// The ON-AIR lamp tells the truth: green = bed, red = radio, amber = the
+// radio dropped and the bed is holding.
+import { createWoofer, createDanceTiles } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial,
+  AmbientLight, DirectionalLight, Color } from 'three';
+
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0x07080c);
+scene.add(new AmbientLight(0x9aa4c0, 0.5));
+const key = new DirectionalLight(0xb8c4ff, 0.7);
+key.position.set(6, 12, 8);
+scene.add(key);
+const ground = new Mesh(new PlaneGeometry(60, 60),
+  new MeshStandardMaterial({ color: 0x111318, roughness: 0.9 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const rig = createWoofer({ seed: 11 });
+rig.object.scale.setScalar(1.8);          // the user asked for a BIG woofer
+rig.object.position.set(0, 0, -6.8);
+scene.add(rig.object);
+
+const tiles = createDanceTiles({ cols: 11, rows: 9, size: 1.0, seed: 11 });
+tiles.object.position.set(0, 0, 0.8);
+scene.add(tiles.object);
+
+// A dancer, so the beat is visible even off the floor.
+const dancer = new Mesh(new BoxGeometry(0.5, 1.75, 0.5),
+  new MeshStandardMaterial({ color: 0x3a3f4a, flatShading: true }));
+dancer.position.set(3.6, 0.875, 3.4);
+scene.add(dancer);
+
+// Auto-on: the deck idles on the bed, so the floor is alive before the
+// first click. THE CLICK is the real interaction — it starts the radio.
+rig.play();
+window.addEventListener('pointerdown', () => rig.operate());
+
+game.onUpdate((t) => {
+  rig.update(t.delta);
+  const pulse = rig.pulse();       // same shape whoever has the floor
+  tiles.feed(pulse);
+  tiles.update(t.delta);
+  dancer.material.color.setRGB(
+    0.23 + pulse.bass * 0.5, 0.25 + pulse.mid * 0.3, 0.29 + pulse.treble * 0.4);
+  dancer.position.y = 0.875 + pulse.bass * 0.12;
+  game.camera.position.set(6.5, 4.6, 9.5);
+  game.camera.lookAt(-0.5, 1.2, -3);
+});
+game.start();`,
+  },
+
+  {
     id: 'stacks',
     title: 'The PA, coverage & the echo',
     group: 'Worldbuilding',

@@ -146,7 +146,10 @@ const browser = await chromium.launch({
   ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
-const benign = (t) => /favicon|404|Failed to load resource|WebGL.*deprecat|pointer-lock|Unrecognized feature/i.test(t);
+// "AudioContext was not allowed to start" is Chrome's autoplay policy doing
+// its job on a page nobody has clicked — for a prop with a radio in it, that
+// warning IS the correct headless behaviour, not a defect.
+const benign = (t) => /favicon|404|Failed to load resource|WebGL.*deprecat|pointer-lock|Unrecognized feature|AudioContext was not allowed to start/i.test(t);
 
 const only = process.argv.slice(2);
 const page0 = await browser.newPage();

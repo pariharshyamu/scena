@@ -593,6 +593,20 @@ export {
   type BarrierSpec,
 } from './props/sound';
 export {
+  createWoofer,
+  createDanceTiles,
+  bedPulse,
+  RADIO_STATIONS,
+  type Woofer,
+  type WooferOptions,
+  type WooferState,
+  type RadioStation,
+  type RadioMedia,
+  type AudioPulse,
+  type DanceTiles,
+  type DanceTilesOptions,
+} from './props/woofer';
+export {
   createSeamark,
   geographicRange,
   luminousRange,

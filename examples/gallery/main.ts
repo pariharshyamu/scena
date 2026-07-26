@@ -71,6 +71,8 @@ import {
   createSeamark,
   createPlumbing,
   createPA,
+  createWoofer,
+  createDanceTiles,
   livesIn,
   NM,
   listFor,
@@ -148,6 +150,8 @@ import {
   type Plumbing,
   type PublicAddress,
   type PAEra,
+  type Woofer,
+  type DanceTiles,
   type MarkKind,
   type SmokeLayer,
   type Extractor,
@@ -181,6 +185,21 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  booth:
+    '<strong>SCENA — the booth</strong><br />' +
+    'The first prop in this library that is <em>not all here</em>. ' +
+    '<strong>Click anywhere</strong> to operate the woofer: it plays real ' +
+    'web radio (SomaFM), and every further click tunes the next channel. ' +
+    'The DJ tiles activated the moment the rig did, and they never find out ' +
+    'where the music comes from — they eat pulses, one direction, no ' +
+    'backchannel. Under the radio runs a seeded <em>bed</em>: when the ' +
+    'stream buffers, stalls or refuses (autoplay policy, CORS, a dead ' +
+    'station — the four ways a stream fails), the bed takes the floor and ' +
+    'the tiles never know. The ON-AIR lamp tells the truth the floor never ' +
+    'hears: <em>green</em> the bed, <em>red</em> the radio, <em>amber</em> ' +
+    'the radio has dropped and the bed is holding. Read ' +
+    '<code>galleryBooth()</code> for the honest state, or ' +
+    '<code>galleryBooth(2)</code> to tune DEF CON Radio.',
   stacks:
     '<strong>SCENA — the PA</strong><br />' +
     'The first prop here that reaches the <em>ear</em>. Four systems, every ' +
@@ -526,6 +545,16 @@ let flushed = false;
  * asked. The walkers exist because a scalar field has no other way of being
  * in a photograph.
  */
+/**
+ * One big woofer, one floor of DJ tiles, and a radio that is not all here.
+ *
+ * In a browser a click operates the rig — web radio, for real. Headless there
+ * is no gesture and no CORS, so the stream fails the way streams fail, the
+ * BED takes the floor, and the picture is alive and deterministic anyway —
+ * which is the entire design of the prop.
+ */
+let booth: { rig: Woofer; tiles: DanceTiles; label: Mesh } | null = null;
+
 const stacks: Array<{
   pa: PublicAddress;
   x0: number;
@@ -1368,6 +1397,54 @@ if (view === 'room') {
   raise(-4.5, 'gravity', 'gravity — loses the flow', 4);
   raise(4.5, 'mains', 'mains — loses the temperature', 6);
   raise(13.5, 'thermostatic', 'thermostatic — holds it', 8);
+
+} else if (view === 'booth') {
+  // THE FIRST PROP IN THIS LIBRARY THAT IS NOT ALL HERE.
+  //
+  // Operate the woofer and it plays WEB RADIO — a stream from outside the
+  // process, that buffers, stalls and dies on its own schedule. The DJ tiles
+  // activate the moment the rig does, and they never find out where the music
+  // is coming from: they eat pulses, and the rig's seeded bed covers every
+  // gap the network leaves. The ON-AIR lamp tells the truth the floor never
+  // hears: green = the bed, red = the radio, amber = the radio has dropped
+  // and the bed is holding.
+  scene.background = new Color(0x07080c);
+  scene.add(new AmbientLight(0x9aa4c0, 0.5));
+  const key = new DirectionalLight(0xb8c4ff, 0.7);
+  key.position.set(6, 12, 8);
+  scene.add(key);
+  const floor = new Mesh(
+    new PlaneGeometry(60, 60),
+    new MeshStandardMaterial({ color: 0x111318, roughness: 0.9 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  const rig = createWoofer({ seed: 11 });
+  // The user asked for a BIG woofer. At 1.9 m she is a cabinet; at three
+  // metres she is a wall, which is what the front of a dance floor has.
+  rig.object.scale.setScalar(1.8);
+  rig.object.position.set(0, 0, -6.8);
+  scene.add(rig.object);
+
+  const tiles = createDanceTiles({ cols: 11, rows: 9, size: 1.0, seed: 11 });
+  tiles.object.position.set(0, 0, 0.8);
+  scene.add(tiles.object);
+
+  // The person the floor is for — lit by whether there is anything to dance to.
+  const label = new Mesh(
+    new BoxGeometry(0.5, 1.75, 0.5),
+    new MeshStandardMaterial({ color: 0x3a3f4a, emissive: 0x0a0a0a, flatShading: true })
+  );
+  label.position.set(3.6, 0.875, 3.4);
+  scene.add(label);
+
+  // Auto-on: the deck idles on the bed so the view is alive with no gesture.
+  // A CLICK is the real interaction — it starts (then tunes) the web radio.
+  rig.play();
+  renderer.domElement.addEventListener('pointerdown', () => rig.operate());
+
+  booth = { rig, tiles, label };
 
 } else if (view === 'stacks') {
   // FOUR SYSTEMS, ONE JOB, AND THE BILL GOES TO SOMEBODY WHO WAS NOT ASKED.
@@ -2414,6 +2491,8 @@ renderer.setAnimationLoop(() => {
     placePlumbingCamera();
   } else if (view === 'stacks') {
     placeStacksCamera();
+  } else if (view === 'booth') {
+    placeBoothCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -2680,6 +2759,33 @@ STEPPERS.push(stepPlumbing);
  * handshake and the reason `levelAt` takes a point rather than living on a
  * character.
  */
+
+/**
+ * One tick of the booth. The coupling on show: rig -> pulse -> tiles, one
+ * direction, no backchannel — a dropout upstream cannot reach the floor.
+ */
+const stepBooth = (dt: number): void => {
+  if (!booth) return;
+  booth.rig.update(dt);
+  const pulse = booth.rig.pulse();
+  booth.tiles.feed(pulse);
+  booth.tiles.update(dt);
+  const mat = booth.label.material as MeshStandardMaterial;
+  if (pulse.beat) mat.emissive.setRGB(0.25, 0.2, 0.05);
+  else {
+    mat.emissive.multiplyScalar(Math.max(0, 1 - dt * 6));
+  }
+  mat.color.setRGB(0.23 + pulse.bass * 0.4, 0.25 + pulse.mid * 0.3, 0.29 + pulse.treble * 0.35);
+};
+STEPPERS.push(stepBooth);
+
+/** Low and close, like standing at the back of the floor. */
+const placeBoothCamera = (): void => {
+  if (!booth) return;
+  camera.position.set(6.5, 4.6, 9.5);
+  camera.lookAt(-0.5, 1.2, -3);
+};
+
 const stepStacks = (dt: number): void => {
   if (!stacks.length) return;
   stackClock = (stackClock + dt * 8) % 240;
@@ -3231,6 +3337,7 @@ declare global {
     galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
     galleryStacks: (haas: number) => void;
+    galleryBooth: (station?: number) => Record<string, unknown>;
     galleryStacksReport: () => Array<Record<string, unknown>>;
     galleryDoors: (open: number) => void;
     gallerySinks: (fresh: number) => void;
@@ -3411,6 +3518,29 @@ const circularSpread = (phases: number[]): number => {
  * 0.012 (right), 0 (combs), 0.25 (everybody hears it twice) and read
  * `galleryStacksReport()`.
  */
+
+/**
+ * Tune the booth (or just read it). `galleryBooth()` reports; a number tunes
+ * that station. The read that matters is `state`: 'live' is the one this
+ * module cannot fake, and everything else says who is covering.
+ */
+window.galleryBooth = (station?: number) => {
+  if (!booth) return {};
+  if (typeof station === 'number') booth.rig.play(station);
+  const p = booth.rig.pulse();
+  return {
+    state: booth.rig.state,
+    station: booth.rig.station?.name ?? null,
+    bpm: Math.round(p.bpm),
+    bass: Number(p.bass.toFixed(2)),
+    mid: Number(p.mid.toFixed(2)),
+    treble: Number(p.treble.toFixed(2)),
+    tilesLit: booth.tiles.litCount(),
+    activated: booth.tiles.activated,
+    dBAat6m: Number(booth.rig.levelAt(0, 0).toFixed(1)),
+  };
+};
+
 window.galleryStacks = (haas: number) => {
   for (const r of stacks) r.pa.alignDelays(haas);
 };
@@ -4053,6 +4183,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'coast') placeCoastCamera();
   if (view === 'plumbing') placePlumbingCamera();
   if (view === 'stacks') placeStacksCamera();
+  if (view === 'booth') placeBoothCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
