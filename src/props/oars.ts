@@ -211,6 +211,21 @@ const wrap01 = (t: number): number => t - Math.floor(t);
 const bump = (t: number): number => Math.sin(Math.PI * clamp01(t)) ** 1.4;
 
 /**
+ * Smooth 0→1 — the shape of a swing, not of a ramp.
+ *
+ * An oar accelerates away from the catch and comes off the pressure before
+ * the finish; it does not jump to full speed the instant the blade touches.
+ * That matters past the look of it, because ANIMA's rower is solved onto
+ * this same path: a handle moving at full speed from the first instant
+ * leaves nothing for his legs to do and forces his elbows to bend at the
+ * catch, which is the one thing a rower's arms must not do.
+ */
+const ease = (t: number): number => {
+  const u = clamp01(t);
+  return u * u * (3 - 2 * u);
+};
+
+/**
  * A bank of oars.
  *
  * Parent it to a hull. The origin is the hull's origin, +z forward, so the
@@ -521,8 +536,8 @@ export function createOarBank(options: OarBankOptions = {}): OarBank {
         // The recovery is the longer half, so it comes back slower than it
         // went — the tell that separates rowing from a windscreen wiper.
         const swing = inWater
-          ? p / spec.drive
-          : 1 - (p - spec.drive) / (1 - spec.drive);
+          ? ease(p / spec.drive)
+          : 1 - ease((p - spec.drive) / (1 - spec.drive));
         const reach = 0.62 + 0.12 * Math.abs(effort);
         b.pivot.rotation.y = b.side * (reach * (swing - 0.5) * 2) * -1;
         // Lift: buried through the drive, clear of the water on the way
@@ -571,7 +586,7 @@ export const OAR_GRIP = {
 export function oarGripAt(phase: number, out = new Vector3()): Vector3 {
   const p = wrap01(phase);
   const drive = 0.4;
-  const swing = p < drive ? p / drive : 1 - (p - drive) / (1 - drive);
+  const swing = p < drive ? ease(p / drive) : 1 - ease((p - drive) / (1 - drive));
   return out.set(
     0,
     OAR_GRIP.height + (1 - swing) * 0.08,
