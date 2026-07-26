@@ -159,6 +159,15 @@ export interface DeckedShip extends Prop, DeckField {
   beam: number;
   /** Height of her main rail above the waterline — where lines are led. */
   freeboard: number;
+  /**
+   * How deep she is DRAWN, m: keel to waterline, as her hull mesh was built.
+   *
+   * Published because anything that makes her float higher or lower has to
+   * measure from the same datum she was drawn to. A hold that measures its
+   * sinkage from its own load line instead lifts the whole ship clear of the
+   * sea by the difference, and every number about her stays correct.
+   */
+  draft: number;
   decks: DeckLevel[];
   ladders: Companionway[];
   /** Where somebody steers. */
@@ -447,6 +456,7 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
     length: L,
     beam: B,
     freeboard: spec.freeboard,
+    draft: spec.draft,
     decks,
     ladders,
     helm,
@@ -531,7 +541,13 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
         const port = sampler(x - cos * B * 0.5, z + sin * B * 0.5);
         const starboard = sampler(x + cos * B * 0.5, z - sin * B * 0.5);
 
-        const wantY = (bow + stern + port + starboard) / 4;
+        // SINKAGE IS PART OF WHERE SHE IS HEADING, not something done to her
+        // afterwards. Subtracted from `position.y` after the easing it is
+        // applied AGAIN every frame and never taken off, so it accumulates
+        // into a leaky integrator and settles at `sink / k` — a light steamer
+        // ends up twenty-two metres in the air, at 60 fps, with every number
+        // about her load perfectly correct.
+        const wantY = (bow + stern + port + starboard) / 4 - (input.loading?.sink ?? 0);
         const wantPitch = Math.atan2(stern - bow, L * 0.8) * spec.gain;
         const wantRoll = Math.atan2(port - starboard, B) * spec.gain;
         // A stiff ship answers the sea FASTER. That is the same claim as a
@@ -555,7 +571,6 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
         // reads back out of the model perfectly and puts her stem in the air.
         group.rotation.x = pitch + (input.loading?.trim ?? 0);
         group.rotation.z = roll - (input.loading?.list ?? 0);
-        group.position.y -= input.loading?.sink ?? 0;
 
         // How hard it is to stand up: the RATE, not the angle. A vessel
         // heeled steadily at ten degrees under sail is easy to walk on; the

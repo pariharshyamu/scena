@@ -591,7 +591,9 @@ const fleet = SET.map((it, i) => {
   ship.object.position.set(-108 + i * 72, 0, -34);
   scene.add(ship.object);
 
-  const hold = createHold({ kind: 'steamer', seed: i + 5, palette });
+  // HER OWN DRAFT, not the hold's load line: sinkage is measured from the
+  // depth the hull was drawn to, or she floats clear of the sea.
+  const hold = createHold({ kind: 'steamer', draft: ship.draft, seed: i + 5, palette });
   ship.object.add(hold.object);
   // THE SIDE IS PART OF THE STOWAGE. Move the cargo's mesh and leave its
   // tonnage on the centreline and she reads as laden with a list of 0.00°.

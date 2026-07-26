@@ -218,6 +218,35 @@ describe('where you put it, not how much of it', () => {
     expect(list).toBeGreaterThan(trim * 3);
   });
 
+  it('SHE IS IN THE WATER, at every load, and that is measured off the hull', () => {
+    // The claim nothing else here makes: not that the numbers agree with each
+    // other, but that the mesh is wet. A hold measuring its sinkage from its
+    // own load line while the hull was drawn to a different one lifts the
+    // whole ship clear of the sea, at every load, with every number correct.
+    const ship = createDeckedShip({ era: 'steamer' });
+    expect(ship.draft).toBeGreaterThan(0);
+    const h = createHold({ kind: 'steamer', draft: ship.draft });
+    ship.object.add(h.object);
+    ship.float(() => 0);
+
+    for (const load of [0, 0.3, 0.8, 1]) {
+      const g = createHold({ kind: 'steamer', draft: ship.draft });
+      laden(g, load);
+      const s2 = createDeckedShip({ era: 'steamer' });
+      s2.float(() => 0);
+      for (let i = 0; i < 240; i++) s2.update(1 / 60, { loading: g.loading });
+      s2.object.updateMatrixWorld(true);
+      // Her keel, in world space. The sea is at zero.
+      const keel = s2.object.localToWorld(new Vector3(0, -s2.draft, 0)).y;
+      expect(keel, `at ${load} of capacity her keel is out of the water`).toBeLessThan(-0.05);
+      // …and her main deck is NOT under it.
+      const deck = s2.object.localToWorld(new Vector3(0, s2.freeboard, 0)).y;
+      expect(deck, `at ${load} of capacity her deck is awash`).toBeGreaterThan(0.05);
+      // How deep she floats is how deep she floats: keel to the sea.
+      expect(-keel).toBeCloseTo(g.draught, 1);
+    }
+  });
+
   it('sinkage is real metres and it comes off her freeboard', () => {
     const h = createHold({ kind: 'steamer' });
     const light = h.draught;
@@ -226,6 +255,10 @@ describe('where you put it, not how much of it', () => {
     expect(h.draught).toBeGreaterThan(light + 1);
     expect(h.freeboard).toBeLessThan(board - 1);
     expect(h.loading.sink).toBeCloseTo(h.draught - 3.6, 5);
+    // …and against a hull's datum instead, it is measured from THAT.
+    const g = createHold({ kind: 'steamer', draft: 2.6 });
+    laden(g);
+    expect(g.loading.sink).toBeCloseTo(g.draught - 2.6, 5);
     expect(h.toMarks).toBeGreaterThan(0.5);
   });
 });

@@ -217,6 +217,20 @@ export interface HoldOptions {
   beam?: number;
   /** Tonnes of hull, engines and everything that is not cargo. */
   lightship?: number;
+  /**
+   * How deep the HULL she is going into is drawn, m — `DeckedShip.draft`.
+   *
+   * `sink` is measured from this, because it is the datum the hull mesh was
+   * built to. Leave it out and the hold measures from its own load line
+   * instead: a ship loaded exactly to her marks is then lifted clear of the
+   * water by the difference between the two, a light one is lifted almost
+   * out of it altogether, and there is no number anywhere that says so.
+   *
+   * ```ts
+   * createHold({ kind: 'steamer', draft: ship.draft });
+   * ```
+   */
+  draft?: number;
   /** Start her loaded. Names not in the kind are ignored. */
   cargo?: Record<string, number>;
   seed?: number;
@@ -352,6 +366,10 @@ export function createHold(options: HoldOptions = {}): Hold {
     beam: options.beam ?? base.beam,
     lightship: options.lightship ?? base.lightship,
   };
+  // The datum her sinkage is measured from. Defaults to her own marks so a
+  // hold on its own is self-consistent; pass the hull's if she is going into
+  // one, because that is the depth the mesh was drawn to.
+  const drawnDraft = options.draft ?? base.marks;
   const seed = options.seed ?? 1;
   const rng = new Rng(seed);
   const palette = options.palette ?? DEFAULT_PALETTE;
@@ -664,7 +682,7 @@ export function createHold(options: HoldOptions = {}): Hold {
       const loll = Math.min(0.45, Math.sqrt(Math.max(0, -gm) / Math.max(0.2, bm)) * 1.6);
       loading.list = (mx >= 0 ? 1 : -1) * loll;
     }
-    loading.sink = draught - spec.marks;
+    loading.sink = draught - drawnDraft;
     // A stiff ship snaps back. The hull's own easing is how fast she answers
     // the sea, and this is the same claim from the other side.
     // A ship with no positive stability does not roll about upright at all —

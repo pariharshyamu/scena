@@ -1000,7 +1000,10 @@ if (view === 'room') {
     ship.object.position.set(-108 + i * 72, 0, -34);
     scene.add(ship.object);
 
-    const hold = createHold({ kind: 'steamer', seed: i + 5, palette });
+    // HER OWN DRAFT, not the hold's load line. Sinkage has to be measured
+    // from the depth the hull mesh was drawn to, or she floats a metre
+    // clear of the sea at every load with every number correct.
+    const hold = createHold({ kind: 'steamer', draft: ship.draft, seed: i + 5, palette });
     ship.object.add(hold.object);
     // Loaded through `load` and never through `cargo`, because THE SIDE IS
     // PART OF THE STOWAGE. The first cut of this view moved the yellow ship's

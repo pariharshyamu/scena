@@ -5,7 +5,10 @@ Everything else in this library that has a mass has it at its origin. A hold doe
 ```js
 import { createHold } from 'scena3d';
 
-const hold = createHold({ kind: 'steamer' });
+// `draft` is the depth the HULL was drawn to. Her sinkage is measured from
+// it, because that is the datum her mesh was built on — leave it out and she
+// floats clear of the sea at every load, with every number about her correct.
+const hold = createHold({ kind: 'steamer', draft: ship.draft });
 ship.object.add(hold.object);
 
 hold.load('fore', 300);        // and she goes down by the head
@@ -118,6 +121,11 @@ hold.toMarks;     // 0 light, 1 down to her marks, >1 overloaded
 hold.draught;
 hold.freeboard;
 ```
+
+`sink` is measured from `HoldOptions.draft` — **the hull's own drawn draft**, not the hold's load line. They are two different numbers and the hold cannot see either the hull or its mesh, so you have to hand it over. Two things go wrong if you do not, and neither of them shows up in a single scalar:
+
+- She floats a constant metre clear of the sea at *every* load, because the two datums differ by that much.
+- And sinkage is part of where she is **heading**, not something done to her after she gets there. Subtract it from `position.y` after the hull has eased and it is applied again every frame and never taken off — a leaky integrator that settles at `sink / k`, which put a light steamer twenty-two metres in the air at 60 fps while her draught read 1.25 m.
 
 The Plimsoll marks are an instrument with no moving parts: they stay where they are painted and the **sea comes up them**. Nothing else in SCENA reads out by not moving. In the hull's frame the mark group descends by exactly `loading.sink`, so in the world it holds still and the waterline climbs.
 
