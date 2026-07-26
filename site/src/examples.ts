@@ -573,6 +573,9 @@ import { Game } from 'gama3d';
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// Bigger than the default camera's thousand-unit far plane.
+game.camera.far = 4000;
+game.camera.updateProjectionMatrix();
 scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
 
 const state = createSeaState({ kind: 'ocean' });
@@ -640,6 +643,11 @@ import { Color, AmbientLight, DirectionalLight, Group, Mesh, SphereGeometry,
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// The default game camera sees a THOUSAND units. This scene is bigger than
+// that, so without this the far plane quietly clips it away — a frame that
+// renders, reports no error, and shows nothing.
+game.camera.far = 14400;
+game.camera.updateProjectionMatrix();
 // NIGHT, because a light view in daylight is a view of a building.
 scene.background = new Color(0x0a1622);
 scene.add(new AmbientLight(0x93a9c4, 0.24));
@@ -804,6 +812,9 @@ import { Game } from 'gama3d';
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// Bigger than the default camera's thousand-unit far plane.
+game.camera.far = 2000;
+game.camera.updateProjectionMatrix();
 scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
 
 const sea = createOcean({ amplitude: 0.3, wavelength: 34, size: 1200, segments: 180 });
@@ -899,6 +910,9 @@ import { Mesh, BoxGeometry, MeshStandardMaterial, Vector3 } from 'three';
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// Bigger than the default camera's thousand-unit far plane.
+game.camera.far = 3840;
+game.camera.updateProjectionMatrix();
 scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
 
 // A swell about half her length. At a wavelength near her own she meets it
@@ -994,6 +1008,9 @@ import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three';
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// Bigger than the default camera's thousand-unit far plane.
+game.camera.far = 2560;
+game.camera.updateProjectionMatrix();
 scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
 
 // A SLIGHT swell: the read is the steady lean a load puts on her, and a metre
@@ -1068,6 +1085,9 @@ import { Mesh, BoxGeometry, MeshStandardMaterial } from 'three';
 const palette = PALETTES.meadow;
 const game = new Game();
 const scene = game.world.scene;
+// Bigger than the default camera's thousand-unit far plane.
+game.camera.far = 2000;
+game.camera.updateProjectionMatrix();
 scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
 
 const sea = createOcean({ amplitude: 0.24, wavelength: 32, size: 1200, segments: 170 });
