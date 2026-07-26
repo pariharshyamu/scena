@@ -119,12 +119,26 @@ export interface ShipInput {
   speed?: number;
   /** Rate of turn, radians/s. */
   turn?: number;
+  /**
+   * Motion that is NOT along her own heading, m/s in world x and z.
+   *
+   * A vessel making way goes where she is pointing; a vessel being set by a
+   * tide, blown down onto a wall, or held off it by her own mooring lines
+   * does not, and there is no value of `speed` and `turn` that says so. It
+   * is applied inside `update` rather than by the caller writing `position`
+   * afterwards, because everything `ride` does depends on the frame delta
+   * being taken across ALL of a frame's movement — a ship warped sideways
+   * after her own update leaves her crew standing where she used to be.
+   */
+  drift?: { x: number; z: number };
 }
 
 export interface DeckedShip extends Prop, DeckField {
   era: ShipEra;
   length: number;
   beam: number;
+  /** Height of her main rail above the waterline — where lines are led. */
+  freeboard: number;
   decks: DeckLevel[];
   ladders: Companionway[];
   /** Where somebody steers. */
@@ -412,6 +426,7 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
     era,
     length: L,
     beam: B,
+    freeboard: spec.freeboard,
     decks,
     ladders,
     helm,
@@ -478,6 +493,10 @@ export function createDeckedShip(options: DeckedShipOptions = {}): DeckedShip {
       if (speed) {
         group.position.x += Math.sin(group.rotation.y) * speed * dt;
         group.position.z += Math.cos(group.rotation.y) * speed * dt;
+      }
+      if (input.drift) {
+        group.position.x += input.drift.x * dt;
+        group.position.z += input.drift.z * dt;
       }
 
       // Ride the sea. Same four-point sample as the existing hulls, but the

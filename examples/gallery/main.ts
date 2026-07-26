@@ -8,6 +8,7 @@ import {
   DirectionalLight,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   PerspectiveCamera,
   PlaneGeometry,
   Quaternion,
@@ -53,6 +54,9 @@ import {
   createOcean,
   createSailRig,
   createWindField,
+  createBerth,
+  moor,
+  createGangway,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -112,6 +116,10 @@ import {
   type Ocean,
   type SailRig,
   type WindField,
+  type Berth,
+  type Mooring,
+  type Gangway,
+  type Carrier,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -132,6 +140,16 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  berth:
+    '<strong>SCENA — alongside</strong><br />' +
+    'A rope is a <em>one-way</em> constraint: it pulls, and it can never ' +
+    'push. A fender is the same thing backwards. She is held in the gap ' +
+    'between them, which is why she is never quite still. The five posts ' +
+    'are people standing perfectly still — and <em>nothing</em> moves them ' +
+    'but the <code>ride()</code> of whatever they are on. The one ashore ' +
+    'never budges, the one on deck goes everywhere she goes, and the three ' +
+    'on the brow move by fractions in between. Try ' +
+    '<code>galleryMoor(0)</code> to let go.',
   sail:
     '<strong>SCENA — sail</strong><br />' +
     'Four rigs, six centuries, one breeze. The arrow is the wind. Nobody can ' +
@@ -226,6 +244,21 @@ const rigs: Array<{ rig: SailRig; ship: DeckedShip; label: Mesh }> = [];
 const KINDS_MAST = { square: 11, lateen: 10, gaff: 12, bermudan: 13 };
 let breeze: WindField | null = null;
 let windVane: Mesh | null = null;
+let berth: Berth | null = null;
+let moored: Mooring | null = null;
+let brow: Gangway | null = null;
+let berthShip: DeckedShip | null = null;
+/**
+ * People standing still on the three frames.
+ *
+ * Nothing ever writes their x/z except the `ride` of whatever they are
+ * standing on. If the one on the quay stays put, the one on deck travels
+ * with the ship, and the ones on the plank move by fractions in between,
+ * the handshake works — and that is a thing you can watch rather than a
+ * number you have to trust.
+ */
+const standers: Array<{ on: Carrier; at: Vector3; post: Mesh; carried: number }> = [];
+let heave = 0;
 const UP = new Vector3(0, 1, 0);
 const plumes: SmokeSource[] = [];
 let smokeRoom: SmokeLayer | null = null;
@@ -802,6 +835,78 @@ if (view === 'room') {
   head.position.set(22, 0, 0);
   windVane.add(head);
 
+} else if (view === 'berth') {
+  // A steamer lying alongside a harbour wall, working against her lines in a
+  // slight swell, with the brow over. The five posts are the whole view:
+  // NOTHING moves them except the `ride` of the thing each is standing on.
+  // One on the quay, one on her deck, three spaced along the gangway — and
+  // if the middle one does not move by half of what the deck one does, the
+  // frames are not blending and somebody is being dragged into the harbour.
+  scene.background = new Color(0x9ab6cf);
+  camera.far = 900;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.85));
+  const key = new DirectionalLight(0xffffff, 1.7);
+  key.position.set(-9, 14, 7);
+  scene.add(key);
+
+  const sea = createOcean({ amplitude: 0.28, wavelength: 30, size: 500, segments: 150 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  berth = createBerth({ era: 'harbour', length: 68, bollards: 6, seed: 5, palette });
+  scene.add(berth.object);
+
+  berthShip = createDeckedShip({ era: 'steamer', seed: 4, palette });
+  berthShip.float((x, z) => sea.heightAt(x, z));
+  berthShip.object.position.set(11, 0, 0);
+  scene.add(berthShip.object);
+  // NOT into `ships`. That list is driven at five knots by `galleryStep`,
+  // and a moored ship steamed along her own quay while every number about
+  // the mooring stayed perfectly plausible — her lines held her off the
+  // wall the whole way.
+
+  moored = moor(berthShip, berth, { standoff: 1.0, seed: 2, palette });
+  scene.add(moored.object);
+
+  // The brow lands on her MAIN deck — `decks[0]` is the topmost, which on a
+  // steamer is her bridge, and a gangway to the bridge is a fire escape.
+  const main = berthShip.decks.reduce((lo, d) => (d.y < lo.y ? d : lo));
+  const landing = new Object3D();
+  landing.position.set(-berthShip.beam * 0.45, main.y, 2);
+  berthShip.object.add(landing);
+  brow = createGangway({ shore: berth.brow.anchor, ship: berthShip, landing, reach: 16, seed: 3, palette });
+  scene.add(brow.object);
+
+  // Settle her before anybody steps aboard.
+  for (let i = 0; i < 60 * 12; i++) berthShip.update(1 / 60, moored.hold(1 / 60));
+  brow.update(1 / 60);
+
+  berth.object.updateMatrixWorld(true);
+  berthShip.object.updateMatrixWorld(true);
+  const ashore = berth.brow.anchor.getWorldPosition(new Vector3());
+  const aboard = landing.getWorldPosition(new Vector3());
+  const post = (on: Carrier, at: Vector3, color: number): void => {
+    const y = on.deckAt(at.x, at.z);
+    if (y === null) return;
+    at.y = y;
+    const m = new Mesh(
+      new BoxGeometry(0.42, 1.75, 0.42),
+      new MeshStandardMaterial({ color, flatShading: true })
+    );
+    scene.add(m);
+    standers.push({ on, at, post: m, carried: 0 });
+  };
+  post(berth, ashore.clone().add(new Vector3(-1.4, 0, 0)), 0xf0efe8);
+  for (const t of [0.2, 0.5, 0.8]) {
+    post(
+      brow,
+      new Vector3().lerpVectors(ashore, aboard, t),
+      [0x53b06a, 0xe0a531, 0xd8483a][[0.2, 0.5, 0.8].indexOf(t)]
+    );
+  }
+  post(berthShip, aboard.clone().add(new Vector3(2.2, 0, -7)), 0x4f8fd8);
+
 } else if (view === 'water') {
   // Streams, a shower, a filling basin and steam, lit flatly. A water shader
   // that compiles is not water that moves — this is the only way to know.
@@ -1052,6 +1157,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepSail(dt);
   }
+  if (view === 'berth') {
+    for (const o of oceans) o.update(dt);
+    stepBerth(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1098,6 +1207,12 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'smoke') {
     camera.position.set(Math.sin(t * 0.08) * 1.2, 1.75, 5.4);
     camera.lookAt(0, 1.5, -0.6);
+  } else if (view === 'berth') {
+    // Along the quay and slightly above it, so the gap between hull and wall
+    // — the thing the whole track is about — is a gap you can see.
+    placeBerthCamera();
+    camera.position.z += Math.sin(t * 0.07) * 2.5;
+    camera.lookAt(2.0, 1.4, -5);
   } else if (view === 'sail') {
     placeSailCamera();
   } else if (view === 'ship') {
@@ -1164,6 +1279,57 @@ const broadsideOn = (fallback: number): number => {
     }
   }
   return best;
+};
+
+/** Frame the berth. Shared by the render loop and `galleryDebug`. */
+const placeBerthCamera = (): void => {
+  // Close in on the brow and the gap, from over the quay. The whole track is
+  // about a few metres of water and a plank across it, and a view that takes
+  // in the whole berth shows neither.
+  // Low, close to the face and looking ALONG it — the gap between hull and
+  // wall is a slot a metre wide, and from anywhere above it the ship's own
+  // bulwark covers it up. Two cuts of this view showed a hull apparently
+  // welded to the coping.
+  camera.position.set(-8.5, 7.6, 22);
+  camera.lookAt(2.0, 1.4, -5);
+};
+
+/**
+ * One tick alongside.
+ *
+ * Order matters and it is the same order as at sea: the mooring works out
+ * what the ropes and fenders are doing, `update` applies ALL of it, and only
+ * then does anybody standing on her get carried. Ride before update and the
+ * crew are moved by last frame's motion.
+ */
+const stepBerth = (dt: number): void => {
+  if (!moored || !berthShip) return;
+  heave += dt;
+  const held = moored.hold(dt);
+  // Something is always working her: a swell setting in past the pierhead.
+  held.drift.x += Math.sin(heave * 0.55) * 0.55;
+  held.drift.z += Math.sin(heave * 0.31 + 1.1) * 0.5;
+  // Let go and the tide sets her off the wall. Nothing is holding her —
+  // which is the point of letting go, and is what takes the brow with it.
+  if (berth && !moored.lines.some((l) => l.fast)) {
+    const off = berth.faceNormal(new Vector3());
+    held.drift.x += off.x * 1.1;
+    held.drift.z += off.z * 1.1;
+  }
+  berthShip.update(dt, held);
+  brow?.update(dt);
+  for (const s of standers) {
+    // THE ONLY thing that moves them.
+    const was = s.at.clone();
+    s.on.ride(s.at);
+    s.carried = Math.max(s.carried * 0.985, s.at.distanceTo(was) / Math.max(dt, 1e-4));
+    const y = s.on.deckAt(s.at.x, s.at.z, s.at.y);
+    if (y !== null) s.at.y = y;
+    s.post.position.copy(s.at);
+    s.post.position.y += 0.88;
+    s.post.quaternion.setFromUnitVectors(UP, s.on.normalAt(s.at.x, s.at.z));
+    s.post.visible = y !== null;
+  }
 };
 
 /**
@@ -1249,6 +1415,8 @@ declare global {
     galleryShut: (shut: number) => void;
     gallerySail: (mode: number, set?: number) => void;
     gallerySailReport: () => Array<Record<string, unknown>>;
+    galleryMoor: (fast: number) => void;
+    galleryBerthReport: () => Record<string, unknown>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -1303,6 +1471,7 @@ window.galleryStep = (dt: number) => {
   for (const v of vents) v.update(dt, 1);
   smokeRoom?.update(dt);
   stepSail(dt);
+  stepBerth(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1377,6 +1546,33 @@ window.gallerySailPositions = () => {
     vane: windVane ? windVane.position.toArray().map((n) => Number(n.toFixed(1))) : null,
   };
 };
+
+/** Make her fast or let her go, for the headless run. */
+window.galleryMoor = (fast: number) => {
+  if (!moored) return;
+  if (fast > 0.5) for (const l of moored.lines) l.makeFast();
+  else moored.cast();
+};
+
+/**
+ * Who moved, and by how much.
+ *
+ * The numbers behind the five posts. `carried` is the distance each one was
+ * shifted by its own frame's `ride` over the last few seconds — which for
+ * the quay must be zero, for the deck must be everything, and on the plank
+ * must land in between in order.
+ */
+window.galleryBerthReport = () => ({
+  gap: moored ? Number(moored.gap.toFixed(3)) : null,
+  surge: moored ? Number(moored.surge.toFixed(3)) : null,
+  alongside: moored?.alongside ?? null,
+  tension: moored ? moored.lines.map((l) => Number(l.tension.toFixed(3))) : null,
+  brow: brow
+    ? { rigged: brow.rigged, span: Number(brow.span.toFixed(2)), angle: Number(brow.angle.toFixed(3)) }
+    : null,
+  carried: standers.map((s) => Number(s.carried.toFixed(3))),
+  posts: standers.map((s) => [Number(s.at.x.toFixed(2)), Number(s.at.z.toFixed(2)), s.post.visible]),
+});
 
 /** Shut every dresser door, for the headless run. */
 window.galleryShut = (shut: number) => {
@@ -1483,6 +1679,7 @@ window.galleryLook = (x, y, z, tx, ty, tz) => {
 window.galleryDebug = (t?: number) => {
   if (typeof t === 'number') setTime(t);
   if (view === 'sail') placeSailCamera();
+  if (view === 'berth') placeBerthCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

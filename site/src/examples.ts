@@ -407,6 +407,91 @@ game.start();`,
   },
 
   {
+    id: 'berth',
+    title: 'Alongside',
+    group: 'Worldbuilding',
+    code: `// A rope is a ONE-WAY constraint: it pulls, and it can never push. A
+// fender is the same thing backwards. She is held in the gap between them,
+// which is why a ship alongside is never quite still. The three posts are
+// people standing perfectly still on three different frames — quay, gangway
+// and deck — and NOTHING moves them but the ride() of what they are on.
+import { createBerth, moor, createGangway, createDeckedShip, createOcean,
+         createSky, createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, Object3D, BoxGeometry, MeshStandardMaterial, Vector3 } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const sea = createOcean({ amplitude: 0.28, wavelength: 30, size: 400, segments: 140 });
+scene.add(sea.mesh);
+
+const berth = createBerth({ era: 'harbour', length: 68, bollards: 6, palette });
+scene.add(berth.object);
+
+const ship = createDeckedShip({ era: 'steamer', seed: 4, palette });
+ship.float((x, z) => sea.heightAt(x, z));
+ship.object.position.set(11, 0, 0);
+scene.add(ship.object);
+
+const lines = moor(ship, berth, { standoff: 1.0, palette });
+scene.add(lines.object);
+
+// The brow lands on her MAIN deck — decks[0] is the topmost, which on a
+// steamer is her bridge, and a gangway to the bridge is a fire escape.
+const main = ship.decks.reduce((lo, d) => (d.y < lo.y ? d : lo));
+const landing = new Object3D();
+landing.position.set(-ship.beam * 0.45, main.y, 2);
+ship.object.add(landing);
+const brow = createGangway({ shore: berth.brow.anchor, ship, landing, reach: 16, palette });
+scene.add(brow.object);
+
+// Settle her before anybody steps aboard.
+for (let i = 0; i < 60 * 12; i++) ship.update(1 / 60, lines.hold(1 / 60));
+brow.update(1 / 60);
+
+berth.object.updateMatrixWorld(true);
+ship.object.updateMatrixWorld(true);
+const ashore = berth.brow.anchor.getWorldPosition(new Vector3());
+const aboard = landing.getWorldPosition(new Vector3());
+const people = [];
+const stand = (on, at, color) => {
+  const y = on.deckAt(at.x, at.z);
+  if (y === null) return;
+  at.y = y;
+  const post = new Mesh(new BoxGeometry(0.42, 1.75, 0.42),
+    new MeshStandardMaterial({ color, flatShading: true }));
+  scene.add(post);
+  people.push({ on, at, post });
+};
+stand(berth, ashore.clone().add(new Vector3(-1.4, 0, 0)), 0xf0efe8);
+stand(brow, new Vector3().lerpVectors(ashore, aboard, 0.5), 0xe0a531);
+stand(ship, aboard.clone().add(new Vector3(2.2, 0, -7)), 0x4f8fd8);
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  const held = lines.hold(t.delta);
+  // A swell setting in past the pierhead — something is always working her.
+  held.drift.x += Math.sin(t.elapsed * 0.55) * 0.55;
+  held.drift.z += Math.sin(t.elapsed * 0.31 + 1.1) * 0.5;
+  ship.update(t.delta, held);
+  brow.update(t.delta);
+  for (const p of people) {
+    p.on.ride(p.at);                       // THE ONLY thing that moves them
+    const y = p.on.deckAt(p.at.x, p.at.z, p.at.y);
+    if (y !== null) p.at.y = y;
+    p.post.position.copy(p.at);
+    p.post.position.y += 0.88;
+  }
+  game.camera.position.set(-8.5, 7.6, 22 + Math.sin(t.elapsed * 0.07) * 2.5);
+  game.camera.lookAt(2, 1.4, -5);
+});
+game.start();`,
+  },
+
+  {
     id: 'surge',
     title: 'Storm surge',
     group: 'Worldbuilding',

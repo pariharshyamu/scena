@@ -483,6 +483,24 @@ export {
   type RigKind,
   type WindSource,
 } from './props/sail';
+
+export {
+  createBerth,
+  moor,
+  createGangway,
+  BERTH_ERAS,
+  type Berth,
+  type BerthEra,
+  type BerthOptions,
+  type Bollard,
+  type Mooring,
+  type MooringLine,
+  type MooringOptions,
+  type Moorable,
+  type Gangway,
+  type GangwayOptions,
+  type Carrier,
+} from './props/mooring';
 export {
   createDeckedShip,
   SHIP_ERAS,
