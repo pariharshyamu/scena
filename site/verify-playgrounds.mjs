@@ -176,15 +176,41 @@ for (const id of list) {
   // back does not work: three.js leaves `preserveDrawingBuffer` off, so every
   // canvas answers pure black and a verifier built on it calls a working scene
   // blank — which is how the last one passed an empty frame in both directions.
+  // An element screenshot forces a fresh compositor capture of the WebGL
+  // canvas, and with preserveDrawingBuffer off SwiftShader sometimes hands
+  // back a cleared buffer — a black frame for a scene that is rendering
+  // perfectly well on the page. The page-level capture can lose the same
+  // race. So a single blank capture is NOT a verdict: try the element, fall
+  // back to a page screenshot clipped to the canvas box (pixels already
+  // composited, no fresh readback), and give the whole sequence three goes
+  // with a breath between them. Only an example that is blank every way,
+  // every time, is blank.
+  const looksBlank = (m) => m.flattest > 0.985 && m.stdev < 1.5;
   let pix = { ok: false };
-  try {
-    const shot = await page
-      .frameLocator('iframe')
-      .locator('canvas')
-      .screenshot({ timeout: 8000 });
-    pix = { ok: true, ...measure(decodePng(shot)) };
-  } catch (e) {
-    pix = { ok: false, why: String(e).slice(0, 80) };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await page.waitForTimeout(1500);
+    try {
+      const shot = await page
+        .frameLocator('iframe')
+        .locator('canvas')
+        .screenshot({ timeout: 8000 });
+      pix = { ok: true, ...measure(decodePng(shot)) };
+    } catch (e) {
+      pix = { ok: false, why: String(e).slice(0, 80) };
+    }
+    if (pix.ok && !looksBlank(pix)) break;
+    try {
+      const box = await page.frameLocator('iframe').locator('canvas').boundingBox();
+      if (box && box.width > 8 && box.height > 8) {
+        const whole = await page.screenshot({
+          clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+          timeout: 8000,
+        });
+        const again = measure(decodePng(whole));
+        if (!looksBlank(again)) pix = { ok: true, via: 'page-clip', ...again };
+      }
+    } catch { /* keep the element reading */ }
+    if (pix.ok && !looksBlank(pix)) break;
   }
   const banner = await page.evaluate(() => {
     const el = document.querySelector('.error, [data-error], .runner-error');

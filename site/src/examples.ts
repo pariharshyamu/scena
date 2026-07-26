@@ -624,6 +624,78 @@ game.start();`,
   },
 
   {
+    id: 'stacks',
+    title: 'The PA, coverage & the echo',
+    group: 'Worldbuilding',
+    code: `// THE FIRST PROP IN THIS LIBRARY THAT REACHES THE EAR.
+// Four systems, and every one has been tuned to do exactly the same job:
+// cover(200, 75) — turn everything down as far as it will go and still put a
+// usable 75 dB(A) two hundred metres back. Four PAs at four arbitrary volumes
+// would say nothing at all.
+//
+// The carpet is the field, classified by what it costs the person standing
+// there: grey-blue you can talk over, green you are raising your voice, amber
+// you are shouting, red the day's safe dose runs out in under four hours.
+import { createPA, createSky, createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+// A 200 m field seen from 300 m up. THE DEFAULT FAR PLANE IS 1000 and every
+// one of these would be behind it — which is how four working examples once
+// rendered as an empty grey rectangle.
+game.camera.far = 4000;
+game.camera.updateProjectionMatrix();
+
+const ground = new Mesh(new PlaneGeometry(1400, 700),
+  new MeshStandardMaterial({ color: 0x2b3138, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, -0.05, 90);
+scene.add(ground);
+
+const rigs = [
+  [-330, 'horn'], [-110, 'hifi'], [110, 'array'], [330, 'delayed'],
+].map(([x0, era]) => {
+  const pa = createPA({ era, x: x0, z: 0, fieldLength: 200, height: 7 });
+  pa.cover(200, 75);                                   // the tuning
+  pa.showCoverage(true, { width: 170, depth: 215, cell: 8 });
+  scene.add(pa.object);
+  // A person, walking in from the back. Blocky on purpose: at this range a
+  // realistic figure is two pixels.
+  const walker = new Mesh(new BoxGeometry(7, 22, 7),
+    new MeshStandardMaterial({ color: 0x53b06a, flatShading: true }));
+  walker.position.set(x0, 11, 200);
+  scene.add(walker);
+  return { pa, x0, walker };
+});
+
+let clock = 0;
+game.onUpdate((t) => {
+  clock = (clock + t.delta * 8) % 240;
+  const z = Math.max(4, 200 - clock);
+  for (const r of rigs) {
+    r.pa.update(t.delta);
+    r.walker.position.z = z;
+    const mat = r.walker.material;
+    // FOUR colours, because 'loud'/'not loud' cannot tell the person who has
+    // to shout from the person who should have left twenty minutes ago.
+    const s = r.pa.stateAt(r.x0, z);
+    if (s === 'harmful') mat.color.setRGB(0.86, 0.19, 0.14);
+    else if (s === 'shouting') mat.color.setRGB(0.88, 0.62, 0.16);
+    else if (s === 'raised') mat.color.setRGB(0.24, 0.70, 0.36);
+    else mat.color.setRGB(0.46, 0.53, 0.62);
+  }
+  game.camera.position.set(0, 330, -210);
+  game.camera.lookAt(0, 0, 95);
+});
+game.start();`,
+  },
+
+  {
     id: 'plumbing',
     title: 'Plumbing, pressure & the scald',
     group: 'Worldbuilding',

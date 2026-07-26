@@ -70,6 +70,7 @@ import {
   createSmallCraft,
   createSeamark,
   createPlumbing,
+  createPA,
   livesIn,
   NM,
   listFor,
@@ -145,6 +146,8 @@ import {
   type SmallCraft,
   type Seamark,
   type Plumbing,
+  type PublicAddress,
+  type PAEra,
   type MarkKind,
   type SmokeLayer,
   type Extractor,
@@ -178,6 +181,23 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  stacks:
+    '<strong>SCENA — the PA</strong><br />' +
+    'The first prop here that reaches the <em>ear</em>. Four systems, every ' +
+    'one tuned to the same job — a usable 75&nbsp;dB(A) two hundred metres ' +
+    'back — so the carpets are <em>meant</em> to look alike. The carpet is ' +
+    'the field, coloured by what it costs you: grey-blue you can talk over, ' +
+    'green you are raising your voice, amber you are shouting, red the day\'s ' +
+    'safe dose runs out in under four hours. The difference is not in the ' +
+    'field, it is in what the field <em>cost</em>, and it lands on the few ' +
+    'metres nobody asked. That is the pillar: how long you can stand at the ' +
+    'barrier, on a log scale, from 48&nbsp;seconds under the stacks to two ' +
+    'and a half hours under the delay towers. Left to right: horns, stacks, ' +
+    'line array, delay towers. The last does not make anything louder — it ' +
+    'stops the loudness having to reach that far, and the bill is paid in ' +
+    '<em>time</em>. Try <code>galleryStacks(0.25)</code> to misalign the ' +
+    'towers: nothing in the picture changes, because an echo is not a level. ' +
+    'Read <code>galleryStacksReport()</code> instead.',
   plumbing:
     '<strong>SCENA — plumbing</strong><br />' +
     'The first thing in this library where <em>what you get depends on what ' +
@@ -497,6 +517,23 @@ const STEPPERS: Array<(dt: number) => void> = [];
 const houses: Array<{ plumb: Plumbing; label: string; post: Mesh; x: number }> = [];
 let houseClock = 0;
 let flushed = false;
+
+/**
+ * Four PAs doing the same job, and a walker in each field.
+ *
+ * The whole read is the carpet: the same coverage, bought at four completely
+ * different prices, and the price is charged to somebody who is not being
+ * asked. The walkers exist because a scalar field has no other way of being
+ * in a photograph.
+ */
+const stacks: Array<{
+  pa: PublicAddress;
+  x0: number;
+  label: string;
+  walker: Mesh;
+  pillar: Mesh;
+}> = [];
+let stackClock = 0;
 
 /**
  * The lit coast at night, and the first thing in this library whose entire
@@ -1331,6 +1368,89 @@ if (view === 'room') {
   raise(-4.5, 'gravity', 'gravity — loses the flow', 4);
   raise(4.5, 'mains', 'mains — loses the temperature', 6);
   raise(13.5, 'thermostatic', 'thermostatic — holds it', 8);
+
+} else if (view === 'stacks') {
+  // FOUR SYSTEMS, ONE JOB, AND THE BILL GOES TO SOMEBODY WHO WAS NOT ASKED.
+  //
+  // Every one has been tuned by `cover(200, 75)` — turn everything down as far
+  // as it will go and still put a usable 75 dB(A) at the back of a
+  // two-hundred-metre field. That is the only fair comparison; four PAs at
+  // four arbitrary volumes says nothing at all.
+  //
+  // WHICH MAKES THE CARPETS LOOK ALIKE ON PURPOSE. They are supposed to: the
+  // coverage is the thing that was held equal. The first version of this view
+  // stopped there and was four near-identical pictures arguing for nothing.
+  // The difference is not in the field, it is in what the field COST, and it
+  // is concentrated in the few metres nobody was asked about — so it needs
+  // its own mark. The pillar at the front of each field is how long a person
+  // can stand at the barrier before the day's safe dose is gone, on a log
+  // scale, because the spread is forty-eight seconds to two and a half hours
+  // and nothing linear can hold both.
+  scene.background = new Color(0x11161d);
+  // A 200 m field seen from 380 m up. The default far plane is 1000 and every
+  // one of these would be behind it — which is how four working examples once
+  // rendered as an empty grey rectangle.
+  camera.far = 4000;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.85));
+  const key = new DirectionalLight(0xffffff, 1.15);
+  key.position.set(-140, 260, -120);
+  scene.add(key);
+  const ground = new Mesh(
+    new PlaneGeometry(1600, 800),
+    new MeshStandardMaterial({ color: 0x3a4149, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0, -0.05, 80);
+  scene.add(ground);
+
+  // The camera looks down +z, so +x falls on the LEFT of the frame and the
+  // reading order has to be laid out backwards. Left to right on screen:
+  // horn, stacks, line array, delay towers.
+  const RIGS: Array<[PAEra, number, string]> = [
+    ['horn', 201, 'horn'],
+    ['hifi', 67, 'stacks'],
+    ['array', -67, 'line array'],
+    ['delayed', -201, 'delay towers'],
+  ];
+  for (const [era, x0, label] of RIGS) {
+    const pa = createPA({ era, x: x0, z: 0, fieldLength: 200, height: 7 });
+    // The tuning, and the only reason the four are comparable at all.
+    pa.cover(200, 75);
+    pa.showCoverage(true, { width: 118, depth: 210, cell: 6 });
+    scene.add(pa.object);
+
+    // A stage, so it is obvious which end the sound comes from. The hangs
+    // themselves are six metres of black box at two hundred metres' range and
+    // read as nothing at all.
+    const stage = new Mesh(
+      new BoxGeometry(46, 13, 16),
+      new MeshStandardMaterial({ color: 0x20252c, flatShading: true })
+    );
+    stage.position.set(x0, 6.5, -12);
+    scene.add(stage);
+
+    // HOW LONG YOU CAN STAND AT THE BARRIER, on a log scale. This is the whole
+    // argument, and it is invisible in the carpet: the front row is 'harmful'
+    // in all four, and 'harmful' cannot tell forty-eight seconds from two and
+    // a half hours.
+    const pillar = new Mesh(
+      new BoxGeometry(13, 1, 13),
+      new MeshStandardMaterial({ color: 0xb03428, emissive: 0x140302, flatShading: true })
+    );
+    pillar.position.set(x0, 0.5, 12);
+    scene.add(pillar);
+
+    // A person, walking in from the back. Blocky on purpose: at this range a
+    // realistic figure is two pixels.
+    const walker = new Mesh(
+      new BoxGeometry(11, 34, 11),
+      new MeshStandardMaterial({ color: 0x53b06a, emissive: 0x0a0a0a, flatShading: true })
+    );
+    walker.position.set(x0, 17, 200);
+    scene.add(walker);
+    stacks.push({ pa, x0, label, walker, pillar });
+  }
 
 } else if (view === 'coast') {
   // THE LIT COAST, AT NIGHT — because a light view in daylight is a view of a
@@ -2292,6 +2412,8 @@ renderer.setAnimationLoop(() => {
     placeCoastCamera();
   } else if (view === 'plumbing') {
     placePlumbingCamera();
+  } else if (view === 'stacks') {
+    placeStacksCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -2548,6 +2670,74 @@ const stepPlumbing = (dt: number): void => {
   }
 };
 STEPPERS.push(stepPlumbing);
+
+
+/**
+ * One tick of four fields, with a walker coming forward in each.
+ *
+ * Nothing here changes the PA. The walkers move and ask; the answer is a
+ * property of where they are standing, which is the whole shape of a field
+ * handshake and the reason `levelAt` takes a point rather than living on a
+ * character.
+ */
+const stepStacks = (dt: number): void => {
+  if (!stacks.length) return;
+  stackClock = (stackClock + dt * 8) % 240;
+  // 200 m to the barrier and a pause at the front, then back to the start.
+  const z = Math.max(4, 200 - stackClock);
+  for (const r of stacks) {
+    r.pa.update(dt);
+    r.walker.position.z = z;
+    const mat = r.walker.material as MeshStandardMaterial;
+    // FOUR colours, because there are four different things it costs you and
+    // 'loud'/'not loud' cannot tell the person who has to shout from the
+    // person who should have left twenty minutes ago.
+    switch (r.pa.stateAt(r.x0, z)) {
+      case 'harmful':
+        mat.color.setRGB(0.86, 0.19, 0.14);
+        mat.emissive.setRGB(0.34, 0.03, 0.02);
+        break;
+      case 'shouting':
+        mat.color.setRGB(0.88, 0.62, 0.16);
+        mat.emissive.setRGB(0.2, 0.11, 0.01);
+        break;
+      case 'raised':
+        mat.color.setRGB(0.24, 0.7, 0.36);
+        mat.emissive.setRGB(0.02, 0.07, 0.02);
+        break;
+      default:
+        mat.color.setRGB(0.46, 0.53, 0.62);
+        mat.emissive.setRGB(0.02, 0.02, 0.03);
+    }
+
+    // The pillar does not move; it is a property of the system, not of the
+    // walker. Rebuilt every frame anyway so that `galleryStacks` and
+    // `setPower` show up in the picture rather than only in the console.
+    const safe = Math.max(1, r.pa.exposureAt(r.x0, 3));
+    const h = Math.max(4, Math.log10(safe) * 26);
+    r.pillar.scale.y = h;
+    r.pillar.position.y = h / 2;
+    const pm = r.pillar.material as MeshStandardMaterial;
+    if (safe < 300) {
+      pm.color.setRGB(0.86, 0.19, 0.14);
+      pm.emissive.setRGB(0.24, 0.02, 0.01);
+    } else if (safe < 3600) {
+      pm.color.setRGB(0.88, 0.62, 0.16);
+      pm.emissive.setRGB(0.18, 0.1, 0.01);
+    } else {
+      pm.color.setRGB(0.24, 0.7, 0.36);
+      pm.emissive.setRGB(0.02, 0.09, 0.03);
+    }
+  }
+};
+STEPPERS.push(stepStacks);
+
+/** Frame all four fields from above and behind the stages. */
+const placeStacksCamera = (): void => {
+  if (!stacks.length) return;
+  camera.position.set(0, 268, -212);
+  camera.lookAt(0, 36, 80);
+};
 
 /** Frame the four from the front, low enough to see the pipework. */
 const placePlumbingCamera = (): void => {
@@ -3040,6 +3230,8 @@ declare global {
     galleryWater: (on: number) => void;
     galleryBath: (on: number) => void;
     galleryStep: (dt: number) => void;
+    galleryStacks: (haas: number) => void;
+    galleryStacksReport: () => Array<Record<string, unknown>>;
     galleryDoors: (open: number) => void;
     gallerySinks: (fresh: number) => void;
     galleryShut: (shut: number) => void;
@@ -3210,6 +3402,43 @@ const circularSpread = (phases: number[]): number => {
 };
 
 /** Set the rate, or pull one side harder, for the headless run. */
+
+/**
+ * Re-time every delay tower by `haas` seconds.
+ *
+ * Nothing in the picture changes, and that is the demonstration: an echo is
+ * not a level, so no amount of looking at a coverage plot will find one. Try
+ * 0.012 (right), 0 (combs), 0.25 (everybody hears it twice) and read
+ * `galleryStacksReport()`.
+ */
+window.galleryStacks = (haas: number) => {
+  for (const r of stacks) r.pa.alignDelays(haas);
+};
+
+/** What each field is doing to the person walking through it. */
+window.galleryStacksReport = () =>
+  stacks.map((r) => {
+    const z = r.walker.position.z;
+    const bands = r.pa.bandsAt(r.x0, z);
+    const echo = r.pa.echoAt(r.x0, z);
+    return {
+      rig: r.label,
+      standingAt: Math.round(z),
+      dBA: Number(r.pa.levelAt(r.x0, z).toFixed(1)),
+      state: r.pa.stateAt(r.x0, z),
+      // What a shout carries, in metres. Under half a metre is an ear.
+      earshot: Number(r.pa.earshotAt(r.x0, z).toFixed(2)),
+      safeFor: Math.round(r.pa.exposureAt(r.x0, z)),
+      frontRow: Number(r.pa.frontRow().toFixed(1)),
+      frontRowSafeFor: Math.round(r.pa.exposureAt(r.x0, 3)),
+      bass: Math.round(bands.bass),
+      mid: Math.round(bands.mid),
+      treble: Math.round(bands.treble),
+      echo: echo.state,
+      spreadMs: Math.round(echo.spread),
+    };
+  });
+
 window.galleryOars = (rate: number, port = 1, starboard = port) => {
   for (const { bank } of banks) {
     bank.setRate(rate);
@@ -3823,6 +4052,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'craft') placeCraftCamera();
   if (view === 'coast') placeCoastCamera();
   if (view === 'plumbing') placePlumbingCamera();
+  if (view === 'stacks') placeStacksCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
