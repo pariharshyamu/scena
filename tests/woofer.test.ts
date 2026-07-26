@@ -363,6 +363,64 @@ describe('the DJ tiles', () => {
   });
 });
 
+
+describe('toggling channels', () => {
+  it('next() and prev() walk the dial both ways', () => {
+    const r = fakeRadio();
+    const w = createWoofer({ media: r.media });
+    w.play(0);
+    w.next();
+    expect(w.station).toBe(RADIO_STATIONS[1]);
+    w.prev();
+    w.prev();
+    expect(w.station).toBe(RADIO_STATIONS[RADIO_STATIONS.length - 1]);
+  });
+
+  it('prev() before anything is tuned lands on the end of the dial', () => {
+    const r = fakeRadio();
+    const w = createWoofer({ media: r.media });
+    w.prev();
+    expect(w.station).toBe(RADIO_STATIONS[RADIO_STATIONS.length - 1]);
+  });
+
+  it('onStation fires on every change, with the station, and unsubscribes', () => {
+    const r = fakeRadio();
+    const w = createWoofer({ media: r.media });
+    const seen: string[] = [];
+    const off = w.onStation((s) => seen.push(s.name));
+    w.play(0);
+    w.next();
+    w.next();
+    w.prev();
+    expect(seen).toEqual([
+      RADIO_STATIONS[0].name,
+      RADIO_STATIONS[1].name,
+      RADIO_STATIONS[2].name,
+      RADIO_STATIONS[1].name,
+    ]);
+    off();
+    w.next();
+    expect(seen.length).toBe(4);
+  });
+
+  it('retuning the SAME station does not fire', () => {
+    const r = fakeRadio();
+    const w = createWoofer({ media: r.media });
+    w.play(2);
+    const seen: string[] = [];
+    w.onStation((s) => seen.push(s.name));
+    w.play(2);
+    expect(seen).toEqual([]);
+  });
+
+  it('the cabinet wears one LED per station', () => {
+    // A toggle whose current position is invisible is a coin, not a control.
+    const before = createWoofer({ stations: [] }).object.children.length;
+    const w = createWoofer();
+    expect(w.object.children.length).toBe(before + RADIO_STATIONS.length);
+  });
+});
+
 describe('the prop', () => {
   it('is big, solid and operable', () => {
     const w = createWoofer();

@@ -31,6 +31,17 @@ rig.station.name;       // 'DEF CON Radio'
 rig.stop();             // and the cones go still
 ```
 
+The dial toggles both ways, jumps anywhere, and reports every move:
+
+```js
+rig.next();                 // one channel clockwise
+rig.prev();                 // one back
+rig.play(2);                // straight to channel 3
+rig.onStation((s) => hud.show(s.name, s.genre));   // every change, any cause
+```
+
+And it is *readable*: the cabinet wears one LED per station across its top, the tuned one lit — because a toggle whose current position is invisible is a coin, not a control. In the playground, **←/→** walk the dial and **1–5** jump.
+
 Bring your own dial with `stations: [{ name, url, genre }]` — but a station that does not send `Access-Control-Allow-Origin` will refuse to load through the analyser graph, which arrives as an error, which is a `holding`. That failure path is not an edge case; it is the module.
 
 ## The dropout is the design problem

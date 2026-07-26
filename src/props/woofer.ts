@@ -177,6 +177,11 @@ export interface Woofer extends Prop, SoundField {
   stop(): void;
   /** Next station round the dial. */
   tune(): void;
+  /** The dial, both ways. `next()` is `tune()` with its partner. */
+  next(): void;
+  prev(): void;
+  /** Fired whenever the tuned station changes. Returns the unsubscribe. */
+  onStation(cb: (station: RadioStation) => void): () => void;
 
   /** The music, now. Same shape whoever has the floor. */
   pulse(): AudioPulse;
@@ -351,6 +356,7 @@ export function createWoofer(options: WooferOptions = {}): Woofer {
   let last: AudioPulse = { bass: 0, mid: 0, treble: 0, beat: false, bpm: 0 };
   const detector = makeBeatDetector();
   const beatCbs = new Set<() => void>();
+  const stationCbs = new Set<(s: RadioStation) => void>();
 
   if (media) {
     media.on('playing', () => {
@@ -416,6 +422,22 @@ export function createWoofer(options: WooferOptions = {}): Woofer {
   const lamp = new Mesh(new BoxGeometry(0.3, 0.07, 0.03), lampMat);
   lamp.position.set(0, H + 0.001 - 0.06, D / 2 + 0.02);
   group.add(lamp);
+
+  // THE CHANNEL SELECTOR: one LED per station across the top of the cabinet,
+  // the tuned one lit. A dial you can read from across the room — because a
+  // toggle whose current position is invisible is a coin, not a control.
+  const ledGeo = new BoxGeometry(0.09, 0.05, 0.02);
+  const leds: MeshBasicMaterial[] = [];
+  {
+    const n = stations.length;
+    for (let i = 0; i < n; i++) {
+      const mat = new MeshBasicMaterial({ color: 0x2a2d33 });
+      const led = new Mesh(ledGeo, mat);
+      led.position.set((i - (n - 1) / 2) * 0.16, H - 0.18, D / 2 + 0.02);
+      group.add(led);
+      leds.push(mat);
+    }
+  }
   const feet = new Mesh(new CylinderGeometry(0.05, 0.06, 0.06, 8), capMat);
   feet.position.set(0, 0.03, 0);
   group.add(feet);
@@ -425,9 +447,12 @@ export function createWoofer(options: WooferOptions = {}): Woofer {
   // -- behaviour -----------------------------------------------------------
 
   const play = (which?: RadioStation | number): void => {
+    const before = stationIdx;
     if (typeof which === 'number') stationIdx = ((which % stations.length) + stations.length) % stations.length;
     else if (which) stationIdx = Math.max(0, stations.indexOf(which));
     else if (stationIdx < 0) stationIdx = 0;
+    if (stationIdx !== before && stationIdx >= 0)
+      for (const cb of stationCbs) cb(stations[stationIdx]);
     if (!media || stations.length === 0) {
       // Nowhere for a stream to come from: the bed IS the show, and says so.
       state = 'demo';
@@ -469,6 +494,17 @@ export function createWoofer(options: WooferOptions = {}): Woofer {
       if (stations.length === 0) return;
       play((stationIdx < 0 ? 0 : stationIdx + 1) % stations.length);
     },
+    next() {
+      woofer.tune();
+    },
+    prev() {
+      if (stations.length === 0) return;
+      play(stationIdx < 0 ? stations.length - 1 : stationIdx - 1 + stations.length);
+    },
+    onStation(cb) {
+      stationCbs.add(cb);
+      return () => stationCbs.delete(cb);
+    },
 
     pulse: () => last,
     level: () => clamp01(last.bass * 0.55 + last.mid * 0.3 + last.treble * 0.15),
@@ -498,8 +534,10 @@ export function createWoofer(options: WooferOptions = {}): Woofer {
       if (state === 'off') {
         for (const c of cones) c.scale.setScalar(1);
         lampMat.color.setHex(0x22252a);
+        leds.forEach((m) => m.color.setHex(0x2a2d33));
         return;
       }
+      leds.forEach((m, i) => m.color.setHex(i === stationIdx ? 0x4ad0ff : 0x2a2d33));
       elapsed += dt;
       // WHO HAS THE FLOOR. Live asks the stream; if the analyser has nothing
       // yet (first buffers), the bed covers the gap without a state change.

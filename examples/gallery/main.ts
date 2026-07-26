@@ -197,7 +197,9 @@ const CAPTIONS: Record<string, string> = {
     'station — the four ways a stream fails), the bed takes the floor and ' +
     'the tiles never know. The ON-AIR lamp tells the truth the floor never ' +
     'hears: <em>green</em> the bed, <em>red</em> the radio, <em>amber</em> ' +
-    'the radio has dropped and the bed is holding. Read ' +
+    'the radio has dropped and the bed is holding. <strong>←/→</strong> and ' +
+    '<strong>1–5</strong> toggle channels; the LED row on the cabinet is the ' +
+    'dial. Read ' +
     '<code>galleryBooth()</code> for the honest state, or ' +
     '<code>galleryBooth(2)</code> to tune DEF CON Radio.',
   stacks:
@@ -1443,6 +1445,13 @@ if (view === 'room') {
   // A CLICK is the real interaction — it starts (then tunes) the web radio.
   rig.play();
   renderer.domElement.addEventListener('pointerdown', () => rig.operate());
+  // TOGGLE CHANNELS from the keyboard: arrows walk the dial, digits jump.
+  // The LEDs across the cabinet top say where the dial is from anywhere.
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') rig.next();
+    else if (e.key === 'ArrowLeft') rig.prev();
+    else if (/^[1-9]$/.test(e.key)) rig.play(Number(e.key) - 1);
+  });
 
   booth = { rig, tiles, label };
 

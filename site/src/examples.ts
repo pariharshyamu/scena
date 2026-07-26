@@ -670,6 +670,13 @@ scene.add(dancer);
 // first click. THE CLICK is the real interaction — it starts the radio.
 rig.play();
 window.addEventListener('pointerdown', () => rig.operate());
+// TOGGLE CHANNELS: arrows walk the dial, digits 1-5 jump straight there.
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') rig.next();
+  else if (e.key === 'ArrowLeft') rig.prev();
+  else if (/^[1-9]$/.test(e.key)) rig.play(Number(e.key) - 1);
+});
+rig.onStation((s) => console.log('tuned:', s.name, '—', s.genre));
 
 game.onUpdate((t) => {
   rig.update(t.delta);
