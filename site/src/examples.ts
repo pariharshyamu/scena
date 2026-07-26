@@ -492,6 +492,69 @@ game.start();`,
   },
 
   {
+    id: 'oars',
+    title: 'Under oars',
+    group: 'Worldbuilding',
+    code: `// An oar is not a throttle, it is a DUTY CYCLE: the blade is in the water
+// for under half of every stroke, so thrust is a pulse and her speed surges.
+// Three crews at one rate — the only difference between them is how together
+// they are, and everything you can see follows from that.
+import { createOarBank, createDeckedShip, createOcean, createSky,
+         createLightingRig, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, MeshStandardMaterial, Vector3 } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+
+const sea = createOcean({ amplitude: 0.22, wavelength: 28, size: 700, segments: 150 });
+scene.add(sea.mesh);
+
+const fleet = [1, 0.55, 0.15].map((together, i) => {
+  const ship = createDeckedShip({ era: 'galley', seed: i + 6, palette });
+  ship.float((x, z) => sea.heightAt(x, z));
+  ship.object.position.set(-22 + i * 22, 0, -30);
+  scene.add(ship.object);
+
+  const bank = createOarBank({
+    kind: 'longship', seats: 11, beam: ship.beam * 1.05,
+    gunwale: 0.95, together, seed: i + 2, palette,
+  });
+  bank.setRate(22);
+  ship.object.add(bank.object);
+
+  // A post on the start line, so the race is a thing you can read off the
+  // water rather than a number.
+  const mark = new Mesh(new BoxGeometry(0.5, 3.2, 0.5),
+    new MeshStandardMaterial({ color: [0x53b06a, 0xe0a531, 0xd8483a][i], flatShading: true }));
+  mark.position.set(ship.object.position.x, 1.6, -30);
+  scene.add(mark);
+  return { ship, bank };
+});
+
+game.onUpdate((t) => {
+  sea.update(t.delta);
+  const mid = new Vector3();
+  for (const f of fleet) {
+    f.bank.update(t.delta);
+    // One number wide: no throttle anywhere. If she is slow it is because
+    // the blades are not going in together.
+    f.ship.update(t.delta, { speed: f.bank.way, turn: f.bank.yaw * 0.25 });
+    mid.add(f.ship.object.position);
+  }
+  mid.multiplyScalar(1 / fleet.length);
+  let spread = 0;
+  for (const f of fleet) spread = Math.max(spread, f.ship.object.position.distanceTo(mid));
+  const back = 40 + spread * 0.95;
+  game.camera.position.set(mid.x - back * 0.62, 6 + back * 0.24, mid.z + back * 0.78);
+  game.camera.lookAt(mid.x, 0.5, mid.z);
+});
+game.start();`,
+  },
+
+  {
     id: 'surge',
     title: 'Storm surge',
     group: 'Worldbuilding',

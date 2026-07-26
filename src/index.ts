@@ -501,6 +501,17 @@ export {
   type GangwayOptions,
   type Carrier,
 } from './props/mooring';
+
+export {
+  createOarBank,
+  oarGripAt,
+  OAR_KINDS,
+  OAR_GRIP,
+  type OarBank,
+  type OarBankOptions,
+  type OarKind,
+  type Oar,
+} from './props/oars';
 export {
   createDeckedShip,
   SHIP_ERAS,

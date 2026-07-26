@@ -57,6 +57,7 @@ import {
   createBerth,
   moor,
   createGangway,
+  createOarBank,
   createSmoke,
   createExtractor,
   createSmokeLayer,
@@ -120,6 +121,7 @@ import {
   type Mooring,
   type Gangway,
   type Carrier,
+  type OarBank,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -140,6 +142,14 @@ const palette = PALETTES.meadow;
  * them.
  */
 const CAPTIONS: Record<string, string> = {
+  oars:
+    '<strong>SCENA — under oars</strong><br />' +
+    'An oar is not a throttle, it is a <em>duty cycle</em>: the blade is in ' +
+    'the water for under half of every stroke, so thrust is a pulse and her ' +
+    'speed <em>surges</em>. Three crews, one rate — the only difference is ' +
+    'how together they are. Watch the ripple run aft down the ragged one, ' +
+    'and watch which boat is winning. Try <code>galleryOars(30)</code> to ' +
+    'rate up, or <code>galleryOars(22, 1, 0.2)</code> to turn.',
   berth:
     '<strong>SCENA — alongside</strong><br />' +
     'A rope is a <em>one-way</em> constraint: it pulls, and it can never ' +
@@ -248,6 +258,7 @@ let berth: Berth | null = null;
 let moored: Mooring | null = null;
 let brow: Gangway | null = null;
 let berthShip: DeckedShip | null = null;
+const banks: Array<{ bank: OarBank; ship: DeckedShip; wake: Mesh }> = [];
 /**
  * People standing still on the three frames.
  *
@@ -835,6 +846,57 @@ if (view === 'room') {
   head.position.set(22, 0, 0);
   windVane.add(head);
 
+} else if (view === 'oars') {
+  // Three longships, three crews, one rate. The only thing different about
+  // them is how TOGETHER they are — and everything you can see follows from
+  // that: the spread of the blades, the ripple running aft down the boat,
+  // and how far up the water each of them has got.
+  scene.background = new Color(0x9dbad2);
+  camera.far = 1400;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0xffffff, 0.88));
+  const key = new DirectionalLight(0xffffff, 1.75);
+  key.position.set(-8, 15, 10);
+  scene.add(key);
+  const sea = createOcean({ amplitude: 0.22, wavelength: 28, size: 900, segments: 170 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  [1, 0.55, 0.15].forEach((together, i) => {
+    const ship = createDeckedShip({ era: 'galley', seed: i + 6, palette });
+    ship.float((x, z) => sea.heightAt(x, z));
+    ship.object.position.set(-22 + i * 22, 0, -30);
+    scene.add(ship.object);
+
+    const bank = createOarBank({
+      kind: 'longship',
+      seats: 11,
+      beam: ship.beam * 1.05,
+      gunwale: 0.95,
+      together,
+      seed: i + 2,
+      palette,
+    });
+    bank.setRate(22);
+    ship.object.add(bank.object);
+
+    // A marker astern of each: how far she has come. Nothing sets its z but
+    // the ship's own start line, so the three of them are a race result you
+    // can read off the water.
+    const wake = new Mesh(
+      new BoxGeometry(0.5, 3.2, 0.5),
+      new MeshStandardMaterial({
+        color: [0x53b06a, 0xe0a531, 0xd8483a][i],
+        emissive: [0x0d2a15, 0x3a2a06, 0x3a0f0a][i],
+        flatShading: true,
+      })
+    );
+    wake.position.set(ship.object.position.x, 1.6, -30);
+    void wake;
+    scene.add(wake);
+    banks.push({ bank, ship, wake });
+  });
+
 } else if (view === 'berth') {
   // A steamer lying alongside a harbour wall, working against her lines in a
   // slight swell, with the brow over. The five posts are the whole view:
@@ -1161,6 +1223,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepBerth(dt);
   }
+  if (view === 'oars') {
+    for (const o of oceans) o.update(dt);
+    stepOars(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -1207,6 +1273,8 @@ renderer.setAnimationLoop(() => {
   } else if (view === 'smoke') {
     camera.position.set(Math.sin(t * 0.08) * 1.2, 1.75, 5.4);
     camera.lookAt(0, 1.5, -0.6);
+  } else if (view === 'oars') {
+    placeOarCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -1279,6 +1347,40 @@ const broadsideOn = (fallback: number): number => {
     }
   }
   return best;
+};
+
+/**
+ * One tick under oars.
+ *
+ * The handshake is one number wide: the bank works out the stroke and hands
+ * back `way`, and the hull is given that and nothing else. There is no
+ * throttle anywhere — if she is slow it is because the blades are not going
+ * in together.
+ */
+const stepOars = (dt: number): void => {
+  for (const { bank, ship } of banks) {
+    bank.update(dt);
+    ship.update(dt, { speed: bank.way, turn: bank.yaw * 0.25 });
+  }
+};
+
+/**
+ * Frame the three boats from ahead and to one side.
+ *
+ * From dead abeam the near boat hides the other two; from dead ahead the
+ * blades are edge-on. Off the bow at an angle is the only place all three
+ * banks are visible sweeping.
+ */
+const placeOarCamera = (): void => {
+  if (!banks.length) return;
+  const mid = new Vector3();
+  for (const b of banks) mid.add(b.ship.object.position);
+  mid.multiplyScalar(1 / banks.length);
+  let spread = 0;
+  for (const b of banks) spread = Math.max(spread, b.ship.object.position.distanceTo(mid));
+  const back = 40 + spread * 0.95;
+  camera.position.set(mid.x - back * 0.62, 6 + back * 0.24, mid.z + back * 0.78);
+  camera.lookAt(mid.x, 0.5, mid.z);
 };
 
 /** Frame the berth. Shared by the render loop and `galleryDebug`. */
@@ -1417,6 +1519,8 @@ declare global {
     gallerySailReport: () => Array<Record<string, unknown>>;
     galleryMoor: (fast: number) => void;
     galleryBerthReport: () => Record<string, unknown>;
+    galleryOars: (rate: number, port?: number, starboard?: number) => void;
+    galleryOarReport: () => Array<Record<string, unknown>>;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -1472,6 +1576,7 @@ window.galleryStep = (dt: number) => {
   smokeRoom?.update(dt);
   stepSail(dt);
   stepBerth(dt);
+  stepOars(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -1546,6 +1651,42 @@ window.gallerySailPositions = () => {
     vane: windVane ? windVane.position.toArray().map((n) => Number(n.toFixed(1))) : null,
   };
 };
+
+/** The smallest arc of the cycle containing every one of these phases. */
+const circularSpread = (phases: number[]): number => {
+  const sorted = [...phases].sort((a, b) => a - b);
+  let widest = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const next = sorted[(i + 1) % sorted.length] + (i === sorted.length - 1 ? 1 : 0);
+    widest = Math.max(widest, next - sorted[i]);
+  }
+  return Math.max(0, 1 - widest);
+};
+
+/** Set the rate, or pull one side harder, for the headless run. */
+window.galleryOars = (rate: number, port = 1, starboard = port) => {
+  for (const { bank } of banks) {
+    bank.setRate(rate);
+    bank.setEffort(port, starboard);
+  }
+};
+
+/** What the three crews are doing, and how far it has got them. */
+window.galleryOarReport = () =>
+  banks.map(({ bank, ship, wake }) => ({
+    together: Number(bank.together.toFixed(2)),
+    rate: bank.rate,
+    thrust: Number(bank.thrust.toFixed(3)),
+    way: Number(bank.way.toFixed(3)),
+    // The spread of the bank right now: 0 is one blade, 0.5 is a shambles.
+    // The smallest arc that holds every blade — circular, because phases
+    // wrap and a plain max-minus-min reports a crew that straddles the
+    // catch as nearly a whole stroke apart when it is a hair.
+    spread: Number(circularSpread(bank.oars.map((o) => o.phase)).toFixed(3)),
+    buried: bank.oars.filter((o) => o.buried).length,
+    of: bank.oars.length,
+    made: Number((ship.object.position.z - wake.position.z).toFixed(1)),
+  }));
 
 /** Make her fast or let her go, for the headless run. */
 window.galleryMoor = (fast: number) => {
@@ -1680,6 +1821,7 @@ window.galleryDebug = (t?: number) => {
   if (typeof t === 'number') setTime(t);
   if (view === 'sail') placeSailCamera();
   if (view === 'berth') placeBerthCamera();
+  if (view === 'oars') placeOarCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 
