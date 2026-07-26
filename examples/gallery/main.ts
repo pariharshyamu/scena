@@ -6,13 +6,16 @@ import {
   Clock,
   Color,
   DirectionalLight,
+  Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
   Quaternion,
   Scene,
+  SphereGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -65,7 +68,9 @@ import {
   createGear,
   createBoat,
   createSmallCraft,
+  createSeamark,
   livesIn,
+  NM,
   listFor,
   createSmoke,
   createExtractor,
@@ -137,6 +142,8 @@ import {
   type SeaState,
   type Gear,
   type SmallCraft,
+  type Seamark,
+  type MarkKind,
   type SmokeLayer,
   type Extractor,
   type SmokeSource,
@@ -169,6 +176,27 @@ const CAPTIONS: Record<string, string> = {
     'sixty times life. Try <code>gallerySeaWind(20, 315)</code> to bring a ' +
     'gale on, then <code>gallerySeaWind(0)</code> to take it away: the sea ' +
     'does not go with it.',
+  coast:
+    '<strong>SCENA — the lit coast</strong><br />' +
+    'The first thing in this library whose whole purpose is to be seen from ' +
+    'somewhere else. A light has two ranges and you get the <em>smaller</em>: ' +
+    'the <em>geographic</em>, where it drops below the horizon — a function ' +
+    'of how high the lamp is and how high your eye is and of nothing else — ' +
+    'and the <em>luminous</em>, where it simply gets too faint. Past the ' +
+    'horizon the lamp stops mattering: multiply the flashing light by a ' +
+    'hundred and you gain under two miles and then nothing at all, for ever. ' +
+    'Four marks along the shore, and the axis is <em>identity</em> rather ' +
+    'than power. The bonfire has no character and is on no chart, so a ' +
+    'burning barn looks the same. The harbour light is charted and still ' +
+    'fixed, which is the same as the next fixed light along the coast, and ' +
+    'ships were lost on exactly that. <code>Fl(3) 15s</code> is a name you ' +
+    'can look up. And the last one tells you where <em>you</em> are: white ' +
+    'down the fairway, red over the rocks. Its sectors are painted on the ' +
+    'water here, which is a <em>chart</em> made visible — nothing at sea ' +
+    'looks like that, and the point is that the boat sees one colour at a ' +
+    'time and the chart sees all three. The red arc is shorter than the ' +
+    'white one because coloured glass eats three quarters of the lamp. Try ' +
+    '<code>galleryCoastReport()</code> or <code>galleryCoastFog(1)</code>.',
   craft:
     '<strong>SCENA — small craft</strong><br />' +
     'Four identical boats in one sea, and the only difference between them is ' +
@@ -419,6 +447,20 @@ let liner: {
  * of those has gone, one is sitting at a level she found for herself, and one
  * has been rolled right over and come back up on her own.
  */
+/**
+ * The lit coast at night, and the first thing in this library whose entire
+ * purpose is to be seen from somewhere else.
+ *
+ * Four marks along a shore and one boat standing in toward them. The read is
+ * the sectored light: her sectors are painted on the water — which is a CHART
+ * made visible and not a thing anybody at sea has ever seen — and the boat
+ * crosses out of the white fairway into the red, which is the whole of
+ * navigation reduced to a colour.
+ */
+const marks: Array<{ mark: Seamark; label: string }> = [];
+let markBoat: { object: Object3D; wake: Mesh[] } | null = null;
+let markClock = 0;
+
 // NOT BREAKING, and still fatal — which is the point. 1.1 m at 9 m is one in
 // eight, an ordinary short sea, and it is over her freeboard doubled.
 let CRAFT_H = 1.1;
@@ -1173,6 +1215,87 @@ if (view === 'room') {
     boats.push({ ship, x0: x, z0: -20, label });
   }
   seaState = { sea: st, boats, clock: 0 };
+
+} else if (view === 'coast') {
+  // THE LIT COAST, AT NIGHT — because a light view in daylight is a view of a
+  // building.
+  //
+  //   A  bonfire   — a fire on a headland. No character, not on any chart, and
+  //                  a burning barn looks exactly the same.
+  //   B  harbour   — charted, in a known place, and still a FIXED light, which
+  //                  is the same as the next fixed light along the coast.
+  //   C  flashing   — Fl(3) 15s. A name you can look up, and the invention that
+  //                  made one light tellable from another.
+  //   D  sectored  — and this one tells you where YOU are.
+  //
+  // D's sectors are painted on the water. Nothing at sea looks remotely like
+  // that; it is the chart made visible, and the point of the picture is that
+  // the boat sees one colour at a time and the chart sees all three.
+  scene.background = new Color(0x0a1622);
+  camera.far = 60000;
+  camera.updateProjectionMatrix();
+  scene.add(new AmbientLight(0x93a9c4, 0.24));
+  const moon = new DirectionalLight(0xa8c0dd, 0.42);
+  moon.position.set(-40, 60, 30);
+  scene.add(moon);
+
+  // A big flat calm — at night, at this range, the sea is a dark floor and the
+  // lights are the picture.
+  const sea = createOcean({ amplitude: 0.12, wavelength: 60, size: 9000, segments: 140 });
+  scene.add(sea.mesh);
+  oceans.push(sea);
+
+  const put = (x: number, z: number, kind: MarkKind, label: string, seed: number): Seamark => {
+    const mark = createSeamark({ kind, seed, palette });
+    mark.object.position.set(x, 0, z);
+    scene.add(mark.object);
+    marks.push({ mark, label });
+    return mark;
+  };
+  put(-980, -180, 'bonfire', 'bonfire', 2);
+  put(-340, -230, 'harbour', 'harbour — fixed', 4);
+  put(280, -300, 'flashing', 'Fl(3) 15s', 6);
+  const sectored = put(920, -150, 'sectored', 'Oc 8s, sectored', 8);
+  // THE CHART, ON THE WATER — off by default in the prop and turned on here on
+  // purpose, with the caption saying so. Drawn at a twentieth, because the real
+  // arc is thirteen miles long: the ratios are what the picture is for, and the
+  // red one being visibly shorter than the white one is the whole claim.
+  sectored.showSectors(true, 0.05);
+
+  // …and a boat standing in, to be somewhere in all that. She is the observer
+  // every number in the report is about.
+  const hull = new Group();
+  const deck = new Mesh(
+    new BoxGeometry(9, 3.4, 30),
+    new MeshStandardMaterial({ color: 0x30363d, flatShading: true })
+  );
+  deck.position.y = 1.7;
+  hull.add(deck);
+  const house = new Mesh(
+    new BoxGeometry(7, 3.2, 8),
+    new MeshStandardMaterial({ color: 0x3d444c, flatShading: true })
+  );
+  house.position.set(0, 5, -4);
+  hull.add(house);
+  // Her own lights, so she is findable in a dark frame.
+  // HER LIGHTS, AND THEY ARE THE SIZE OF LIGHTS AND NOT OF LAMPS. At a range
+  // that shows what a sector is, an accurate 30 m hull is twenty pixels of
+  // grey on black water and her sidelights are a fraction of one. On a chart a
+  // vessel is a symbol for the same reason.
+  const wake: Mesh[] = [];
+  for (const [dx, colour] of [[-9, 0xd1443a], [9, 0x2f9d5b], [0, 0xf6f2e6]] as Array<
+    [number, number]
+  >) {
+    const side = new Mesh(
+      new SphereGeometry(dx === 0 ? 5 : 4, 10, 8),
+      new MeshBasicMaterial({ color: colour })
+    );
+    side.position.set(dx, dx === 0 ? 12 : 5, dx === 0 ? -2 : 6);
+    hull.add(side);
+    wake.push(side);
+  }
+  scene.add(hull);
+  markBoat = { object: hull, wake };
 
 } else if (view === 'craft') {
   // FOUR IDENTICAL BOATS IN ONE SEA, and the only difference between them is
@@ -2019,6 +2142,10 @@ renderer.setAnimationLoop(() => {
     for (const o of oceans) o.update(dt);
     stepCraft(dt);
   }
+  if (view === 'coast') {
+    for (const o of oceans) o.update(dt);
+    stepCoast(dt);
+  }
   if (view === 'larder') {
     for (const st of colds) st.update(dt);
     for (const f of foods) f.update(dt, foodChill ?? undefined);
@@ -2079,6 +2206,8 @@ renderer.setAnimationLoop(() => {
     placeGearCamera();
   } else if (view === 'craft') {
     placeCraftCamera();
+  } else if (view === 'coast') {
+    placeCoastCamera();
   } else if (view === 'berth') {
     // Along the quay and slightly above it, so the gap between hull and wall
     // — the thing the whole track is about — is a gap you can see.
@@ -2265,6 +2394,43 @@ const stepLiner = (dt: number): void => {
   };
   paint(posts, ship);
   paint(liner.smallPosts, liner.small);
+};
+
+/**
+ * One tick of a dark coast, with a boat standing in across the sectors.
+ *
+ * Nothing here is sped up. The characters run at life — `Fl(3) 15s` really is
+ * dark for eleven and a half seconds out of fifteen, and a view that hurried
+ * it along would be showing a light that does not exist.
+ */
+const stepCoast = (dt: number): void => {
+  if (!marks.length) return;
+  markClock += dt;
+  for (const m of marks) m.mark.update(dt);
+  if (markBoat) {
+    // She crosses the sectored light's boundaries: out of the white fairway
+    // into the red over the rocks, which is the entire point of the thing.
+    const t = markClock * 0.06;
+    markBoat.object.position.set(920 + Math.sin(t) * 520, 0, 700 + Math.cos(t) * 90);
+    markBoat.object.rotation.y = Math.cos(t) * 0.9;
+  }
+};
+
+/**
+ * Frame it from above and to seaward, at chart scale.
+ *
+ * There is no camera that shows a light and its range at once. The sectors it
+ * throws are thirteen nautical miles long and the tower they come out of is
+ * twenty-five metres tall — five orders of magnitude apart — so a frame
+ * containing the architecture cannot contain the subject, and a frame
+ * containing the subject shows the towers as points. That is not a shortcoming
+ * of the view; it is what a lighthouse IS. So the lamps are drawn as lights
+ * rather than as buildings, and the sectors get the frame.
+ */
+const placeCoastCamera = (): void => {
+  if (!marks.length) return;
+  camera.position.set(430, 900, 2150);
+  camera.lookAt(430, 0, 120);
 };
 
 /**
@@ -2732,6 +2898,8 @@ declare global {
     galleryGearReport: () => Record<string, unknown>;
     galleryCraftReport: () => Record<string, unknown>;
     galleryCraftSea: (height: number, length?: number) => void;
+    galleryCoastReport: (heightOfEye?: number) => Record<string, unknown>;
+    galleryCoastFog: (nauticalMiles: number) => void;
     gallerySailPositions: () => Record<string, unknown>;
   }
 }
@@ -2794,6 +2962,7 @@ window.galleryStep = (dt: number) => {
   stepSea(dt);
   stepGear(dt);
   stepCraft(dt);
+  stepCoast(dt);
   for (const s of streams) s.update(dt);
   for (const s of showers) s.update(dt);
   for (const t2 of tubs) t2.update(dt);
@@ -3015,6 +3184,54 @@ window.galleryLinerWay = (fraction: number) => {
   if (!liner) return;
   liner.plant.setRegulator(Math.max(0, Math.min(1, fraction)));
   liner.plant.setLink(fraction > 0.02 ? 0.45 : 0);
+};
+
+/**
+ * What the boat has of each light, from where she is.
+ *
+ * Every row is really a statement about the observer: the same four lamps
+ * answer differently to an eye 1.5 m up in an open boat and one 12 m up on a
+ * bridge, and not only with a different range but with a different REASON.
+ */
+window.galleryCoastReport = (heightOfEye = 4) => {
+  if (!marks.length || !markBoat) return {};
+  const p = markBoat.object.position;
+  const nm = (m: number): number => Number((m / NM).toFixed(2));
+  return {
+    clock: Number(markClock.toFixed(1)),
+    heightOfEye,
+    boat: { x: Number(p.x.toFixed(0)), z: Number(p.z.toFixed(0)) },
+    lights: marks.map((m) => {
+      const s = m.mark.sightedFrom(p.x, p.z, heightOfEye);
+      return {
+        at: m.label,
+        kind: m.mark.kind,
+        character: m.mark.character,
+        charted: m.mark.charted,
+        identifiable: m.mark.identifiable,
+        focalM: m.mark.height,
+        candela: m.mark.intensity,
+        offNm: nm(s.distance),
+        geographicNm: nm(s.geographic),
+        luminousNm: nm(s.luminous),
+        rangeNm: nm(s.range),
+        limitedBy: s.limitedBy,
+        state: s.state,
+        inRange: s.inRange,
+        // Lit THIS instant — false most of the time on a flashing light, and
+        // that is not a bug in the light or in the report.
+        litNow: s.showing,
+        sector: s.sector ? s.sector.colour : null,
+        safe: s.safe,
+        soundingFog: m.mark.sounding,
+      };
+    }),
+  };
+};
+
+/** Bring fog down on the whole coast, in nautical miles of visibility. */
+window.galleryCoastFog = (nauticalMiles: number) => {
+  for (const m of marks) m.mark.setVisibility(nauticalMiles);
 };
 
 /**
@@ -3390,6 +3607,7 @@ window.galleryDebug = (t?: number) => {
   if (view === 'sea') placeSeaCamera();
   if (view === 'gear') placeGearCamera();
   if (view === 'craft') placeCraftCamera();
+  if (view === 'coast') placeCoastCamera();
   renderer.render(scene, camera);
   const gl = renderer.getContext();
 

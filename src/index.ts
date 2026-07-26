@@ -547,6 +547,20 @@ export {
   type StabiliserKind,
 } from './props/stabiliser';
 export {
+  createSeamark,
+  geographicRange,
+  luminousRange,
+  MARK_KINDS,
+  SECTOR_TRANSMISSION,
+  NM,
+  type Seamark,
+  type SeamarkOptions,
+  type MarkKind,
+  type SightState,
+  type Sighting,
+  type Sector,
+} from './props/seamark';
+export {
   createSmallCraft,
   livesIn,
   isBreaking,

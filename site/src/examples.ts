@@ -621,6 +621,91 @@ game.start();`,
   },
 
   {
+    id: 'coast',
+    title: 'Lights, sectors & the horizon',
+    group: 'Worldbuilding',
+    code: `// A LIGHT IS A FACT ABOUT THE OBSERVER. It does nothing where it stands;
+// its whole function happens fifteen miles away in somebody else's eye.
+//
+// It has two ranges and you get the SMALLER: the geographic, where it drops
+// below the horizon — a function of how high the lamp is and how high your eye
+// is and of nothing else — and the luminous, where it gets too faint. Past the
+// horizon the lamp stops mattering: multiply it by a hundred and you gain
+// under two miles and then nothing at all, for ever.
+import { createSeamark, createOcean, createLightingRig, NM, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Color, AmbientLight, DirectionalLight, Group, Mesh, SphereGeometry,
+         BoxGeometry, MeshBasicMaterial, MeshStandardMaterial } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+// NIGHT, because a light view in daylight is a view of a building.
+scene.background = new Color(0x0a1622);
+scene.add(new AmbientLight(0x93a9c4, 0.24));
+const moon = new DirectionalLight(0xa8c0dd, 0.42);
+moon.position.set(-40, 60, 30);
+scene.add(moon);
+void createLightingRig;
+
+const sea = createOcean({ amplitude: 0.12, wavelength: 60, size: 9000, segments: 140 });
+scene.add(sea.mesh);
+
+// Four marks, and the axis is IDENTITY rather than power.
+const marks = [
+  [-980, -180, 'bonfire'], [-340, -230, 'harbour'],
+  [280, -300, 'flashing'], [920, -150, 'sectored'],
+].map(([x, z, kind]) => {
+  const mark = createSeamark({ kind, seed: 6, palette });
+  mark.object.position.set(x, 0, z);
+  scene.add(mark.object);
+  return mark;
+});
+
+// THE CHART, ON THE WATER — and nothing at sea looks remotely like this.
+// Drawn at a twentieth, because the real arc is thirteen nautical miles long
+// and the tower it comes out of is twenty-five metres tall. The ratios are
+// what the picture is for: the red arc is shorter than the white one, because
+// coloured glass eats three quarters of the lamp.
+marks[3].showSectors(true, 0.05);
+
+// A vessel standing in — she is the observer every number is about. Her lights
+// are the size of LIGHTS and not of lamps: at a range that shows what a sector
+// is, an accurate hull is twenty pixels of grey on black water.
+const hull = new Group();
+const deck = new Mesh(new BoxGeometry(9, 3.4, 30),
+  new MeshStandardMaterial({ color: 0x30363d, flatShading: true }));
+deck.position.y = 1.7;
+hull.add(deck);
+for (const [dx, colour] of [[-9, 0xd1443a], [9, 0x2f9d5b], [0, 0xf6f2e6]]) {
+  const light = new Mesh(new SphereGeometry(dx === 0 ? 5 : 4, 10, 8),
+    new MeshBasicMaterial({ color: colour }));
+  light.position.set(dx, dx === 0 ? 12 : 5, dx === 0 ? -2 : 6);
+  hull.add(light);
+}
+scene.add(hull);
+
+let clock = 0;
+game.onUpdate((t) => {
+  clock += t.delta;
+  for (const m of marks) m.update(t.delta);
+  // She crosses out of the white fairway into the red over the rocks, which is
+  // the whole of navigation reduced to a colour.
+  hull.position.set(920 + Math.sin(clock * 0.06) * 520, 0, 700 + Math.cos(clock * 0.06) * 90);
+  const s = marks[3].sightedFrom(hull.position.x, hull.position.z, 4);
+  if (Math.floor(clock) % 5 === 0 && Math.floor(clock) !== Math.floor(clock - t.delta)) {
+    console.log(s.sector ? s.sector.colour : 'none', 'safe', s.safe,
+      '| range', (s.range / NM).toFixed(1), 'nm, limited by', s.limitedBy);
+  }
+  // There is no camera that holds a light and its range at once, so the lamps
+  // are drawn as lights rather than as buildings and the sectors get the frame.
+  game.camera.position.set(430, 900, 2150);
+  game.camera.lookAt(430, 0, 120);
+});
+game.start();`,
+  },
+
+  {
     id: 'craft',
     title: 'Small craft & swamping',
     group: 'Worldbuilding',
