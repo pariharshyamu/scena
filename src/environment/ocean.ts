@@ -9,6 +9,29 @@ import {
 } from 'three';
 import type { WindField } from './wind';
 
+/**
+ * The surf zone — what turns a coloured plane into a coast.
+ *
+ * Two effects, on one clock so they agree: **breakers** (bands of
+ * whitewater that form where the swell trips on the bottom and run
+ * shoreward) and the **swash** (the waterline itself running up the beach
+ * and draining back, leaving a mirror-thin sheet behind it).
+ */
+export interface SurfOptions {
+  /** Water depth at which the swell trips and whitens, metres. Default 1.7. */
+  breakDepth?: number;
+  /**
+   * How far up the beach the water runs, in metres of DEPTH — the edge's
+   * travel is this divided by the beach slope, so 0.42 m on a 1-in-7 face
+   * is nearly three metres of moving waterline. Default 0.42.
+   */
+  runUp?: number;
+  /** Seconds per swash cycle, in and back out again. Default 8. */
+  period?: number;
+  /** Breaker lines per metre of depth — more = tighter surf. Default 2.4. */
+  bands?: number;
+}
+
 export interface OceanOptions {
   /** World-space sea level (the plane's Y). Default 0. */
   level?: number;
@@ -35,6 +58,12 @@ export interface OceanOptions {
   surge?: number;
   /** Terrain height sampler (`terrain.heightAt`): the ocean fades out over land and foams at the shore. */
   shore?: (x: number, z: number) => number;
+  /**
+   * The surf zone: breakers that run shoreward, and a waterline that runs
+   * UP the beach and drains back. Needs a `shore` — without one there is
+   * no beach to break on and every term is inert. `false` turns it off.
+   */
+  surf?: false | SurfOptions;
   /**
    * A live sea state — `() => seaState.trains`.
    *
@@ -66,6 +95,19 @@ export interface Ocean {
   level: number;
   /** The wave height at a world point (and time) — sit a boat on this to bob it. */
   heightAt(x: number, z: number, time?: number): number;
+  /**
+   * The swash's run-up right now, in metres of extra depth — positive while
+   * the water is running up the beach, negative while it drains. Add it to a
+   * depth reading and gameplay agrees with what the shader is drawing: a
+   * wader gets caught by the wave that visibly arrives.
+   */
+  readonly runUp: number;
+  /**
+   * How deep the water is over ground of height `groundY`, right now,
+   * including the swash. 0 where the sea has drained away — so a player
+   * walking the edge is in and out of the water as the waves come.
+   */
+  depthOver(groundY: number): number;
   /** Advance manually instead of self-driving (for deterministic loops). */
   update(dt: number): void;
 }
@@ -156,6 +198,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   const speedMul = options.speed ?? 1;
   const wind = options.wind;
   const shore = options.shore;
+  const surf = options.surf;
   const surge = options.surge ?? 1.2;
   const stormSrc =
     typeof options.storm === 'function'
@@ -229,6 +272,12 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     uFoamBand: { value: 0.6 },
     uStorm: { value: 0 },
     uSurge: { value: 0 },
+    // The surf zone. Inert without a `shore`: out there the shore depth is
+    // 999, so every one of these terms multiplies out to nothing.
+    uBreakDepth: { value: surf === false ? 0 : (surf?.breakDepth ?? 1.7) },
+    uSwash: { value: surf === false ? 0 : (surf?.runUp ?? 0.42) },
+    uSwashPeriod: { value: Math.max(1, (surf === false ? 8 : surf?.period) ?? 8) },
+    uSurfBands: { value: surf === false ? 0 : (surf?.bands ?? 2.4) },
   };
   // The current sea level, lifted by the surge — mirrored into heightAt so
   // boats ride the rising water, not just the base level.
@@ -317,18 +366,33 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
+        `#include <common>\nuniform float uTime;\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nuniform float uBreakDepth;\nuniform float uSwash;\nuniform float uSwashPeriod;\nuniform float uSurfBands;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
       )
       .replace(
         '#include <map_fragment>',
         `#include <map_fragment>
+        // THE SWASH: the whole waterline runs up the beach and drains back.
+        // Adding the run-up to the shore depth moves the edge itself — on a
+        // 1-in-7 beach face, 40 cm of water is nearly three metres of travel,
+        // which is what makes a coast stop looking like a painted line.
+        float swashPhase = uTime * 6.2831853 / uSwashPeriod;
+        float runUp = uSwash * sin(swashPhase);
         // The surge lifts the waterline, so a storm floods higher up the beach.
-        float shoreD = vOceanShore + uSurge;
+        float shoreD = vOceanShore + uSurge + runUp;
         if (shoreD < -0.06) discard;             // terrain stands above the sea here
         float shoal = clamp(shoreD / uShoalDepth, 0.0, 1.0);
-        diffuseColor.rgb = mix(uShallowColor, uDeepColor, shoal);
+        // Shallow water is bright out of all proportion to its depth, so the
+        // turquoise hugs the shore instead of ramping linearly to blue.
+        diffuseColor.rgb = mix(uShallowColor, uDeepColor, pow(shoal, 0.72));
+        // THE BREAKERS: bands of whitewater that form where the swell trips
+        // on the bottom and run SHOREWARD, brightening as they shallow. The
+        // phase runs with the swash, so the water arrives after a wave breaks
+        // rather than breathing on a clock of its own.
+        float surfZone = 1.0 - smoothstep(0.0, max(uBreakDepth, 0.0001), shoreD);
+        float bands = sin(shoreD * uSurfBands + swashPhase * 2.0);
+        float breakers = smoothstep(0.1, 0.85, bands) * surfZone * surfZone;
         float shoreFoam = (1.0 - smoothstep(0.0, uFoamBand, shoreD)) * step(0.0, shoreD);
-        float oceanFoam = clamp(max(vOceanFoam, shoreFoam), 0.0, 1.0);
+        float oceanFoam = clamp(max(vOceanFoam, max(shoreFoam, breakers)), 0.0, 1.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.94, 0.96, 0.97), oceanFoam);
         // A storm darkens and greys the water between the whitecaps.
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.18, 0.2), uStorm * 0.45 * (1.0 - oceanFoam));`
@@ -344,10 +408,16 @@ export function createOcean(options: OceanOptions = {}): Ocean {
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        `#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.85, oceanFoam);`
+        `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 0.85, oceanFoam);
+        // The drain sheet: the thinnest water left behind is the most
+        // mirror-like surface on a beach, and reading it as glass is what
+        // separates a wet coast from a coloured plane.
+        float sheet = (1.0 - smoothstep(0.0, 0.35, shoreD)) * step(0.0, shoreD) * (1.0 - oceanFoam);
+        roughnessFactor = mix(roughnessFactor, 0.04, sheet);`
       );
   };
-  material.customProgramCacheKey = () => 'scena-ocean-v1';
+  material.customProgramCacheKey = () => 'scena-ocean-v2';
 
   const mesh = new Mesh(geometry, material);
   mesh.name = 'ocean';
@@ -375,10 +445,26 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     return curLevel + y;
   };
 
+  /** The same run-up the shader is drawing this frame — one clock, one truth. */
+  const runUpNow = (): number => {
+    const r =
+      uniforms.uSwash.value *
+      Math.sin((uniforms.uTime.value * Math.PI * 2) / uniforms.uSwashPeriod.value);
+    // A stilled surf multiplies the sine's sign through and hands back -0,
+    // which is true-equal to 0 but not Object.is-equal — normalise it.
+    return r === 0 ? 0 : r;
+  };
+
   return {
     mesh,
     level,
     heightAt,
+    get runUp() {
+      return runUpNow();
+    },
+    depthOver(groundY: number): number {
+      return Math.max(0, curLevel - groundY + runUpNow());
+    },
     update(dt) {
       manual = true;
       uniforms.uTime.value += dt;

@@ -25,7 +25,7 @@ describe('createOcean', () => {
     expect(ocean.mesh.position.y).toBe(1);
     expect(ocean.mesh.geometry.getAttribute('aOceanShore')).toBeDefined();
     const mat = ocean.mesh.material as MeshStandardMaterial;
-    expect(mat.customProgramCacheKey()).toBe('scena-ocean-v1');
+    expect(mat.customProgramCacheKey()).toBe('scena-ocean-v2');
     expect(mat.customProgramCacheKey()).not.toBe(new MeshStandardMaterial().customProgramCacheKey());
   });
 
@@ -120,5 +120,44 @@ describe('createOcean', () => {
     const windy = createOcean({ wind });
     windy.update(0.1); // retune to the wind
     expect(Number.isFinite(windy.heightAt(10, 0))).toBe(true);
+  });
+});
+
+describe('the surf zone', () => {
+  it('runs the waterline up the beach and drains it back', () => {
+    const ocean = createOcean({ level: 0, shore: () => -1, surf: { runUp: 0.4, period: 8 } });
+    // A full cycle: in, out, and back to where it started.
+    const seen: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      seen.push(ocean.runUp);
+      ocean.update(1);
+    }
+    expect(Math.max(...seen)).toBeGreaterThan(0.3);
+    expect(Math.min(...seen)).toBeLessThan(-0.3);
+    expect(Math.abs(seen[0])).toBeLessThan(1e-9);   // starts at rest
+  });
+
+  it('depthOver follows the swash: the edge is in and out of the water', () => {
+    const ocean = createOcean({ level: 0, shore: () => 0, surf: { runUp: 0.4, period: 8 } });
+    // Ground a fraction above sea level: dry at rest, wet at the top of the run.
+    expect(ocean.depthOver(0.2)).toBe(0);
+    ocean.update(2); // quarter period — the run-up peaks
+    expect(ocean.depthOver(0.2)).toBeGreaterThan(0.1);
+    ocean.update(4); // half a period later it has drained past
+    expect(ocean.depthOver(0.2)).toBe(0);
+    // Deep water is always deep, swash or no swash.
+    expect(ocean.depthOver(-5)).toBeGreaterThan(4);
+  });
+
+  it('surf: false stills the edge, and no shore means no surf to still', () => {
+    const flat = createOcean({ level: 0, shore: () => -1, surf: false });
+    for (let i = 0; i < 6; i++) {
+      expect(flat.runUp).toBe(0);
+      flat.update(1);
+    }
+    expect(flat.depthOver(-2)).toBe(2);
+    // The default ocean (no shore) still exposes the query, harmlessly.
+    const open = createOcean({ level: 0 });
+    expect(typeof open.depthOver(-3)).toBe('number');
   });
 });

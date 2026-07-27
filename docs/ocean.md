@@ -65,3 +65,34 @@ const ocean = createOcean({
 Because the surge feeds through `heightAt`, the buoyancy handshake keeps holding: a boat bobbing on a calm swell is lifted by the surge and pitched by the bigger waves, all from the same function. It's the [weather controller](weather.md) reaching all the way down into the sea — one `storminess` value, and the whole world weathers together.
 
 *(For a still pond or a fountain, reach for the simpler `createWater` instead — `createOcean` is for open, wind-driven sea.)*
+
+## The surf zone — breakers and the swash
+
+A coloured plane with a fixed edge reads as a painted line, however good the waves further out are. Given a `shore`, the ocean now runs a **surf zone**: two effects on one clock, so they agree with each other.
+
+```js
+const ocean = createOcean({
+  level: 0,
+  shore: beachProfile,          // the same height function the sand mesh uses
+  surf: { breakDepth: 1.7, runUp: 0.42, period: 8, bands: 2.4 },
+});
+```
+
+- **Breakers** — bands of whitewater that form where the swell trips on the bottom (shallower than `breakDepth`) and travel *shoreward*, brightening as they shallow.
+- **The swash** — the waterline itself runs up the beach and drains back every `period` seconds. `runUp` is given in metres of **depth**, and the edge's travel is that divided by the beach slope: 0.42 m on a 1-in-7 face is nearly three metres of moving waterline. That movement is the single strongest cue that a coast is water and not paint.
+- **The drain sheet** — the thinnest water left behind goes nearly mirror-smooth, which is what a wet beach looks like between waves.
+
+Shallow water is also now bright out of proportion to its depth, so the turquoise hugs the shore instead of ramping linearly to blue.
+
+**It is inert without a `shore`.** Out at sea the shore depth is 999 and every surf term multiplies out to nothing, so open-water scenes are untouched. `surf: false` turns it off entirely.
+
+### Gameplay agrees with the picture
+
+The swash is not a shader-only effect — the same run-up is readable on the CPU, so a wader gets caught by the wave that visibly arrives:
+
+```js
+ocean.runUp;              // metres of extra depth right now (+ running up, − draining)
+ocean.depthOver(groundY); // depth over ground of that height, swash included; 0 when drained
+```
+
+Walk a character along the edge reading `depthOver(profile(x, z))` and they are in and out of the water as the waves come.

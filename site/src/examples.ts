@@ -906,8 +906,10 @@ sandGeo.rotateX(-Math.PI / 2);
     const x = pos.getX(i), z = pos.getZ(i) + 55;
     pos.setY(i, profile(x, z));
     // Wet sand is darker: the band the water has just left.
-    const wet = Math.max(0, Math.min(1, (10 - z) / 9));
-    cols.push(1 - wet * 0.3, 1 - wet * 0.28, 1 - wet * 0.24);
+    // Wet sand, dark and wide enough to cover everything the swash can
+    // reach — otherwise the drained beach flashes dry tan between waves.
+    const wet = Math.max(0, Math.min(1, (13 - z) / 11));
+    cols.push(1 - wet * 0.46, 1 - wet * 0.44, 1 - wet * 0.38);
   }
   sandGeo.setAttribute('color',
     new (Object.getPrototypeOf(pos).constructor)(new Float32Array(cols), 3));
