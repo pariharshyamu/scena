@@ -693,6 +693,65 @@ game.start();`,
   },
 
   {
+    id: 'shala',
+    title: 'The shala: four rooms for one practice',
+    group: 'Worldbuilding',
+    code: `// THE QUIETEST GATHERING IN THIS LIBRARY: no seats, no table, no fire —
+// a deck, a grid of mats, and an ORIENTATION. Surya namaskar faces the
+// sun, so every shala takes a sunrise bearing and lays its student mats
+// facing it, instructor out front facing back at the class. matSpots()
+// hands the layout over in WORLD space, instructor first — stand an
+// ANIMA YogaClass on it and the room fills (see the trilogy handshake).
+// Four eras, one practice: the ashram's sandstone and columns, the
+// studio's mirror and barre, the rooftop's railing and string lights,
+// the retreat's bamboo pergola.
+import { createShala, SHALA_ERAS } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial,
+  AmbientLight, DirectionalLight, Color, Fog } from 'three';
+
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xf2e2ca);
+scene.fog = new Fog(0xf2e2ca, 40, 90);
+scene.add(new AmbientLight(0xfff0dc, 0.7));
+const sun = new DirectionalLight(0xffd9a0, 1.15);  // surya, low in the east
+sun.position.set(-20, 7, 26);
+scene.add(sun);
+const ground = new Mesh(new PlaneGeometry(120, 120),
+  new MeshStandardMaterial({ color: 0xcdb98f, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.01;
+scene.add(ground);
+
+// The four rooms, arranged so each catches the same dawn. Every one
+// faces its own sunrise bearing — watch the mats agree with it.
+const spots = [[-11, -2, 0.5], [1.5, -6, 0.15], [13.5, -1, -0.2], [3, 6, 0.35]];
+SHALA_ERAS.forEach((era, i) => {
+  const [x, z, sunrise] = spots[i];
+  const shala = createShala({ seed: 20 + i, era, students: i === 3 ? 6 : 8,
+    sunrise });
+  shala.object.position.set(x, 0, z);
+  scene.add(shala.object);
+  // The handshake, minus the people: mark each mat spot with a pebble so
+  // the world-space contract is visible. Index 0 (instructor) is darker.
+  shala.matSpots().forEach((s, j) => {
+    const pebble = new Mesh(new BoxGeometry(0.16, 0.05, 0.16),
+      new MeshStandardMaterial({ color: j === 0 ? 0x6e4630 : 0xa08a68 }));
+    pebble.position.set(s.x, shala.deckTop + 0.08, s.z);
+    pebble.rotation.y = s.facing;
+    scene.add(pebble);
+  });
+});
+
+game.onUpdate(() => {
+  game.camera.position.set(15, 11, 21);
+  game.camera.lookAt(0.5, 0.4, -0.8);
+});
+game.start();`,
+  },
+
+  {
     id: 'stacks',
     title: 'The PA, coverage & the echo',
     group: 'Worldbuilding',

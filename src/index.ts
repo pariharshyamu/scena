@@ -607,6 +607,14 @@ export {
   type DanceTilesOptions,
 } from './props/woofer';
 export {
+  createShala,
+  SHALA_ERAS,
+  type Shala,
+  type ShalaEra,
+  type ShalaOptions,
+  type MatSpot,
+} from './props/shala';
+export {
   createSeamark,
   geographicRange,
   luminousRange,
