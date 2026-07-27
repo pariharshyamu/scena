@@ -194,6 +194,40 @@ One tuning note learned the hard way: real zinc spangle is millimetres across, b
 > Metals need an environment map to reflect. `galvanised`, `diamondPlate` and `copperPatina` are deliberately kept off full metalness so they still read under a plain directional light — a scene with no IBL renders a mirror as black.
 
 
+## The physical tier
+
+Five surfaces defined by a light response `MeshStandardMaterial` has no term for. These are the only kinds in the catalogue that build a **`MeshPhysicalMaterial`** — the other 52 keep the cheap material they have always had, and a test walks all of them to prove it.
+
+| | the term | why nothing else gets you there |
+|---|---|---|
+| `velvet` | `sheen` | dark head-on and bright at every grazing edge — the rim *is* the material |
+| `silk` | `anisotropy` | a stretched highlight instead of a round one |
+| `brushedMetal` | `anisotropy` | the linisher went one way, and the streak is all that separates it from plain steel |
+| `nacre` | `iridescence` | thin-film interference: the hue depends on the film's thickness and your angle |
+| `ice` | `transmission` | light goes *through* |
+
+```js
+createSurface('velvet', { color: 0x243b6b });   // that is all
+```
+
+Everything else still applies: they are seeded, they weather, and rain still soaks them.
+
+### What it costs
+
+A physical material is a bigger shader, and **`transmission` makes three render the scene a second time** into a buffer. That is why `createGlass` fakes its glass rather than transmitting it, and why only `ice` switches transmission on — a tier that enabled it for a fabric would be a performance bug wearing a material's clothes. Use these on **objects**, not on facades.
+
+Two programs, not fifty-seven: every standard surface compiles to one, every physical surface to the other.
+
+### The honest limits
+
+Both of these are three's, not scena's, and they are worth knowing before you reach for the tier:
+
+- **Anisotropy follows the geometry's UVs.** A mesh with no UV attribute will not show a streak at all, and a box shows it per-face.
+- **Iridescence and metals want an environment map.** Iridescence is strongest over a metallic F0 — but a metal with no environment to reflect renders as dead grey, which is exactly what happened the first time `nacre` was tuned at `metalness: 0.6`. It ships at 0.2 over a pale pearl with a thick film instead, so the highlight is visibly coloured under nothing but a directional light. Give the scene an envMap and it will sing properly.
+
+One more thing a render taught: **fine noise plus bump is specular aliasing on curved geometry.** The industrial six were shot on flat boxes and got away with a `scale` of 40; the same values on a sphere are pixel confetti. The physical presets all run coarse noise and almost no bump, and let the physical term carry the character.
+
+
 ## Wear: rain on everything
 
 `wet` is a **state, not a kind**. Every one of the presets above can be rained on, and the catalogue does not grow by one entry to make it happen:

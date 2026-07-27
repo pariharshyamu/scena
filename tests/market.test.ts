@@ -15,7 +15,7 @@ function surfaceCount(object: { traverse(cb: (o: unknown) => void): void }): num
   let n = 0;
   object.traverse((o) => {
     const m = (o as Mesh).material;
-    if (m instanceof MeshStandardMaterial && m.customProgramCacheKey() === 'scena-surface-v4') n++;
+    if (m instanceof MeshStandardMaterial && m.customProgramCacheKey() === 'scena-surface-v5') n++;
   });
   return n;
 }

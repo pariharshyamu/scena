@@ -1,4 +1,4 @@
-import { Color, MeshStandardMaterial, Vector2, Vector3 } from 'three';
+import { Color, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, Vector3 } from 'three';
 
 /**
  * Procedural surface materials — the reason low-poly SCENA props can look
@@ -81,7 +81,13 @@ export type SurfaceKind =
   | 'diamondPlate'
   | 'galvanised'
   | 'copperPatina'
-  | 'basalt';
+  | 'basalt'
+  // Tier 6 — physical (MeshPhysicalMaterial; see `physical`)
+  | 'velvet'
+  | 'silk'
+  | 'brushedMetal'
+  | 'nacre'
+  | 'ice';
 
 export interface SurfaceParams {
   /**
@@ -154,6 +160,52 @@ export interface SurfaceParams {
   capSharp?: number;
   /** Roughness inside the capped area (fresh snow reads matte/bright). */
   capRough?: number;
+
+  // --- physical: light responses MeshStandardMaterial cannot produce -----
+  /**
+   * Build a `MeshPhysicalMaterial` instead of a `MeshStandardMaterial`.
+   *
+   * Some surfaces are defined by a light response the standard model has no
+   * term for at all — the retroreflective rim of velvet, the stretched
+   * highlight on silk, the thin-film hue shift on a shell, light going
+   * THROUGH ice. None of those can be faked with albedo and roughness.
+   *
+   * It costs: a physical material is a bigger shader, and `transmission` in
+   * particular makes three render the scene a second time into a buffer. Use
+   * it on OBJECTS, not on facades — which is exactly why `createGlass` fakes
+   * its glass rather than transmitting it.
+   */
+  physical?: boolean;
+  /** Sheen strength — velvet, felt, wool. The rim IS the material. */
+  sheen?: number;
+  /** Sheen colour, as a hex int. */
+  sheenColor?: number;
+  /** Sheen roughness. */
+  sheenRough?: number;
+  /**
+   * Anisotropy strength: a stretched highlight instead of a round one.
+   * Silk, brushed metal, carbon fibre. NOTE it follows the geometry's UVs,
+   * so a mesh with no UV attribute will not show it.
+   */
+  anisotropy?: number;
+  /** Which way the grain runs, in radians. */
+  anisotropyRotation?: number;
+  /** Thin-film iridescence — nacre, beetle shell, oil on water. */
+  iridescence?: number;
+  /** Iridescent film IOR. */
+  iridescenceIOR?: number;
+  /** Film thickness range in nanometres, [min, max]. */
+  iridescenceThickness?: [number, number];
+  /** Transmission: light passing THROUGH. Expensive — see `physical`. */
+  transmission?: number;
+  /** How thick the volume is, for transmission. */
+  thickness?: number;
+  /** Index of refraction (water 1.33, ice 1.31, glass 1.5). */
+  ior?: number;
+  /** Colour light picks up on its way through, as a hex int. */
+  attenuationColor?: number;
+  /** How far light travels before it is fully attenuated, in metres. */
+  attenuationDistance?: number;
 
   // --- ribs: parallel ridges (opt-in; `ribs: 0` — the default — is flat) ---
   /** Ridge relief strength (0 off). Corrugated sheet, fluting, tread plate. */
@@ -698,6 +750,67 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
     cells: 1, cellScale: 3.2, cellEdge: 0.85, cellJitter: 0.16, cellPlan: 1,
   },
+
+  // --- Tier 6: physical --------------------------------------------------
+  // Each of these is defined by a light response the standard model has no
+  // term for. They are the one part of the catalogue that costs more than a
+  // MeshStandardMaterial, and they are worth it only because nothing else
+  // gets you there.
+
+  // THE RIM IS THE MATERIAL. Velvet is dark where you look straight at it
+  // and bright at every grazing edge, because the pile scatters sideways —
+  // and no amount of albedo and roughness produces that.
+  velvet: {
+    baseColor: 0x6d1730,
+    roughness: 0.92, metalness: 0, scale: 7, albedoVar: 0.05, tint: 0x3a0a19,
+    tintAmount: 0.14, ao: 0.12, bump: 0.015, roughVar: 0.03, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    physical: true, sheen: 1, sheenColor: 0xd8869c, sheenRough: 0.32,
+  },
+  // A stretched highlight instead of a round one: the thread runs one way,
+  // so the light does too.
+  silk: {
+    baseColor: 0xc9b7d8,
+    roughness: 0.2, metalness: 0.05, scale: 6, albedoVar: 0.04, tint: 0x8f7fa6,
+    tintAmount: 0.08, ao: 0.06, bump: 0.01, roughVar: 0.02, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    physical: true, anisotropy: 0.9, anisotropyRotation: 0,
+    sheen: 0.35, sheenColor: 0xffffff, sheenRough: 0.2,
+  },
+  // The linisher went one way. Brushed aluminium, a kitchen front, a lift
+  // door — the streak is the only thing separating it from plain steel.
+  brushedMetal: {
+    baseColor: 0xb4b9be,
+    roughness: 0.34, metalness: 0.7, scale: 5, albedoVar: 0.02, tint: 0x8b9196,
+    tintAmount: 0.04, ao: 0.03, bump: 0.008, roughVar: 0.02, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    physical: true, anisotropy: 0.95, anisotropyRotation: Math.PI / 2,
+  },
+  // Thin-film interference: the hue depends on how thick the film is and
+  // which way you are looking, which is why a shell has no fixed colour.
+  nacre: {
+    baseColor: 0xdcd8d0,
+    roughness: 0.12, metalness: 0.2, scale: 4, albedoVar: 0.04, tint: 0xa8b0c0,
+    tintAmount: 0.18, ao: 0.05, bump: 0.02, roughVar: 0.02, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    // Low metalness on purpose. Iridescence is strongest over a metallic
+    // F0, but a metal with no environment map to reflect renders as dead
+    // grey — so the film sits over a pale pearl instead, and a thick one
+    // (a high IOR) makes the highlight visibly COLOURED rather than white.
+    physical: true, iridescence: 1, iridescenceIOR: 2.4,
+    iridescenceThickness: [300, 900],
+  },
+  // Light goes THROUGH. The cells are the fracture planes inside it — ice
+  // is not clear, it is full of the cracks it froze around.
+  ice: {
+    baseColor: 0xcfe8f2,
+    roughness: 0.13, metalness: 0, scale: 2.5, albedoVar: 0.05, tint: 0x7fb4cc,
+    tintAmount: 0.14, ao: 0.08, bump: 0.06, roughVar: 0.03, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    cells: 1, cellScale: 1.8, cellEdge: 0.22, cellJitter: 0.08,
+    physical: true, transmission: 0.85, thickness: 0.5, ior: 1.31,
+    attenuationColor: 0x9fd4e8, attenuationDistance: 1.4,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -1095,12 +1208,43 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   const p: SurfaceParams = { ...preset, ...options };
   const seed = options.seed ?? 0;
 
-  const material = new MeshStandardMaterial({
+  const base = {
     color: options.color ?? preset.baseColor ?? 0x9a9a9a,
     roughness: p.roughness,
     metalness: p.metalness,
     flatShading: p.flat,
-  });
+  };
+  // A MeshPhysicalMaterial only when the preset genuinely needs one. It is a
+  // bigger shader, and `transmission` makes three render the scene a second
+  // time — so the other 52 kinds keep the cheap material they have always had.
+  const material: MeshStandardMaterial = p.physical
+    ? new MeshPhysicalMaterial({
+        ...base,
+        ...(p.sheen === undefined ? {} : {
+          sheen: p.sheen,
+          sheenColor: new Color(p.sheenColor ?? 0xffffff),
+          sheenRoughness: p.sheenRough ?? 0.3,
+        }),
+        ...(p.anisotropy === undefined ? {} : {
+          anisotropy: p.anisotropy,
+          anisotropyRotation: p.anisotropyRotation ?? 0,
+        }),
+        ...(p.iridescence === undefined ? {} : {
+          iridescence: p.iridescence,
+          iridescenceIOR: p.iridescenceIOR ?? 1.3,
+          iridescenceThicknessRange: p.iridescenceThickness ?? [100, 400],
+        }),
+        ...(p.transmission === undefined ? {} : {
+          transmission: p.transmission,
+          thickness: p.thickness ?? 0.5,
+          ior: p.ior ?? 1.5,
+          ...(p.attenuationColor === undefined ? {} : {
+            attenuationColor: new Color(p.attenuationColor),
+            attenuationDistance: p.attenuationDistance ?? 1,
+          }),
+        }),
+      })
+    : new MeshStandardMaterial(base);
 
   const uniforms = {
     uSurfScale: { value: p.scale },
@@ -1176,7 +1320,8 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   // from colliding with a plain MeshStandardMaterial that has matching base
   // params but no injection. three still appends its own feature key, so
   // flat/smooth/instanced variants stay separate programs.
-  material.customProgramCacheKey = () => 'scena-surface-v4';
+  const cacheKey = p.physical ? 'scena-surface-v5-physical' : 'scena-surface-v5';
+  material.customProgramCacheKey = () => cacheKey;
 
   // Expose the live uniforms so weather can drive them after the fact — e.g.
   // snow settling ramps uSurfCap, rain darkens/glosses via the same handles.

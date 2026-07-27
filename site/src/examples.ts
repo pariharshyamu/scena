@@ -3119,6 +3119,58 @@ game.onUpdate((t) => {
 });
 game.start();`,
   },
+  {
+    id: 'physical',
+    title: 'The physical tier',
+    group: 'Worldbuilding',
+    code: `// Five light responses MeshStandardMaterial has no term for at all —
+// the only kinds in the catalogue that build a MeshPhysicalMaterial.
+//
+//   velvet        sheen        dark head-on, bright at every grazing edge
+//   silk          anisotropy   a stretched highlight, not a round one
+//   brushedMetal  anisotropy   the linisher went one way
+//   nacre         iridescence  thin-film: hue depends on thickness and angle
+//   ice           transmission light goes THROUGH (three renders twice)
+//
+// Spheres, not boxes: sheen and anisotropy are about the way a highlight
+// WRAPS, and a flat face has nothing to wrap around.
+import { createSurface, createSky, createLightingRig, applyFog,
+         PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, PlaneGeometry, SphereGeometry, TorusKnotGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+
+const floor = new Mesh(new PlaneGeometry(60, 60),
+  createSurface('slate', { seed: 4, color: 0x6f7378 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+const KINDS = ['velvet', 'silk', 'brushedMetal', 'nacre', 'ice'];
+KINDS.forEach((kind, i) => {
+  const ball = new Mesh(new SphereGeometry(0.62, 40, 28),
+    createSurface(kind, { seed: 3 + i }));
+  ball.position.set((i - 2) * 1.55, 0.75, 0);
+  scene.add(ball);
+});
+
+// Something behind the ice, so the transmission has something to distort.
+const knot = new Mesh(new TorusKnotGeometry(0.42, 0.14, 90, 12),
+  createSurface('brass', { seed: 9 }));
+knot.position.set(3.1, 0.78, -1.9);
+scene.add(knot);
+
+game.onUpdate((t) => {
+  knot.rotation.y = t.elapsed * 0.5;
+  game.camera.position.set(Math.sin(t.elapsed * 0.15) * 1.4, 1.5, 7.6);
+  game.camera.lookAt(0, 0.74, 0);
+});
+game.start();`,
+  },
 ];
 
 export function findExample(id: string): Example {

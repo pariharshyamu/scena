@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Color, Mesh, MeshStandardMaterial, ShaderLib, Vector3 } from 'three';
+import { Color, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, ShaderLib, Vector3 } from 'three';
 import { createSurface, SURFACE_PRESETS, type SurfaceKind } from '../src/materials/surface';
 
 /** The subset of three's onBeforeCompile shader object we inspect. */
@@ -69,11 +69,17 @@ describe('createSurface', () => {
     expect(shader.uniforms.uSurfScale.value).toBe(SURFACE_PRESETS.wood.scale);
   });
 
-  it('shares one program cache key so presets do not fragment the pipeline', () => {
+  it('shares its program cache key so presets do not fragment the pipeline', () => {
+    // TWO keys, not one per preset: every standard surface compiles to one
+    // program and every physical surface to another, because a
+    // MeshPhysicalMaterial genuinely is a different shader. Fifty-seven
+    // kinds, two programs.
     const keys = KINDS.map((k) => createSurface(k).customProgramCacheKey());
-    expect(new Set(keys).size).toBe(1);
-    // …but it is distinct from a plain material's default key.
-    expect(keys[0]).not.toBe(new MeshStandardMaterial().customProgramCacheKey());
+    expect(new Set(keys).size).toBe(2);
+    // …and both are distinct from a plain material's default key.
+    for (const k of new Set(keys)) {
+      expect(k).not.toBe(new MeshStandardMaterial().customProgramCacheKey());
+    }
   });
 
   it('seed shifts the noise field so equal colours weather apart', () => {
@@ -195,7 +201,7 @@ describe('props adopt surfaces', () => {
       const mat = (o as Mesh).material;
       if (mat instanceof MeshStandardMaterial && typeof mat.onBeforeCompile === 'function') {
         // Distinguish surface materials (custom key) from plain ones.
-        if (mat.customProgramCacheKey() === 'scena-surface-v4') n++;
+        if (mat.customProgramCacheKey() === 'scena-surface-v5') n++;
       }
     });
     return n;
@@ -297,11 +303,14 @@ describe('the industrial six', () => {
     expect(u('basalt').uSurfCellPlan.value).toBe(1);
   });
 
-  it('and the other 46 are untouched by it', () => {
+  it('and the original catalogue is untouched by it', () => {
     // A new tier that quietly restyled the existing catalogue would be a
-    // much worse bug than one that did not work.
+    // much worse bug than one that did not work. (`ice` is in the physical
+    // tier and uses the cells for its fracture planes, so it is excluded
+    // here and covered by its own test below.)
+    const LATER = [...SIX, 'velvet', 'silk', 'brushedMetal', 'nacre', 'ice'] as SurfaceKind[];
     for (const kind of KINDS) {
-      if (SIX.includes(kind)) continue;
+      if (LATER.includes(kind)) continue;
       const u = compilePatched(createSurface(kind)).uniforms;
       expect(u.uSurfRibs.value, kind).toBe(0);
       expect(u.uSurfSpeck.value, kind).toBe(0);
@@ -360,5 +369,99 @@ describe('the industrial six', () => {
     ]) {
       expect(frag).toContain(guard);
     }
+  });
+});
+
+describe('the physical tier', () => {
+  const PHYSICAL = ['velvet', 'silk', 'brushedMetal', 'nacre', 'ice'] as SurfaceKind[];
+
+  /** Same as compilePatched, but against three's PHYSICAL shader. */
+  function compilePhysical(mat: MeshStandardMaterial): Shader {
+    const shader: Shader = {
+      uniforms: {},
+      vertexShader: ShaderLib.physical.vertexShader,
+      fragmentShader: ShaderLib.physical.fragmentShader,
+    };
+    (mat.onBeforeCompile as (s: Shader, r: unknown) => void)(shader, null);
+    return shader;
+  }
+
+  it('builds a MeshPhysicalMaterial — and ONLY for the kinds that need one', () => {
+    for (const kind of KINDS) {
+      const mat = createSurface(kind);
+      const want = PHYSICAL.includes(kind);
+      expect(mat instanceof MeshPhysicalMaterial, kind).toBe(want);
+      // Either way it is still a MeshStandardMaterial, so nothing downstream
+      // that types against one has to care.
+      expect(mat, kind).toBeInstanceOf(MeshStandardMaterial);
+    }
+  });
+
+  it('THE WHOLE INJECTION STILL FIRES against the physical shader', () => {
+    // The patch is written against MeshStandard's chunk names. If the
+    // physical shader spelled any of them differently the replace would
+    // silently no-op and the surface would render as flat paint.
+    for (const chunk of [
+      '#include <map_fragment>',
+      '#include <roughnessmap_fragment>',
+      '#include <metalnessmap_fragment>',
+      '#include <normal_fragment_maps>',
+      '#include <emissivemap_fragment>',
+    ]) {
+      expect(ShaderLib.physical.fragmentShader, chunk).toContain(chunk);
+    }
+    const shader = compilePhysical(createSurface('velvet'));
+    expect(shader.vertexShader).toContain('vSurfWorldPos');
+    expect(shader.fragmentShader).toContain('scenaTri(');
+    expect(shader.fragmentShader).toContain('scenaWetMask');
+    expect(shader.uniforms.uSurfScale.value).toBe(SURFACE_PRESETS.velvet.scale);
+  });
+
+  it('each one asks three for the term that defines it', () => {
+    const velvet = createSurface('velvet') as MeshPhysicalMaterial;
+    expect(velvet.sheen).toBe(1);
+    expect(velvet.sheenRoughness).toBeCloseTo(0.32, 5);
+
+    const silk = createSurface('silk') as MeshPhysicalMaterial;
+    expect(silk.anisotropy).toBeGreaterThan(0.8);
+
+    const brushed = createSurface('brushedMetal') as MeshPhysicalMaterial;
+    expect(brushed.anisotropy).toBeGreaterThan(0.8);
+    expect(brushed.anisotropyRotation).toBeCloseTo(Math.PI / 2, 5);
+
+    const nacre = createSurface('nacre') as MeshPhysicalMaterial;
+    expect(nacre.iridescence).toBe(1);
+    expect(nacre.iridescenceThicknessRange).toEqual([300, 900]);
+
+    const ice = createSurface('ice') as MeshPhysicalMaterial;
+    expect(ice.transmission).toBeGreaterThan(0.5);
+    expect(ice.ior).toBeCloseTo(1.31, 5);       // ice, not glass
+    expect(ice.attenuationDistance).toBeCloseTo(1.4, 5);
+  });
+
+  it('ONLY ice pays for transmission', () => {
+    // Transmission makes three render the scene a second time into a
+    // buffer. A tier that switched it on for a fabric would be a
+    // performance bug disguised as a material.
+    for (const kind of KINDS) {
+      const mat = createSurface(kind);
+      if (kind === 'ice') continue;
+      expect((mat as MeshPhysicalMaterial).transmission ?? 0, kind).toBe(0);
+    }
+  });
+
+  it('ice keeps its fracture planes: the cells run inside the transmission', () => {
+    const u = compilePhysical(createSurface('ice')).uniforms;
+    expect(u.uSurfCells.value).toBe(1);
+    expect(u.uSurfCellPlan.value).toBe(0);
+  });
+
+  it('a physical surface is still weatherable, and still seeded', () => {
+    const a = compilePhysical(createSurface('velvet', { seed: 1, wet: 0.6 }));
+    const b = compilePhysical(createSurface('velvet', { seed: 2 }));
+    expect(a.uniforms.uSurfWet.value).toBe(0.6);
+    expect((a.uniforms.uSurfSeed.value as Vector3).equals(b.uniforms.uSurfSeed.value as Vector3)).toBe(false);
+    const live = (createSurface('ice').userData as { scenaSurface?: unknown }).scenaSurface;
+    expect(live).toBeDefined();          // rain can still soak it
   });
 });
