@@ -114,3 +114,15 @@ createOcean({
 **`ripples`** are the fine chop riding on the swell. Four Gerstner waves give a sea its shape, but a swell alone is a rolling sheet — what reads as water is the ripple breaking the light into a thousand moving highlights. Three crossing trains at different scales, with analytic derivatives perturbing the normal, drifting with the swell so the surface *flows* one way like a real sea instead of shimmering in place. They fade with distance (chop that doesn't would alias into a mess) and drop out inside foam, which is froth and has no facets.
 
 It is shading, not geometry: `heightAt` is untouched, so boats float exactly as they did. `ripples: false` gives glass — a lagoon at dawn, a harbour before the wind gets up.
+
+## Clarity — seeing the bottom
+
+```js
+createOcean({ shore: profile, shoalDepth: 13, clarity: 0.8 });
+```
+
+Clear water **is** its bottom. `clarity` (0–1) makes the shallows see-through — the sand, the reef and the fish read straight through the turquoise — and deepens back to opaque as the floor drops away. That transition is the whole reason a reef reads as a reef rather than a painted circle on a sheet.
+
+Foam stays opaque at any clarity, because froth is not glass.
+
+The default is **0** — an opaque sheet, which is right for a grey sea and cheaper, since the material only pays for blending when somebody asks to see through it. `depthWrite` deliberately stays on: this is one surface over opaque ground, and turning it off lets the sea floor draw over the sea.

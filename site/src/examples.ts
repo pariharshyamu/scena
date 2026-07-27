@@ -935,6 +935,8 @@ const ocean = createOcean({
   shoalDepth: 13,
   // And the chop that breaks the light up into moving highlights.
   ripples: { strength: 0.4, scale: 0.8 },
+  // See-through shallows: clear water IS its bottom.
+  clarity: 0.8,
 });
 // NOT offset: the shore sampler works in the ocean's own space, so the
 // plane has to sit on the same origin as the profile it fades against.

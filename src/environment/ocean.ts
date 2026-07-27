@@ -87,6 +87,13 @@ export interface OceanOptions {
    */
   ripples?: false | RippleOptions;
   /**
+   * How see-through the shallows are, 0–1. Clear water IS its bottom: at
+   * 0.8 you read the sand, the reef and the fish through the turquoise,
+   * and the colour deepens to opaque as the floor drops away. Default 0
+   * — an opaque sheet, which is right for a grey sea and cheaper.
+   */
+  clarity?: number;
+  /**
    * A live sea state — `() => seaState.trains`.
    *
    * Structurally `SeaState.trains`, duck-typed like `storm`, so the ocean
@@ -225,6 +232,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   const shore = options.shore;
   const surf = options.surf;
   const ripples = options.ripples;
+  const clarity = Math.max(0, Math.min(1, options.clarity ?? 0));
   const surge = options.surge ?? 1.2;
   const stormSrc =
     typeof options.storm === 'function'
@@ -297,6 +305,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     // How deep the water goes before it reads as open sea. Bigger = a
     // wider turquoise shelf, which is most of what a tropical coast IS.
     uShoalDepth: { value: options.shoalDepth ?? 3.0 },
+    uClarity: { value: clarity },
     uFlow: { value: new Vector2(0.06, 0.04) },
     uRipple: { value: ripples === false ? 0 : (ripples?.strength ?? 0.34) },
     uRippleScale: { value: ripples === false ? 1 : (ripples?.scale ?? 0.85) },
@@ -384,6 +393,10 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     color: 0x2a6b82,
     metalness: 0.0,
     roughness: 0.18,
+    // Only pay for blending when somebody asked to see through the water.
+    // depthWrite stays ON: this is one surface over opaque ground, and
+    // turning it off lets the sea floor draw over the sea.
+    transparent: clarity > 0,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -397,7 +410,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nuniform float uTime;\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nuniform float uBreakDepth;\nuniform float uSwash;\nuniform float uSwashPeriod;\nuniform float uSurfBands;\nuniform vec2 uFlow;\nuniform float uRipple;\nuniform float uRippleScale;\nvarying float vOceanFoam;\nvarying float vOceanShore;\nvarying vec3 vOceanWorld;`
+        `#include <common>\nuniform float uTime;\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nuniform float uBreakDepth;\nuniform float uSwash;\nuniform float uSwashPeriod;\nuniform float uSurfBands;\nuniform float uClarity;\nuniform vec2 uFlow;\nuniform float uRipple;\nuniform float uRippleScale;\nvarying float vOceanFoam;\nvarying float vOceanShore;\nvarying vec3 vOceanWorld;`
       )
       .replace(
         '#include <map_fragment>',
@@ -425,6 +438,11 @@ export function createOcean(options: OceanOptions = {}): Ocean {
         float shoreFoam = (1.0 - smoothstep(0.0, uFoamBand, shoreD)) * step(0.0, shoreD);
         float oceanFoam = clamp(max(vOceanFoam, max(shoreFoam, breakers)), 0.0, 1.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.94, 0.96, 0.97), oceanFoam);
+        // CLARITY. Shallow water shows its floor and deep water does not —
+        // the transition is the whole reason a reef reads as a reef and not
+        // a painted circle. Foam stays opaque: froth is not glass.
+        float seeThrough = uClarity * (1.0 - smoothstep(0.0, uShoalDepth * 0.6, shoreD));
+        diffuseColor.a = max(1.0 - seeThrough * 0.72, oceanFoam);
         // A storm darkens and greys the water between the whitecaps.
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.18, 0.2), uStorm * 0.45 * (1.0 - oceanFoam));`
       )
