@@ -19,7 +19,7 @@ import {
 
 const palette = PALETTES.meadow;
 const scene = new Scene();
-const camera = new PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 400);
+const camera = new PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 900);
 const renderer = new WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);

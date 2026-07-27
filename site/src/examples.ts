@@ -3072,6 +3072,53 @@ game.onUpdate((t) => {
 });
 game.start();`,
   },
+  {
+    id: 'industrial',
+    title: 'The industrial six',
+    group: 'Worldbuilding',
+    code: `// Six kinds, four new pieces of shader — all off by default, all costing
+// one compare when they are.
+//
+//   ribs      parallel ridges in the FACE's plane (a world axis is no use:
+//             two of them collapse onto the same direction on a wall, which
+//             turns a crossed tread plate back into plain stripes)
+//   speck     hard-edged aggregate — asphalt is stones in tar, and stones
+//             have edges, where smooth fbm just reads as mottling
+//   cells     warped Voronoi: the zinc spangle and basalt's columnar
+//             jointing are one function two orders of magnitude apart
+//   crust     verdigris, rust, lichen — and it takes the METALNESS with it,
+//             which is the difference between patina and green paint
+import { createSurface, createSky, createLightingRig, applyFog,
+         PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry } from 'three';
+
+const palette = PALETTES.urban;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+
+// The road IS the asphalt sample: aggregate only reads at a grazing angle.
+const road = new Mesh(new PlaneGeometry(70, 70), createSurface('asphalt', { seed: 3 }));
+road.rotation.x = -Math.PI / 2;
+scene.add(road);
+
+// Tall slabs, so the corrugation and the basalt columns have room to run.
+const KINDS = ['corrugatedIron', 'diamondPlate', 'galvanised', 'copperPatina', 'basalt'];
+KINDS.forEach((kind, i) => {
+  const panel = new Mesh(new BoxGeometry(1.7, 2.6, 0.5),
+    createSurface(kind, { seed: 5 + i }));
+  panel.position.set((i - 2) * 2.1, 1.3, 0);
+  scene.add(panel);
+});
+
+game.onUpdate((t) => {
+  game.camera.position.set(Math.sin(t.elapsed * 0.14) * 3.4, 2.5, 8.4);
+  game.camera.lookAt(0, 1.25, 0);
+});
+game.start();`,
+  },
 ];
 
 export function findExample(id: string): Example {

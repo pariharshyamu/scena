@@ -156,6 +156,44 @@ const window_ = createGlass({ nightGlow: true });     // ignites at dusk
 
 `nightGlow` follows the house-window convention: the emissive sits at the intensity `createDayCycle` scans for, so listing the pane's building in the cycle's `lamps` makes the glass burn warm at night — the lit-window skyline, free. Try `?t=0.95` in the **Modern materials** playground.
 
+## The industrial six
+
+Six kinds and four new pieces of shader, all of them off by default and all of them costing a single compare when they are:
+
+| | what it needed |
+|---|---|
+| `corrugatedIron` | ribs, plus a rust crust in the valleys |
+| `asphalt` | hard-edged aggregate |
+| `diamondPlate` | crossed ribs |
+| `galvanised` | Voronoi cells — the zinc spangle |
+| `copperPatina` | a crust that takes the metalness with it |
+| `basalt` | Voronoi cells, laid out in plan |
+
+### Ribs, in the face's own plane
+
+`ribs` is a wave of parallel ridges — the reason a flat plane reads as a *roof* from fifty metres, and why corrugated iron is the most recognisable industrial material there is. `ribCross` lays a second set across the first and takes the **minimum**, so the two are high together only where they actually cross: a field of studs, which is tread plate.
+
+Ribs are laid out in the **face's** plane, like the masonry grid, not along a world axis. That is not a stylistic choice — two world axes that differ in space collapse onto the same direction once projected onto a wall, which turns a crossed tread plate straight back into plain stripes. `ribTurn` rotates them 90° on the face.
+
+### Aggregate has edges
+
+Everything else in this shader runs on smooth fbm, which reads as mottling. Asphalt is **stones in tar**, and stones have edges — so `speck` comes from cell noise, hard-stepped, and that is the whole difference between a road and a mud flat.
+
+### Cells: one function, two orders of magnitude
+
+`cells` is a warped Voronoi returning a per-cell hash and the distance to the nearest seam (the F2−F1 distance, so the seam doesn't care how big the cells are). The columnar jointing of basalt and the zinc spangle on galvanised steel are that one function at very different scales.
+
+`cellPlan: 1` lays the cells out **in plan and extrudes them vertically**, whatever the face is pointing at — because columnar jointing is crazy paving seen from above, pulled up into columns. Project it per-face instead and a cliff gets blotches rather than columns.
+
+One tuning note learned the hard way: real zinc spangle is millimetres across, but a crystal too small to resolve is not a crystal — it is per-pixel noise, and on a metal that is a sparkling mess. The preset uses grains you can actually see.
+
+### Crust is not a tint
+
+`crust` grows in the cavities and on the up-facing side: verdigris, a rust bloom, lichen. Where it takes hold it **zeroes the metalness**, because a mineral scab does not reflect like the metal it grew on. That is the difference between patina and green paint, and it is why a green copper roof is matte where the copper beside it is not.
+
+> Metals need an environment map to reflect. `galvanised`, `diamondPlate` and `copperPatina` are deliberately kept off full metalness so they still read under a plain directional light — a scene with no IBL renders a mirror as black.
+
+
 ## Wear: rain on everything
 
 `wet` is a **state, not a kind**. Every one of the presets above can be rained on, and the catalogue does not grow by one entry to make it happen:

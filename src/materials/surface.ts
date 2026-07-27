@@ -74,7 +74,14 @@ export type SurfaceKind =
   | 'glaze'
   | 'mosaic'
   | 'parquet'
-  | 'patternedTile';
+  | 'patternedTile'
+  // Tier 5 — industrial
+  | 'corrugatedIron'
+  | 'asphalt'
+  | 'diamondPlate'
+  | 'galvanised'
+  | 'copperPatina'
+  | 'basalt';
 
 export interface SurfaceParams {
   /**
@@ -147,6 +154,64 @@ export interface SurfaceParams {
   capSharp?: number;
   /** Roughness inside the capped area (fresh snow reads matte/bright). */
   capRough?: number;
+
+  // --- ribs: parallel ridges (opt-in; `ribs: 0` — the default — is flat) ---
+  /** Ridge relief strength (0 off). Corrugated sheet, fluting, tread plate. */
+  ribs?: number;
+  /** Ridges per world metre. */
+  ribScale?: number;
+  /**
+   * 1 = turn the ridges through 90° on the face. Ribs are laid out in the
+   * FACE's own plane, not along a world axis: two world axes that differ in
+   * space collapse onto the same direction once projected onto a wall, which
+   * turned a crossed tread plate back into plain stripes.
+   */
+  ribTurn?: number;
+  /** 1 = a second set crossed over the first: the diamond studs of tread plate. */
+  ribCross?: number;
+
+  // --- aggregate: hard-edged chips (opt-in; `speck: 0` — the default — off) ---
+  /**
+   * Chip contrast. The rest of the shader runs on smooth fbm, which reads as
+   * mottling; asphalt is STONES IN TAR, and stones have edges.
+   */
+  speck?: number;
+  /** Chips per world metre. */
+  speckScale?: number;
+
+  // --- cells: warped Voronoi (opt-in; `cells: 0` — the default — off) ---
+  /**
+   * Cell strength. Irregular polygons: the columnar jointing of basalt and
+   * the zinc spangle on galvanised steel are the same function at two very
+   * different scales.
+   */
+  cells?: number;
+  /** Cells per world metre. */
+  cellScale?: number;
+  /** How dark and deep the seams between cells run (0–1). */
+  cellEdge?: number;
+  /** Per-cell brightness jitter (0–1). */
+  cellJitter?: number;
+  /**
+   * 1 = lay the cells out in PLAN and extrude them vertically, whatever the
+   * face is pointing at. That is what columnar jointing is — a crazy paving
+   * seen from above, pulled up into columns — and projecting it per-face
+   * instead gives blotches on a wall rather than columns in a cliff.
+   */
+  cellPlan?: number;
+
+  // --- crust: a mineral layer (opt-in; `crust: 0` — the default — off) ---
+  /**
+   * How much crust has grown: verdigris on copper, a rust bloom, lichen.
+   * It takes in the cavities and on the up-facing side, and it is a CRUST,
+   * not a tint — wherever it takes hold the metalness goes with it, because
+   * a mineral scab does not reflect like the metal underneath.
+   */
+  crust?: number;
+  /** Crust colour, as a hex int (verdigris green, rust orange…). */
+  crustColor?: number;
+  /** Roughness inside the crust. */
+  crustRough?: number;
 
   // --- wear: water (opt-in; `wet: 0` — the default — is bone dry) ---
   /**
@@ -565,6 +630,74 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     tile: 1, tileW: 0.33, tileH: 0.33, mortar: 0.008, bond: 0, round: 0,
     tileJitter: 0.05, mortarColor: 0xa9a396, tileRelief: 0.035, motif: 0.9,
   },
+
+  // --- Tier 5: industrial ------------------------------------------------
+  // Sheet steel rolled into a wave, galvanised, and left out in the rain.
+  // The corrugation is the ONLY reason a flat plane reads as a roof from
+  // fifty metres, and it is why this is the most recognisable industrial
+  // material there is: a shanty wall, a barn, a lock-up, a site hoarding.
+  corrugatedIron: {
+    baseColor: 0x9aa2a6,
+    roughness: 0.58, metalness: 0.5, scale: 9, albedoVar: 0.1, tint: 0x6a5545,
+    tintAmount: 0.16, ao: 0.16, bump: 0.35, roughVar: 0.18, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    ribs: 1, ribScale: 5,
+    // Rust takes in the valleys, where the water sits — but a sheet that is
+    // more rust than iron reads as rust, not as a roof.
+    crust: 0.3, crustColor: 0x8a4a26, crustRough: 0.95,
+  },
+  // Stones in tar. The chips are the point: a smooth mottle is mud, and
+  // the reason a road reads as a road at all is that it is visibly made of
+  // gravel somebody poured glue over.
+  asphalt: {
+    baseColor: 0x3b3b3e,
+    roughness: 0.93, metalness: 0, scale: 14, albedoVar: 0.1, tint: 0x1e1e20,
+    tintAmount: 0.18, ao: 0.2, bump: 0.4, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    speck: 0.42, speckScale: 40,
+  },
+  // Tread plate: raised studs in a diamond lattice, so a gantry floor has
+  // grip and a stair tread reads as a stair tread.
+  diamondPlate: {
+    baseColor: 0x8d9399,
+    roughness: 0.44, metalness: 0.55, scale: 12, albedoVar: 0.05, tint: 0x5c6166,
+    tintAmount: 0.1, ao: 0.1, bump: 0.5, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    ribs: 1, ribScale: 6, ribCross: 1,
+  },
+  // THE SPANGLE is the whole material: hot-dip galvanising freezes into
+  // visible zinc crystals, each catching the light its own way, and no
+  // other metal has that.
+  galvanised: {
+    baseColor: 0xa9b1b5,
+    roughness: 0.46, metalness: 0.5, scale: 3.5, albedoVar: 0.04, tint: 0x7d868b,
+    tintAmount: 0.06, ao: 0.05, bump: 0.1, roughVar: 0.05, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    // Grains you can SEE, each catching the light its own way. Real spangle
+    // is millimetres, but a crystal too small to resolve is not a crystal —
+    // it is per-pixel noise, and on a metal that is a sparkling mess.
+    cells: 1, cellScale: 6, cellEdge: 0.22, cellJitter: 0.4,
+  },
+  // Copper does not stay copper. Verdigris grows in the cavities and on
+  // the up-facing side, and where it grows the metal is gone — which is
+  // why a green roof is matte and a copper one is not.
+  copperPatina: {
+    baseColor: 0x9c5b34,
+    roughness: 0.42, metalness: 0.75, scale: 6, albedoVar: 0.08, tint: 0x6b3a1f,
+    tintAmount: 0.12, ao: 0.14, bump: 0.2, roughVar: 0.12, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: false,
+    crust: 0.95, crustColor: 0x4fa88a, crustRough: 0.92,
+  },
+  // Columnar jointing: lava that cooled slowly and cracked into polygons,
+  // then stood up as columns. Laid out in PLAN and extruded, because that
+  // is what the rock actually did.
+  basalt: {
+    baseColor: 0x54585e,
+    roughness: 0.86, metalness: 0.04, scale: 3, albedoVar: 0.06, tint: 0x2b2e33,
+    tintAmount: 0.12, ao: 0.16, bump: 0.5, roughVar: 0.1, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    cells: 1, cellScale: 3.2, cellEdge: 0.85, cellJitter: 0.16, cellPlan: 1,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -618,6 +751,20 @@ uniform vec3  uSurfGlowColor;
 uniform float uSurfGlowThresh;
 uniform float uSurfWet;
 uniform float uSurfWetCling;
+uniform float uSurfRibs;
+uniform float uSurfRibScale;
+uniform float uSurfRibTurn;
+uniform float uSurfRibCross;
+uniform float uSurfSpeck;
+uniform float uSurfSpeckScale;
+uniform float uSurfCells;
+uniform float uSurfCellScale;
+uniform float uSurfCellEdge;
+uniform float uSurfCellJitter;
+uniform float uSurfCellPlan;
+uniform float uSurfCrust;
+uniform vec3  uSurfCrustColor;
+uniform float uSurfCrustRough;
 
 float scenaHash13(highp vec3 p){
   p = fract(p * 0.1031);
@@ -705,6 +852,76 @@ float scenaCapMask(vec3 wn, float breakup){
   float s = max(uSurfCapSharp, 1e-3);
   return clamp(smoothstep(uSurfCapUp - s, uSurfCapUp + s, up + (breakup - 0.5) * 0.6), 0.0, 1.0);
 }
+// Parallel ridges along an axis — a corrugated sheet. Crossed with a second
+// set, the two lattices intersect in isolated studs: tread plate.
+float scenaRibs(highp vec3 wp, vec3 wn){
+  if (uSurfRibs <= 0.0) return 0.0;
+  // In the FACE's own plane, like the masonry grid. A world axis is no use
+  // here: on a wall, two different world axes project onto the same
+  // direction, which turns a crossed tread plate back into plain stripes.
+  vec3 an = abs(normalize(wn));
+  highp vec2 uv;
+  if (an.x >= an.y && an.x >= an.z) uv = wp.zy;
+  else if (an.y >= an.x && an.y >= an.z) uv = wp.xz;
+  else uv = wp.xy;
+  uv = (uSurfRibTurn > 0.5 ? uv.yx : uv) * uSurfRibScale;
+  float r = abs(fract(uv.x) - 0.5) * 2.0;
+  if (uSurfRibCross > 0.5) {
+    // Two sets at ±45° IN THAT PLANE. MIN, not max: crossed ridges are high
+    // together only where they actually cross, and that is a field of studs
+    // rather than a waffle grid.
+    highp vec2 d = vec2(uv.x + uv.y, uv.x - uv.y) * 0.7071;
+    r = min(abs(fract(d.x) - 0.5), abs(fract(d.y) - 0.5)) * 2.0;
+  }
+  return r * r * (3.0 - 2.0 * r);   // round the triangle off
+}
+// Aggregate. Everything else in this shader runs on smooth fbm, which reads
+// as mottling; asphalt is STONES IN TAR, and stones have edges.
+float scenaSpeck(highp vec3 wp){
+  if (uSurfSpeck <= 0.0) return 0.5;
+  return scenaHash13(floor(wp * uSurfSpeckScale + uSurfSeed));
+}
+// Warped Voronoi. Returns x = per-cell hash, y = distance to the nearest
+// seam (0 on it). Basalt's columnar jointing and the zinc spangle on
+// galvanised steel are this one function two orders of magnitude apart.
+vec2 scenaCells(highp vec3 wp, vec3 wn){
+  if (uSurfCells <= 0.0) return vec2(0.5, 1.0);
+  highp vec2 uv;
+  if (uSurfCellPlan > 0.5) {
+    // Columnar jointing is a crazy paving seen from ABOVE, pulled up into
+    // columns — so it is laid out in plan whatever the face is pointing at.
+    uv = wp.xz;
+  } else {
+    vec3 an = abs(normalize(wn));
+    if (an.x >= an.y && an.x >= an.z) uv = wp.zy;
+    else if (an.y >= an.x && an.y >= an.z) uv = wp.xz;
+    else uv = wp.xy;
+  }
+  uv = uv * uSurfCellScale + uSurfSeed.xy;
+  highp vec2 g = floor(uv);
+  highp vec2 f = uv - g;
+  float d1 = 8.0, d2 = 8.0, id = 0.5;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 o = vec2(float(i), float(j));
+      float h = scenaHash13(vec3(g + o, 11.0));
+      vec2 seed = o + vec2(h, fract(h * 37.31));
+      float d = length(seed - f);
+      if (d < d1) { d2 = d1; d1 = d; id = h; }
+      else if (d < d2) { d2 = d; }
+    }
+  }
+  // d2 - d1 is 0 exactly on the boundary between two cells and grows inward,
+  // which is a seam that does not care how big the cells are.
+  return vec2(id, clamp(d2 - d1, 0.0, 1.0));
+}
+// A mineral crust — verdigris, a rust bloom, lichen — taking hold in the
+// cavities and on the up-facing side.
+float scenaCrustMask(vec3 wn, float low){
+  if (uSurfCrust <= 0.0) return 0.0;
+  float up = normalize(wn).y * 0.5 + 0.5;
+  return clamp(smoothstep(0.66, 0.28, low) * uSurfCrust * mix(0.5, 1.0, up), 0.0, 1.0);
+}
 // WATER FILLS FROM THE BOTTOM. Wetness is a LEVEL, not a multiply: every
 // point has a height (the surface's own low-frequency band, with the
 // mortar joints counted as the lowest ground there is), and it is wet when
@@ -762,6 +979,11 @@ function fragmentPatch(src: string): string {
       float scenaN   = scenaTri(vSurfWorldPos, vSurfWorldNormal, uSurfScale);
       float scenaLow = scenaTri(vSurfWorldPos, vSurfWorldNormal, uSurfScale * 0.25);
       float scenaG   = scenaGrain(vSurfWorldPos);
+      float scenaRib = scenaRibs(vSurfWorldPos, vSurfWorldNormal);
+      float scenaSp  = scenaSpeck(vSurfWorldPos);
+      vec2  scenaC   = scenaCells(vSurfWorldPos, vSurfWorldNormal);
+      // Seam mask: 1 on the join between two cells, 0 inside one.
+      float scenaSeam = (1.0 - smoothstep(0.0, 0.085, scenaC.y)) * uSurfCells;
       // masonry grid (no-op when uSurfTile == 0)
       vec4  scenaT   = scenaTile(vSurfWorldPos, vSurfWorldNormal);
       float scenaMortar = scenaT.x * uSurfTile;
@@ -775,6 +997,13 @@ function fragmentPatch(src: string): string {
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint, uSurfTintAmount * (1.0 - scenaLow));
       // grain darkening (no-op when uSurfGrain == 0)
       diffuseColor.rgb *= 1.0 - uSurfGrain * scenaG * 0.5;
+      // aggregate chips — hard-edged, unlike everything else here
+      diffuseColor.rgb *= 1.0 + (scenaSp - 0.5) * uSurfSpeck;
+      // cells: each one its own shade, and the seams between them dark
+      diffuseColor.rgb *= 1.0 + (scenaC.x - 0.5) * uSurfCellJitter * uSurfCells;
+      diffuseColor.rgb *= 1.0 - scenaSeam * uSurfCellEdge;
+      // the ridge valleys hold shadow the lighting alone will not give them
+      diffuseColor.rgb *= 1.0 - uSurfRibs * (1.0 - scenaRib) * 0.22;
       // accent cells (mosaic chips) painted solid tint — a no-op at 0
       float scenaAccent = uSurfTile * uSurfTileTint;
       diffuseColor.rgb = mix(diffuseColor.rgb, uSurfTint, step(scenaT.y, scenaAccent) * uSurfTile);
@@ -794,6 +1023,10 @@ function fragmentPatch(src: string): string {
       // darken hard and sealed ones barely change — a wet flagstone is
       // almost black, wet chrome is just chrome — and metal, which has no
       // subsurface to wet, does not darken at all.
+      // A CRUST, not a tint: verdigris, rust bloom, lichen. It goes over
+      // everything above it, because it grew on top of all of it.
+      float scenaCrustM = scenaCrustMask(vSurfWorldNormal, scenaLow);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfCrustColor, scenaCrustM);
       float scenaWetM = scenaWetMask(vSurfWorldNormal, scenaLow, scenaMortar);
       float scenaPorous = (1.0 - clamp(metalness, 0.0, 1.0)) * clamp(roughness, 0.0, 1.0);
       diffuseColor.rgb *= mix(1.0, mix(0.93, 0.45, scenaPorous), scenaWetM);`
@@ -803,9 +1036,20 @@ function fragmentPatch(src: string): string {
       `#include <roughnessmap_fragment>
       roughnessFactor = clamp(roughnessFactor + (scenaN - 0.5) * uSurfRoughVar + uSurfGrain * scenaG * 0.12
         + scenaMortar * 0.25 + (scenaT.y - 0.5) * uSurfTileJitter * 0.3 * uSurfTile, 0.04, 1.0);
+      roughnessFactor = clamp(roughnessFactor + (scenaSp - 0.5) * uSurfSpeck * 0.35
+        + scenaSeam * 0.2, 0.04, 1.0);
+      roughnessFactor = mix(roughnessFactor, uSurfCrustRough, scenaCrustM);
       roughnessFactor = mix(roughnessFactor, uSurfCapRough, scenaCapM);
       // A film of water is a mirror, whatever is underneath it.
       roughnessFactor = mix(roughnessFactor, 0.05, scenaWetM * 0.92);`
+    )
+    .replace(
+      '#include <metalnessmap_fragment>',
+      `#include <metalnessmap_fragment>
+      // A mineral scab does not reflect like the metal it grew on, so where
+      // the crust has taken hold the metal is simply not there any more.
+      // This is the difference between patina and green paint.
+      metalnessFactor = mix(metalnessFactor, 0.0, scenaCrustM);`
     )
     .replace(
       '#include <normal_fragment_maps>',
@@ -815,7 +1059,8 @@ function fragmentPatch(src: string): string {
         // plus the tile relief (a step down into each mortar joint).
         // Standing water fills the micro-relief, so the bump flattens out
         // under it — the puddle is smooth even where the stone is not.
-        float scenaH = (scenaN + uSurfGrain * scenaG * 0.5 + scenaT.z * uSurfTile * uSurfTileRelief)
+        float scenaH = (scenaN + uSurfGrain * scenaG * 0.5 + scenaT.z * uSurfTile * uSurfTileRelief
+          + scenaRib * uSurfRibs * 0.9 + scenaC.y * uSurfCells * uSurfCellEdge * 0.5)
           * (1.0 - scenaWetM * 0.7);
         vec3 sX = dFdx(-vViewPosition);
         vec3 sY = dFdy(-vViewPosition);
@@ -901,6 +1146,21 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
     // Wear: water (uSurfWet 0 is bone dry and costs one compare).
     uSurfWet: { value: p.wet ?? 0 },
     uSurfWetCling: { value: p.wetCling ?? 0.55 },
+    // Ribs, aggregate, cells and crust (each 0 = off, and off costs a compare).
+    uSurfRibs: { value: p.ribs ?? 0 },
+    uSurfRibScale: { value: p.ribScale ?? 8 },
+    uSurfRibTurn: { value: p.ribTurn ?? 0 },
+    uSurfRibCross: { value: p.ribCross ?? 0 },
+    uSurfSpeck: { value: p.speck ?? 0 },
+    uSurfSpeckScale: { value: p.speckScale ?? 40 },
+    uSurfCells: { value: p.cells ?? 0 },
+    uSurfCellScale: { value: p.cellScale ?? 4 },
+    uSurfCellEdge: { value: p.cellEdge ?? 0.4 },
+    uSurfCellJitter: { value: p.cellJitter ?? 0.18 },
+    uSurfCellPlan: { value: p.cellPlan ?? 0 },
+    uSurfCrust: { value: p.crust ?? 0 },
+    uSurfCrustColor: { value: new Color(p.crustColor ?? 0x4fa88a) },
+    uSurfCrustRough: { value: p.crustRough ?? 0.9 },
   };
 
   material.onBeforeCompile = (shader) => {
@@ -916,7 +1176,7 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   // from colliding with a plain MeshStandardMaterial that has matching base
   // params but no injection. three still appends its own feature key, so
   // flat/smooth/instanced variants stay separate programs.
-  material.customProgramCacheKey = () => 'scena-surface-v3';
+  material.customProgramCacheKey = () => 'scena-surface-v4';
 
   // Expose the live uniforms so weather can drive them after the fact — e.g.
   // snow settling ramps uSurfCap, rain darkens/glosses via the same handles.

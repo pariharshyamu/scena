@@ -195,7 +195,7 @@ describe('props adopt surfaces', () => {
       const mat = (o as Mesh).material;
       if (mat instanceof MeshStandardMaterial && typeof mat.onBeforeCompile === 'function') {
         // Distinguish surface materials (custom key) from plain ones.
-        if (mat.customProgramCacheKey() === 'scena-surface-v3') n++;
+        if (mat.customProgramCacheKey() === 'scena-surface-v4') n++;
       }
     });
     return n;
@@ -279,5 +279,86 @@ describe('wear: water', () => {
     const u = (mat.userData as { scenaSurface: Record<string, { value: unknown }> }).scenaSurface;
     expect(u.uSurfWet.value).toBe(0);
     expect(u.uSurfWetCling.value).toBe(0.55);
+  });
+});
+
+describe('the industrial six', () => {
+  const SIX = ['corrugatedIron', 'asphalt', 'diamondPlate', 'galvanised',
+    'copperPatina', 'basalt'] as SurfaceKind[];
+
+  it('each one turns on the machinery it actually needs', () => {
+    const u = (k: SurfaceKind) => compilePatched(createSurface(k)).uniforms;
+    expect(u('corrugatedIron').uSurfRibs.value).toBe(1);
+    expect(u('corrugatedIron').uSurfCrust.value).toBeGreaterThan(0);
+    expect(u('diamondPlate').uSurfRibCross.value).toBe(1);
+    expect(u('asphalt').uSurfSpeck.value).toBeGreaterThan(0);
+    expect(u('galvanised').uSurfCells.value).toBe(1);
+    expect(u('copperPatina').uSurfCrust.value).toBeGreaterThan(0);
+    expect(u('basalt').uSurfCellPlan.value).toBe(1);
+  });
+
+  it('and the other 46 are untouched by it', () => {
+    // A new tier that quietly restyled the existing catalogue would be a
+    // much worse bug than one that did not work.
+    for (const kind of KINDS) {
+      if (SIX.includes(kind)) continue;
+      const u = compilePatched(createSurface(kind)).uniforms;
+      expect(u.uSurfRibs.value, kind).toBe(0);
+      expect(u.uSurfSpeck.value, kind).toBe(0);
+      expect(u.uSurfCells.value, kind).toBe(0);
+      expect(u.uSurfCrust.value, kind).toBe(0);
+    }
+  });
+
+  it('RIBS ARE FACE-RELATIVE, not world-axis', () => {
+    // The bug this replaces: two different world axes project onto the SAME
+    // direction once you are on a wall, so a crossed tread plate came out as
+    // plain stripes. Ribs are laid out in the face's own plane, like the
+    // masonry grid is.
+    const frag = compilePatched(createSurface('diamondPlate')).fragmentShader;
+    expect(frag).not.toContain('uSurfRibAxis');
+    const ribs = frag.slice(frag.indexOf('float scenaRibs'));
+    expect(ribs.slice(0, 700)).toContain('if (an.x >= an.y && an.x >= an.z) uv = wp.zy;');
+    // MIN, not max: crossed ridges are high together only where they cross,
+    // and that is a field of studs rather than a waffle grid.
+    expect(ribs.slice(0, 1400)).toContain('r = min(abs(fract(d.x) - 0.5), abs(fract(d.y) - 0.5)) * 2.0;');
+  });
+
+  it('COLUMNS ARE LAID OUT IN PLAN, whatever face you are looking at', () => {
+    // Columnar jointing is crazy paving seen from above, pulled up. Project
+    // it per-face instead and a cliff gets blotches rather than columns.
+    const frag = compilePatched(createSurface('basalt')).fragmentShader;
+    expect(frag).toContain('if (uSurfCellPlan > 0.5) {');
+    expect(frag).toContain('uv = wp.xz;');
+    // The seam is the F2−F1 distance, so it does not care how big the cells are.
+    expect(frag).toContain('return vec2(id, clamp(d2 - d1, 0.0, 1.0));');
+  });
+
+  it('THE CRUST TAKES THE METAL WITH IT', () => {
+    // Patina is a mineral scab, not green paint: where it has grown there is
+    // no metal left to reflect. That needs a hook three must actually have.
+    expect(ShaderLib.standard.fragmentShader).toContain('#include <metalnessmap_fragment>');
+    const frag = compilePatched(createSurface('copperPatina')).fragmentShader;
+    const after = frag.split('#include <metalnessmap_fragment>')[1];
+    expect(after).toContain('metalnessFactor = mix(metalnessFactor, 0.0, scenaCrustM);');
+  });
+
+  it('aggregate is HARD-EDGED, unlike everything else in here', () => {
+    // Smooth fbm reads as mottling. Asphalt is stones in tar, and stones
+    // have edges — so the chips come from cell noise, not from the fbm.
+    const frag = compilePatched(createSurface('asphalt')).fragmentShader;
+    expect(frag).toContain('return scenaHash13(floor(wp * uSurfSpeckScale + uSurfSeed));');
+  });
+
+  it('every new piece costs a single compare when it is switched off', () => {
+    const frag = compilePatched(createSurface('plaster')).fragmentShader;
+    for (const guard of [
+      'if (uSurfRibs <= 0.0) return 0.0;',
+      'if (uSurfSpeck <= 0.0) return 0.5;',
+      'if (uSurfCells <= 0.0) return vec2(0.5, 1.0);',
+      'if (uSurfCrust <= 0.0) return 0.0;',
+    ]) {
+      expect(frag).toContain(guard);
+    }
   });
 });
