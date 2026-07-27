@@ -615,6 +615,12 @@ export {
   type MatSpot,
 } from './props/shala';
 export {
+  createSingingBowl,
+  type SingingBowl,
+  type SingingBowlOptions,
+  type BreathPulse,
+} from './props/bowl';
+export {
   createSeamark,
   geographicRange,
   luminousRange,

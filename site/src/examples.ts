@@ -752,6 +752,103 @@ game.start();`,
   },
 
   {
+    id: 'bowl',
+    title: 'The singing bowl & the breath pulse',
+    group: 'Worldbuilding',
+    code: `// THE WOOFER'S CALM OPPOSITE. The woofer publishes music as an
+// AudioPulse and a floor answers; the bowl publishes BREATH — a tenth
+// the frequency, no beat edge at all — and the ROOM answers: the incense
+// thickens on the exhale, the lanterns brighten on the inhale and flare
+// softly at the strike, settling as the note does. CLICK to strike the
+// bowl: the chime is the cue to breathe in (the clock restarts at the
+// inhale), and in a real browser it SOUNDS — two detuned partials whose
+// beating is the "singing", synthesized in the click itself so autoplay
+// policy is satisfied by construction. Headless, it rings silently.
+import { createShala, createSingingBowl, createSmoke } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, CylinderGeometry, SphereGeometry,
+  PlaneGeometry, MeshStandardMaterial, AmbientLight, DirectionalLight,
+  PointLight, Color, Fog } from 'three';
+
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0x2a2340);            // before the dawn
+scene.fog = new Fog(0x2a2340, 30, 70);
+scene.add(new AmbientLight(0x8d84b8, 0.5));
+const moon = new DirectionalLight(0xb9c4e8, 0.35);
+moon.position.set(14, 10, -8);
+scene.add(moon);
+const ground = new Mesh(new PlaneGeometry(90, 90),
+  new MeshStandardMaterial({ color: 0x4a4258, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.01;
+scene.add(ground);
+
+const shala = createShala({ seed: 24, era: 'retreat', students: 6,
+  sunrise: 0.25 });
+scene.add(shala.object);
+
+// The bowl, on a small stand by the instructor's mat.
+const stand = new Mesh(new CylinderGeometry(0.26, 0.3, 0.3, 8),
+  new MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 }));
+const front = shala.matSpots()[0];
+stand.position.set(front.x + 1.1, shala.deckTop + 0.15, front.z + 0.2);
+scene.add(stand);
+const bowl = createSingingBowl({ seed: 4, breathsPerMinute: 6 });
+bowl.object.position.set(front.x + 1.1, shala.deckTop + 0.3, front.z + 0.2);
+scene.add(bowl.object);
+window.addEventListener('pointerdown', () => bowl.strike());
+bowl.onBreath((side) => console.log('breath:', side));
+
+// The incense: a stick whose smoke answers the EXHALE.
+const stick = new Mesh(new CylinderGeometry(0.008, 0.008, 0.5, 5),
+  new MeshStandardMaterial({ color: 0x3a2c22 }));
+stick.position.set(front.x - 1.2, shala.deckTop + 0.25, front.z + 0.2);
+stick.rotation.z = 0.06;
+scene.add(stick);
+const incense = createSmoke({ style: 'scorch', height: 2.2, radius: 0.1,
+  seed: 9 });
+incense.object.position.set(front.x - 1.2, shala.deckTop + 0.5,
+  front.z + 0.2);
+scene.add(incense.object);
+
+// The lanterns: four warm globes on posts, breathing with the inhale.
+const lanterns = [];
+[[-3.4, -2.2], [3.4, -2.2], [-3.4, 3.4], [3.4, 3.4]].forEach(([x, z]) => {
+  const post = new Mesh(new CylinderGeometry(0.04, 0.05, 1.5, 6),
+    new MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 }));
+  post.position.set(x, 0.9, z);
+  scene.add(post);
+  const globe = new Mesh(new SphereGeometry(0.14, 8, 6),
+    new MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb35a,
+      emissiveIntensity: 0.6 }));
+  globe.position.set(x, 1.72, z);
+  scene.add(globe);
+  const light = new PointLight(0xffb35a, 2.5, 9);
+  light.position.set(x, 1.75, z);
+  scene.add(light);
+  lanterns.push({ globe, light });
+});
+
+game.onUpdate((t) => {
+  bowl.update(t.delta);
+  const breath = bowl.pulse();               // the whole coupling
+  // Exhale feeds the incense; the strike's ring flares the lanterns.
+  const out = Math.max(0, Math.sin(breath.phase * Math.PI * 2 + Math.PI));
+  incense.setRate(0.2 + out * 0.75);
+  incense.update(t.delta);
+  const inGlow = Math.max(0, Math.sin(breath.phase * Math.PI * 2));
+  for (const { globe, light } of lanterns) {
+    globe.material.emissiveIntensity = 0.45 + inGlow * 0.5 + breath.ring * 0.9;
+    light.intensity = 1.8 + inGlow * 1.6 + breath.ring * 4;
+  }
+  game.camera.position.set(7.5, 4.4, 10.5);
+  game.camera.lookAt(-0.5, 0.7, 0.6);
+});
+game.start();`,
+  },
+
+  {
     id: 'stacks',
     title: 'The PA, coverage & the echo',
     group: 'Worldbuilding',
