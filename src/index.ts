@@ -620,6 +620,7 @@ export {
   type SingingBowlOptions,
   type BreathPulse,
 } from './props/bowl';
+export { createBeach, type Beach, type BeachOptions } from './props/beach';
 export {
   createSeamark,
   geographicRange,

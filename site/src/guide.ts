@@ -26,6 +26,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'radio', title: 'The booth, web radio & DJ tiles', playground: 'booth' },
   { id: 'shala', title: 'The shala: rooms for a practice', playground: 'shala' },
   { id: 'bowl', title: 'The singing bowl & the breath', playground: 'bowl' },
+  { id: 'beach', title: 'The beach: swash & wet sand', playground: 'beach' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },

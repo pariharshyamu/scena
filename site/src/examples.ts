@@ -849,6 +849,93 @@ game.start();`,
   },
 
   {
+    id: 'beach',
+    title: 'The beach: the swash & the fifth field',
+    group: 'Worldbuilding',
+    code: `// A BEACH IS AN EDGE, NOT A PLACE. Dry sand is terrain and the sea
+// already ships; what makes a beach READ is the strip between them — the
+// SWASH. Watch the tongue run up the sand and drain back: where it has
+// just been the sand is mirror-wet, drying through dark and damp over
+// half a minute; each retreat strands a lace of foam at its high point.
+// All of it is queryable as wetAt(x, z) — the fifth spatial field, after
+// depthAt, heatAt, chillAt and smokeAt.
+//
+// The beach and the ocean compose BOTH WAYS and import nothing: the
+// ocean takes beach.heightAt as its shore (it fades over the sand and
+// foams at the line), and the beach takes ocean.heightAt as its water
+// (the swash runs on the real swell). And the sand REMEMBERS: a
+// beachcomber walks the wet band leaving prints — only wet sand takes
+// one — and the next tongue wipes them.
+import { createBeach, createOcean } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial,
+  AmbientLight, DirectionalLight, Color, Fog } from 'three';
+
+const game = new Game();
+const scene = game.world.scene;
+scene.background = new Color(0xf6dfc0);            // golden hour
+scene.fog = new Fog(0xf6dfc0, 55, 130);
+scene.add(new AmbientLight(0xffe9cf, 0.65));
+const sun = new DirectionalLight(0xffc98a, 1.15);
+sun.position.set(-30, 14, 6);
+scene.add(sun);
+// The hinterland, so the dune has something to be in front of.
+const land = new Mesh(new PlaneGeometry(200, 200),
+  new MeshStandardMaterial({ color: 0xd6c294, roughness: 1 }));
+land.rotation.x = -Math.PI / 2;
+land.position.y = 1.55;
+land.position.z = -114;
+scene.add(land);
+
+// The two-way handshake: the ocean's shore is the beach; the beach's
+// water is the ocean. One coastline, agreed on from both sides. (The
+// water closure binds late, so the mutual reference costs nothing.)
+const beach = createBeach({ seed: 7, width: 60, depth: 28,
+  water: (x, z, tt) => (ocean ? ocean.heightAt(x, z, tt) : 0) });
+scene.add(beach.object);
+
+const ocean = createOcean({
+  level: 0, amplitude: 0.4, wavelength: 19, direction: 205,
+  shore: beach.heightAt,
+  shallowColor: 0x5fb4b8, deepColor: 0x1d5a70, skyColor: 0xf6dfc0,
+});
+ocean.mesh.position.z = 18;
+scene.add(ocean.mesh);
+
+// The beachcomber: a stand-in walker (ANIMA drops straight in here —
+// wire loco.onFootstep to beach.stamp and characters write their path).
+const comber = new Mesh(new BoxGeometry(0.34, 1.1, 0.26),
+  new MeshStandardMaterial({ color: 0x7a4630 }));
+scene.add(comber);
+let stride = 0;
+let side = 1;
+
+let t = 0;
+game.onUpdate((dt) => {
+  const d = dt.delta;
+  t += d;
+  ocean.update(d);
+  beach.update(d);
+
+  // Walk the wet band: along the shore, weaving with the water's edge.
+  const x = -24 + ((t * 1.1) % 48);
+  const edge = beach.reachAt(x);
+  const z = edge.z - 1.4 + Math.sin(t * 0.7) * 0.8;
+  comber.position.set(x, beach.heightAt(x, z) + 0.55, z);
+  stride += d * 2.6;
+  if (stride > 1) {
+    stride = 0;
+    side = -side;
+    beach.stamp(x - 0.1 * side, z + side * 0.14, 0.1);   // a footprint —
+  }                                                       // if the sand is wet
+
+  game.camera.position.set(13, 5.2, -8.5);
+  game.camera.lookAt(-6, 0, 7);
+});
+game.start();`,
+  },
+
+  {
     id: 'stacks',
     title: 'The PA, coverage & the echo',
     group: 'Worldbuilding',
