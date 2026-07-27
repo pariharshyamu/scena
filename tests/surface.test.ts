@@ -195,7 +195,7 @@ describe('props adopt surfaces', () => {
       const mat = (o as Mesh).material;
       if (mat instanceof MeshStandardMaterial && typeof mat.onBeforeCompile === 'function') {
         // Distinguish surface materials (custom key) from plain ones.
-        if (mat.customProgramCacheKey() === 'scena-surface-v2') n++;
+        if (mat.customProgramCacheKey() === 'scena-surface-v3') n++;
       }
     });
     return n;
@@ -222,5 +222,62 @@ describe('props adopt surfaces', () => {
       if (mat?.emissive && mat.emissive.getHex() !== 0 && mat.emissiveIntensity > 0.5) emissive++;
     });
     expect(emissive).toBeGreaterThan(0);
+  });
+});
+
+describe('wear: water', () => {
+  it('EVERY preset is bone dry out of the box', () => {
+    // A state that defaulted to anything but off would silently restyle all
+    // 46 kinds and every prop already built on them.
+    for (const kind of KINDS) {
+      const u = compilePatched(createSurface(kind)).uniforms;
+      expect(u.uSurfWet.value, kind).toBe(0);
+    }
+  });
+
+  it('takes a level, and a cling for vertical faces', () => {
+    const u = compilePatched(createSurface('stone', { wet: 0.8, wetCling: 0.2 })).uniforms;
+    expect(u.uSurfWet.value).toBe(0.8);
+    expect(u.uSurfWetCling.value).toBe(0.2);
+    expect(compilePatched(createSurface('stone')).uniforms.uSurfWetCling.value).toBe(0.55);
+  });
+
+  it('WET IS NOT JUST DARKER: it changes albedo, roughness AND relief', () => {
+    // Darkening alone is the cheap version — a wet surface is also glossy,
+    // and the water fills the micro-relief it is standing in.
+    const frag = compilePatched(createSurface('brick', { wet: 0.5 })).fragmentShader;
+    const [beforeRough, afterRough] = frag.split('#include <roughnessmap_fragment>');
+    const [, afterNormal] = frag.split('#include <normal_fragment_maps>');
+    expect(beforeRough).toContain('scenaWetMask');          // albedo stage
+    expect(beforeRough).toContain('diffuseColor.rgb *= mix(1.0, mix(0.93, 0.45, scenaPorous), scenaWetM)');
+    expect(afterRough).toContain('roughnessFactor = mix(roughnessFactor, 0.05, scenaWetM');
+    expect(afterNormal).toContain('1.0 - scenaWetM * 0.7');
+  });
+
+  it('leans on uniforms three actually declares', () => {
+    // The darkening is scaled by how porous the surface is, which reads
+    // three's own `roughness` and `metalness` uniforms. If either were ever
+    // renamed the shader would fail to compile — in a browser that is a
+    // black mesh, not an exception, so it is worth asserting here.
+    expect(ShaderLib.standard.fragmentShader).toContain('uniform float roughness;');
+    expect(ShaderLib.standard.fragmentShader).toContain('uniform float metalness;');
+  });
+
+  it('water fills from the BOTTOM: the level is compared against a height', () => {
+    const frag = compilePatched(createSurface('cobblestone', { wet: 0.3 })).fragmentShader;
+    // The mask is a level test against the surface's own low band, with the
+    // mortar joints counted as the lowest ground there is — that is what
+    // makes a light shower wet the joints and leave the faces dry.
+    expect(frag).toContain('float height = min(low, 1.0 - mortar);');
+    expect(frag).toContain('smoothstep(height - 0.2, height + 0.2, level)');
+    // And it is free when dry.
+    expect(frag).toContain('if (uSurfWet <= 0.0) return 0.0;');
+  });
+
+  it('the uniforms are exposed live, so weather can drive them', () => {
+    const mat = createSurface('concrete');
+    const u = (mat.userData as { scenaSurface: Record<string, { value: unknown }> }).scenaSurface;
+    expect(u.uSurfWet.value).toBe(0);
+    expect(u.uSurfWetCling.value).toBe(0.55);
   });
 });

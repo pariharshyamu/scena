@@ -40,6 +40,9 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  'wear-rain-on-everything': 'wear',
+  'water-fills-from-the-bottom': 'wear',
+  'driven-by-the-rain': 'wear',
   terrain: 'world',
   'water-shores': 'living',
   'the-day-night-cycle': 'living',

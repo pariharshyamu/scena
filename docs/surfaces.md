@@ -156,6 +156,41 @@ const window_ = createGlass({ nightGlow: true });     // ignites at dusk
 
 `nightGlow` follows the house-window convention: the emissive sits at the intensity `createDayCycle` scans for, so listing the pane's building in the cycle's `lamps` makes the glass burn warm at night — the lit-window skyline, free. Try `?t=0.95` in the **Modern materials** playground.
 
+## Wear: rain on everything
+
+`wet` is a **state, not a kind**. Every one of the presets above can be rained on, and the catalogue does not grow by one entry to make it happen:
+
+```js
+createSurface('cobblestone', { wet: 0.9 });   // just rained
+```
+
+Water behaves the same way on all of them, and it does three things — because darkening alone is the cheap version that reads as "somebody multiplied the colour":
+
+- **the albedo darkens**, because water fills the pores: light gets in, scatters, and comes back out with less of it. So the darkening scales with how *porous* the surface is — a wet flagstone is nearly black, wet glaze is just glaze, and metal, which has no subsurface to wet, does not darken at all;
+- **the roughness collapses** to a film, which is a mirror whatever is underneath it;
+- **the relief flattens**, because standing water fills the micro-bumps: the puddle is smooth even where the stone is not.
+
+### Water fills from the bottom
+
+The part that makes it read as weather rather than as a tint: wetness is a **level**, not a multiplier. Every point on the surface has a height — its own low-frequency noise band, with the mortar joints counted as the lowest ground there is — and it is wet when the level is above it.
+
+So a light shower puts dark, glossy water in the joints and the hollows and leaves the faces dry; a downpour sheets the whole wall. One scalar, and the in-between states are the interesting ones.
+
+The level is lower on a vertical face than a horizontal one, because rain falls down — a sill soaks while the wall beneath it is merely damp. `wetCling` sets how much: 0 wets only the tops, 1 wets a wall as fast as a floor, and the default is 0.55. Sealed, shedding surfaces want less; things that wick (plaster, concrete, canvas) want more.
+
+### Driven by the rain
+
+```js
+const rain = createPrecipitation({ type: 'rain', wind });
+scene.add(rain.object);
+rain.soak(scene, { max: 0.95, rate: 0.3, dry: 0.06 });
+```
+
+`soak` is rain's counterpart to snow's `accumulate`: it finds every surface material under `target` and drives its wetness from how hard it is actually raining. Ease off to a drizzle and the surfaces settle at the drizzle's level, not at zero.
+
+**Drying is deliberately much slower than wetting** — a fifth of the rate by default. A wall soaks in a minute and takes an hour to come back, and a street that goes dry the instant the rain stops reads as a bug rather than as weather.
+
+
 ## Adopted by the props
 
 `createHouse`, `createTower`, `createWell`, `createRuin`, `createRock` and `createCrate` are built on surfaces out of the box — plastered walls, tiled roofs, stone foundations, planked doors, grained crates. Their emissive windows are left as ordinary materials so the day-night cycle still lights them at dusk. Try the **Procedural surfaces** playground example to see the whole preset palette beside the props that use them.

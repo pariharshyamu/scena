@@ -110,3 +110,93 @@ describe('snow accumulation', () => {
     expect(cap.uSurfCap.value).toBe(before); // untouched
   });
 });
+
+describe('rain soaks, and it dries again', () => {
+  const wetOf = (m: unknown) =>
+    (m.userData as { scenaSurface: { uSurfWet: { value: number }; uSurfWetCling: { value: number } } })
+      .scenaSurface;
+
+  const scene = () => {
+    const road = new Mesh();
+    road.material = createSurface('cobblestone');
+    const group = new Group();
+    group.add(road);
+    return { road, group };
+  };
+
+  it('wets the surfaces below it, up to the rain it is actually raining', () => {
+    const { road, group } = scene();
+    expect(wetOf(road.material).uSurfWet.value).toBe(0);
+
+    const rain = createPrecipitation({ type: 'rain', count: 10 });
+    rain.setIntensity(1);
+    rain.soak(group, { max: 0.9, rate: 0.2, cling: 0.4 });
+
+    rain.update(1);
+    const after1s = wetOf(road.material).uSurfWet.value;
+    expect(after1s).toBeGreaterThan(0.1);
+    expect(after1s).toBeLessThanOrEqual(0.9);
+    expect(wetOf(road.material).uSurfWetCling.value).toBe(0.4);
+
+    // It saturates at `max` and goes no further, however long it rains.
+    rain.update(60);
+    expect(wetOf(road.material).uSurfWet.value).toBeCloseTo(0.9, 5);
+  });
+
+  it('DRYING IS SLOWER THAN WETTING — the street stays dark after the rain', () => {
+    const { road, group } = scene();
+    const rain = createPrecipitation({ type: 'rain', count: 10 });
+    rain.setIntensity(1);
+    rain.soak(group, { max: 0.9, rate: 0.2, dry: 0.02 });
+    rain.update(10);
+    const soaked = wetOf(road.material).uSurfWet.value;
+    expect(soaked).toBeCloseTo(0.9, 5);
+
+    // The rain stops. Ten seconds of drying must not undo ten of soaking.
+    rain.setIntensity(0);
+    rain.update(10);
+    const drying = wetOf(road.material).uSurfWet.value;
+    expect(drying).toBeLessThan(soaked);
+    expect(drying).toBeGreaterThan(0.5);
+
+    // …but it does get there in the end.
+    rain.update(200);
+    expect(wetOf(road.material).uSurfWet.value).toBeCloseTo(0, 5);
+  });
+
+  it('follows the weather down as well as up, without being asked twice', () => {
+    const { road, group } = scene();
+    const rain = createPrecipitation({ type: 'rain', count: 10 });
+    rain.setIntensity(1);
+    rain.soak(group, { max: 1, rate: 0.5, dry: 0.5 });
+    rain.update(4);
+    expect(wetOf(road.material).uSurfWet.value).toBeCloseTo(1, 5);
+    // Easing off to a drizzle settles at the drizzle's level, not at zero.
+    rain.setIntensity(0.3);
+    rain.update(10);
+    expect(wetOf(road.material).uSurfWet.value).toBeCloseTo(0.3, 5);
+  });
+
+  it('only rain wets things: snow and petals refuse', () => {
+    for (const type of ['snow', 'petal'] as const) {
+      const { road, group } = scene();
+      const p = createPrecipitation({ type, count: 10 });
+      p.setIntensity(1);
+      p.soak(group);
+      p.update(5);
+      expect(wetOf(road.material).uSurfWet.value, type).toBe(0);
+    }
+  });
+
+  it('wets ANY surface, capped or not — a mossy wall gets wet too', () => {
+    const mossy = new Mesh();
+    mossy.material = createSurface('moss');
+    const group = new Group();
+    group.add(mossy);
+    const rain = createPrecipitation({ type: 'rain', count: 10 });
+    rain.setIntensity(1);
+    rain.soak(group, { rate: 0.5 });
+    rain.update(2);
+    expect(wetOf(mossy.material).uSurfWet.value).toBeGreaterThan(0.5);
+  });
+});

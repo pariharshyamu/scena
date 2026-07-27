@@ -148,6 +148,27 @@ export interface SurfaceParams {
   /** Roughness inside the capped area (fresh snow reads matte/bright). */
   capRough?: number;
 
+  // --- wear: water (opt-in; `wet: 0` — the default — is bone dry) ---
+  /**
+   * How wet the surface is: 0 dry, 1 running with water.
+   *
+   * This is a STATE, not a kind. Every one of the presets above can be
+   * rained on, and water behaves the same way on all of them — it darkens
+   * the albedo, collapses the roughness to a film, and, most of all, it
+   * POOLS: at a light wetting only the hollows and the mortar joints are
+   * dark and glossy, and the face only sheets over when it is properly
+   * raining.
+   */
+  wet?: number;
+  /**
+   * How well water clings to vertical faces: 0 = only the tops ever get
+   * wet, 1 = a wall wets as fast as a floor. Default 0.55 — rain falls
+   * down, so a sill soaks while the wall under it is merely damp. Sealed,
+   * shedding surfaces (glass, glaze, chrome) want less; things that wick
+   * (plaster, concrete, canvas) want more.
+   */
+  wetCling?: number;
+
   // --- emissive glow (opt-in; `glow: 0` — the default — keeps it dark) ---
   /** Glow strength added straight to emissive radiance (lava, crystal, runes). */
   glow?: number;
@@ -595,6 +616,8 @@ uniform float uSurfCapRough;
 uniform float uSurfGlow;
 uniform vec3  uSurfGlowColor;
 uniform float uSurfGlowThresh;
+uniform float uSurfWet;
+uniform float uSurfWetCling;
 
 float scenaHash13(highp vec3 p){
   p = fract(p * 0.1031);
@@ -682,6 +705,22 @@ float scenaCapMask(vec3 wn, float breakup){
   float s = max(uSurfCapSharp, 1e-3);
   return clamp(smoothstep(uSurfCapUp - s, uSurfCapUp + s, up + (breakup - 0.5) * 0.6), 0.0, 1.0);
 }
+// WATER FILLS FROM THE BOTTOM. Wetness is a LEVEL, not a multiply: every
+// point has a height (the surface's own low-frequency band, with the
+// mortar joints counted as the lowest ground there is), and it is wet when
+// the level is above it. That is what makes a light shower read as dark
+// glossy lines in the joints and hollows while the faces stay dry, and a
+// downpour sheet the whole wall — from one scalar.
+//
+// The level is lower on a vertical face than a horizontal one, because
+// rain falls down: a sill soaks while the wall beneath it is merely damp.
+float scenaWetMask(vec3 wn, float low, float mortar){
+  if (uSurfWet <= 0.0) return 0.0;
+  float up = normalize(wn).y * 0.5 + 0.5;
+  float level = uSurfWet * mix(clamp(uSurfWetCling, 0.0, 1.0), 1.0, up) * 1.4 - 0.2;
+  float height = min(low, 1.0 - mortar);
+  return clamp(smoothstep(height - 0.2, height + 0.2, level), 0.0, 1.0);
+}
 `;
 
 function vertexPatch(src: string): string {
@@ -749,14 +788,24 @@ function fragmentPatch(src: string): string {
       diffuseColor.rgb *= 1.0 - 0.35 * scenaMortar;
       // snow / moss cap settling on the up-facing faces (over the mortar too)
       float scenaCapM = scenaCapMask(vSurfWorldNormal, scenaN) * uSurfCap;
-      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfCapColor, scenaCapM);`
+      diffuseColor.rgb = mix(diffuseColor.rgb, uSurfCapColor, scenaCapM);
+      // WET. Water darkens a surface because it fills the pores: light gets
+      // in, scatters, and comes back out with less of it. So POROUS things
+      // darken hard and sealed ones barely change — a wet flagstone is
+      // almost black, wet chrome is just chrome — and metal, which has no
+      // subsurface to wet, does not darken at all.
+      float scenaWetM = scenaWetMask(vSurfWorldNormal, scenaLow, scenaMortar);
+      float scenaPorous = (1.0 - clamp(metalness, 0.0, 1.0)) * clamp(roughness, 0.0, 1.0);
+      diffuseColor.rgb *= mix(1.0, mix(0.93, 0.45, scenaPorous), scenaWetM);`
     )
     .replace(
       '#include <roughnessmap_fragment>',
       `#include <roughnessmap_fragment>
       roughnessFactor = clamp(roughnessFactor + (scenaN - 0.5) * uSurfRoughVar + uSurfGrain * scenaG * 0.12
         + scenaMortar * 0.25 + (scenaT.y - 0.5) * uSurfTileJitter * 0.3 * uSurfTile, 0.04, 1.0);
-      roughnessFactor = mix(roughnessFactor, uSurfCapRough, scenaCapM);`
+      roughnessFactor = mix(roughnessFactor, uSurfCapRough, scenaCapM);
+      // A film of water is a mirror, whatever is underneath it.
+      roughnessFactor = mix(roughnessFactor, 0.05, scenaWetM * 0.92);`
     )
     .replace(
       '#include <normal_fragment_maps>',
@@ -764,7 +813,10 @@ function fragmentPatch(src: string): string {
       {
         // three's perturbNormalArb, in view space, driven by the noise height
         // plus the tile relief (a step down into each mortar joint).
-        float scenaH = scenaN + uSurfGrain * scenaG * 0.5 + scenaT.z * uSurfTile * uSurfTileRelief;
+        // Standing water fills the micro-relief, so the bump flattens out
+        // under it — the puddle is smooth even where the stone is not.
+        float scenaH = (scenaN + uSurfGrain * scenaG * 0.5 + scenaT.z * uSurfTile * uSurfTileRelief)
+          * (1.0 - scenaWetM * 0.7);
         vec3 sX = dFdx(-vViewPosition);
         vec3 sY = dFdy(-vViewPosition);
         vec3 sN = normal;
@@ -846,6 +898,9 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
     uSurfGlow: { value: p.glow ?? 0 },
     uSurfGlowColor: { value: new Color(p.glowColor ?? 0xff6a2a) },
     uSurfGlowThresh: { value: p.glowThreshold ?? 0.45 },
+    // Wear: water (uSurfWet 0 is bone dry and costs one compare).
+    uSurfWet: { value: p.wet ?? 0 },
+    uSurfWetCling: { value: p.wetCling ?? 0.55 },
   };
 
   material.onBeforeCompile = (shader) => {
@@ -861,7 +916,7 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
   // from colliding with a plain MeshStandardMaterial that has matching base
   // params but no injection. three still appends its own feature key, so
   // flat/smooth/instanced variants stay separate programs.
-  material.customProgramCacheKey = () => 'scena-surface-v2';
+  material.customProgramCacheKey = () => 'scena-surface-v3';
 
   // Expose the live uniforms so weather can drive them after the fact — e.g.
   // snow settling ramps uSurfCap, rain darkens/glosses via the same handles.

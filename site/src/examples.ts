@@ -3013,6 +3013,65 @@ game.onUpdate((t) => {
 });
 game.start();`,
   },
+  {
+    id: 'wear',
+    title: 'Wear: rain on everything',
+    group: 'Worldbuilding',
+    code: `// WET IS A STATE, NOT A KIND. Every one of the 46 surface presets can be
+// rained on, and the catalogue does not grow by one entry to allow it.
+// Front rank DRY, back rank SOAKED — the same six presets, so the pairs
+// are directly comparable.
+//
+// Water fills from the BOTTOM: wetness is a level, not a multiply, so a
+// light shower puts dark glossy water in the mortar joints and the
+// hollows and leaves the faces dry. And it darkens by how POROUS the
+// surface is — the cobbles and the sandstone go nearly black, the glaze
+// and the marble barely move at all.
+import { createSurface, createPrecipitation, createSky, createLightingRig,
+         applyFog, PALETTES } from 'scena3d';
+import { Game } from 'gama3d';
+import { Mesh, BoxGeometry, PlaneGeometry } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+
+const floor = new Mesh(new PlaneGeometry(60, 60),
+  createSurface('concrete', { seed: 2, color: 0x8d8d88 }));
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.01;
+scene.add(floor);
+
+// No metals here: chrome and steel need an environment map to reflect,
+// and a wet mirror with nothing to mirror is just a darker mirror.
+const KINDS = ['cobblestone', 'plaster', 'brick', 'sandstone', 'glaze', 'marble'];
+KINDS.forEach((kind, i) => {
+  for (const wet of [0, 0.92]) {
+    const slab = new Mesh(new BoxGeometry(1.5, 1.5, 0.45),
+      createSurface(kind, { seed: 7 + i, wet }));
+    slab.position.set((i - 2.5) * 1.85, 0.75, wet > 0 ? -3.2 : 2.4);
+    scene.add(slab);
+  }
+});
+
+// And the wiring: real rain, soaking the floor and drying it again.
+// soak() is rain's counterpart to snow's accumulate(). Drying is a fifth
+// of the wetting rate, because a street that goes dry the moment the rain
+// stops reads as a bug rather than as weather.
+const rain = createPrecipitation({ type: 'rain', count: 2600, area: [40, 26, 40] });
+scene.add(rain.object);
+rain.soak(floor, { max: 0.95, rate: 0.3, dry: 0.06 });
+
+game.onUpdate((t) => {
+  rain.setIntensity(t.elapsed % 24 < 12 ? 1 : 0);
+  rain.update(t.delta);
+  game.camera.position.set(Math.sin(t.elapsed * 0.1) * 3, 6.4, 10.5);
+  game.camera.lookAt(0, 0.2, -0.4);
+});
+game.start();`,
+  },
 ];
 
 export function findExample(id: string): Example {

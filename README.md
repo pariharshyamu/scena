@@ -100,6 +100,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Water with shoreline masks; terrain sand bands
 - [x] Day-night cycle: one `timeOfDay` drives sun, sky, fog and lamps igniting at dusk
 - [x] Wind sway on scattered vegetation (per-instance phase)
+- [x] Surface **wear states**: `wet` — water that fills from the bottom (joints and hollows first), darkens by porosity, and is driven by the rain via `precipitation.soak()`
 - [x] Paths: one curve = visual ribbon + scatter keep-out + GAMA patrol route
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake

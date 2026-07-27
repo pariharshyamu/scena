@@ -46,6 +46,8 @@ type SurfaceUniforms = {
   uSurfCapUp: { value: number };
   uSurfCapSharp: { value: number };
   uSurfCapRough: { value: number };
+  uSurfWet: { value: number };
+  uSurfWetCling: { value: number };
 };
 
 interface Accumulation {
@@ -56,6 +58,14 @@ interface Accumulation {
   rate: number;
 }
 
+interface Soaking {
+  entries: Array<{ material: Material; configured: boolean }>;
+  cling: number;
+  max: number;
+  rate: number;
+  dry: number;
+}
+
 export interface Precipitation {
   /** The renderable — add it to the scene. Follows the camera; never culled. */
   object: Points | LineSegments;
@@ -64,9 +74,27 @@ export interface Precipitation {
   /** Set how heavy it falls, 0–1 (0 stops it). */
   setIntensity(value: number): void;
   /** Snow only: settle a white cap onto the surfaces under `target` as it falls. */
-  accumulate(target: Object3D, options?: AccumulateOptions): Precipitation;
+  accumulate(target: Object3D, options?: SoakOptions & AccumulateOptions): Precipitation;
+  /** Rain only: wet the surfaces under `target` as it falls, and dry them after. */
+  soak(target: Object3D, options?: SoakOptions): Precipitation;
   /** Advance manually instead of self-driving (for deterministic loops). */
   update(dt: number): void;
+}
+
+export interface SoakOptions {
+  /** How wet it gets at full intensity, 0–1. Default 0.9. */
+  max?: number;
+  /** Wetting speed (wetness per second). Default 0.22. */
+  rate?: number;
+  /**
+   * Drying speed once the rain eases (wetness per second). Default 0.045 —
+   * a fifth of the wetting rate, because a wall soaks in a minute and takes
+   * an hour to dry, and a puddle that vanishes the moment the rain stops
+   * reads as a bug rather than as weather.
+   */
+  dry?: number;
+  /** How well water clings to vertical faces, 0–1. Default 0.55. */
+  cling?: number;
 }
 
 export interface AccumulateOptions {
@@ -286,6 +314,7 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
   object.name = `precipitation-${type}`;
 
   let accum: Accumulation | null = null;
+  let soaking: Soaking | null = null;
   let manual = false;
   let last = nowSeconds();
 
@@ -321,6 +350,32 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
         if (live) e.configured = true;
       }
     }
+    if (soaking) {
+      // Wetting is driven by how hard it is raining; DRYING happens whenever
+      // the surface is wetter than the weather justifies, at its own much
+      // slower rate. That asymmetry is the whole effect: the street goes
+      // dark in a minute and takes a long time to come back.
+      const target = soaking.max * (material.uniforms.uIntensity.value as number);
+      for (const e of soaking.entries) {
+        const data = e.material.userData as {
+          scenaSurface?: SurfaceUniforms;
+          scenaShader?: { uniforms: SurfaceUniforms };
+        };
+        const live = data.scenaShader?.uniforms;
+        const base = data.scenaSurface;
+        const now = base?.uSurfWet.value ?? 0;
+        const next =
+          now < target
+            ? Math.min(target, now + soaking.rate * dt)
+            : Math.max(target, now - soaking.dry * dt);
+        for (const u of [base, live]) {
+          if (!u) continue;
+          if (!e.configured) u.uSurfWetCling.value = soaking.cling;
+          u.uSurfWet.value = next;
+        }
+        if (live) e.configured = true;
+      }
+    }
   };
 
   object.onBeforeRender = () => {
@@ -338,6 +393,25 @@ export function createPrecipitation(options: PrecipitationOptions = {}): Precipi
     material,
     setIntensity(value) {
       material.uniforms.uIntensity.value = Math.max(0, Math.min(1, value));
+    },
+    soak(target, opts = {}) {
+      if (!isRain) return precip; // only rain wets things
+      const entries: Soaking['entries'] = [];
+      target.traverse((o) => {
+        const mats = ((o as { material?: Material | Material[] }).material ?? []) as Material | Material[];
+        for (const m of Array.isArray(mats) ? mats : [mats]) {
+          const u = (m.userData as { scenaSurface?: SurfaceUniforms } | undefined)?.scenaSurface;
+          if (u && u.uSurfWet) entries.push({ material: m, configured: false });
+        }
+      });
+      soaking = {
+        entries,
+        cling: opts.cling ?? 0.55,
+        max: opts.max ?? 0.9,
+        rate: opts.rate ?? 0.22,
+        dry: opts.dry ?? 0.045,
+      };
+      return precip;
     },
     accumulate(target, opts = {}) {
       if (type !== 'snow') return precip; // only snow settles
