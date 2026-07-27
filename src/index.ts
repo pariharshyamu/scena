@@ -622,6 +622,14 @@ export {
 } from './props/bowl';
 export { createBeach, type Beach, type BeachOptions } from './props/beach';
 export {
+  createPalm,
+  createBananaTree,
+  type TropicalTree,
+  type PalmOptions,
+  type BananaOptions,
+} from './props/tropics';
+export { createLagoon, type Lagoon, type LagoonOptions } from './props/lagoon';
+export {
   createSeamark,
   geographicRange,
   luminousRange,

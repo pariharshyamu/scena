@@ -850,87 +850,101 @@ game.start();`,
 
   {
     id: 'beach',
-    title: 'The beach: the swash & the fifth field',
+    title: 'The beach: lagoon, cloth palms & the postcard',
     group: 'Worldbuilding',
-    code: `// A BEACH IS AN EDGE, NOT A PLACE. Dry sand is terrain and the sea
-// already ships; what makes a beach READ is the strip between them — the
-// SWASH. Watch the tongue run up the sand and drain back: where it has
-// just been the sand is mirror-wet, drying through dark and damp over
-// half a minute; each retreat strands a lace of foam at its high point.
-// All of it is queryable as wetAt(x, z) — the fifth spatial field, after
-// depthAt, heatAt, chillAt and smokeAt.
+    code: `// THE POSTCARD, FRONT ON. A big calm TURQUOISE lagoon people can swim
+// in — clear enough that the sandy bowl and the fish show through — with
+// dunes and greenery around it, a little fishing boat hauled up on the
+// sand, and the open ocean out on the horizon where it belongs: a
+// distant blue band, not surf at your feet.
 //
-// The beach and the ocean compose BOTH WAYS and import nothing: the
-// ocean takes beach.heightAt as its shore (it fades over the sand and
-// foams at the line), and the beach takes ocean.heightAt as its water
-// (the swash runs on the real swell). And the sand REMEMBERS: a
-// beachcomber walks the wet band leaving prints — only wet sand takes
-// one — and the next tongue wipes them.
-import { createBeach, createOcean } from 'scena3d';
+// The trees are CLOTH. A palm frond is mechanically a flag pinned at
+// the stem, so every leaf here is driven by the same cloth-wave shader
+// as the banners — each with a phase of its own, nobody fluttering in
+// step. The banana leaves are three cloth strips each, because banana
+// leaves split along their veins, and the strips moving out of phase IS
+// that split. Rigid leaves read as plastic; fabric reads as alive.
+//
+// The lagoon is structurally ANIMA's WaterBody ({ surfaceY, depthAt,
+// disturb }) — hand it to a Swimming character and they swim in it.
+import { createLagoon, createPalm, createBananaTree, createSmallCraft,
+  createOcean } from 'scena3d';
 import { Game } from 'gama3d';
-import { Mesh, BoxGeometry, PlaneGeometry, MeshStandardMaterial,
+import { Mesh, SphereGeometry, PlaneGeometry, MeshStandardMaterial,
   AmbientLight, DirectionalLight, Color, Fog } from 'three';
 
-const game = new Game();
+const game = new Game();                       // the GAMA camera frames it
 const scene = game.world.scene;
-scene.background = new Color(0xf6dfc0);            // golden hour
-scene.fog = new Fog(0xf6dfc0, 55, 130);
-scene.add(new AmbientLight(0xffe9cf, 0.65));
-const sun = new DirectionalLight(0xffc98a, 1.15);
-sun.position.set(-30, 14, 6);
+scene.background = new Color(0xbfe3ef);        // tropical noon
+scene.fog = new Fog(0xbfe3ef, 90, 220);
+scene.add(new AmbientLight(0xf2f6ff, 0.7));
+const sun = new DirectionalLight(0xfff2d8, 1.1);
+sun.position.set(-14, 26, 10);
 scene.add(sun);
-// The hinterland, so the dune has something to be in front of.
-const land = new Mesh(new PlaneGeometry(200, 200),
-  new MeshStandardMaterial({ color: 0xd6c294, roughness: 1 }));
-land.rotation.x = -Math.PI / 2;
-land.position.y = 1.55;
-land.position.z = -114;
-scene.add(land);
 
-// The two-way handshake: the ocean's shore is the beach; the beach's
-// water is the ocean. One coastline, agreed on from both sides. (The
-// water closure binds late, so the mutual reference costs nothing.)
-const beach = createBeach({ seed: 7, width: 60, depth: 28,
-  water: (x, z, tt) => (ocean ? ocean.heightAt(x, z, tt) : 0) });
-scene.add(beach.object);
-
-const ocean = createOcean({
-  level: 0, amplitude: 0.4, wavelength: 19, direction: 205,
-  shore: beach.heightAt,
-  shallowColor: 0x5fb4b8, deepColor: 0x1d5a70, skyColor: 0xf6dfc0,
+// The sand, and the dunes that hold the lagoon.
+const sand = new Mesh(new PlaneGeometry(300, 300),
+  new MeshStandardMaterial({ color: 0xe2cf9f, roughness: 1 }));
+sand.rotation.x = -Math.PI / 2;
+sand.position.y = -0.08;              // below the lagoon's apron: no seam
+scene.add(sand);
+const duneMat = new MeshStandardMaterial({ color: 0xdcc794, roughness: 1 });
+[[-16, -10, 7, 1.8], [17, -12, 8, 2.2], [-24, -26, 12, 3],
+ [26, -28, 13, 3.4], [0, -34, 16, 3.2]].forEach(([x, z, r, h]) => {
+  const dune = new Mesh(new SphereGeometry(r, 12, 8), duneMat);
+  dune.scale.set(1, h / r, 0.7);
+  dune.position.set(x, 0, z);
+  scene.add(dune);
 });
-ocean.mesh.position.z = 18;
+
+// THE LAGOON, front and centre: turquoise over a visible sand bowl,
+// fourteen reef fish on circuits of their own.
+const lagoon = createLagoon({ seed: 7, radius: 9.5, depth: 1.9, fish: 14 });
+lagoon.object.position.set(0, 0, 3);
+scene.add(lagoon.object);
+
+// The greenery: cloth palms leaning over the water, bananas in the lee.
+const trees = [];
+[[-12.5, -3, 0.32], [-9.5, 3.5, 0.24], [12.5, -4, -0.28],
+ [10.5, 4.5, -0.2], [15.5, -13, -0.35]].forEach(([x, z, lean], i) => {
+  const palm = createPalm({ seed: 30 + i, lean: Math.abs(lean) });
+  palm.object.position.set(x, 0, z);
+  palm.object.rotation.y = lean > 0 ? Math.PI / 2 : -Math.PI / 2;
+  scene.add(palm.object);
+  trees.push(palm);
+});
+[[-7.5, -7.5], [-5.8, -9.2], [7.2, -8.4]].forEach(([x, z], i) => {
+  const banana = createBananaTree({ seed: 50 + i, fruiting: i === 0 });
+  banana.object.position.set(x, 0, z);
+  scene.add(banana.object);
+  trees.push(banana);
+});
+
+// The little fishing boat, hauled up on the sand beside the pool.
+const boat = createSmallCraft({ fit: 'open', length: 4.4, seed: 12 });
+boat.object.position.set(9.2, 0.32, 11.5);
+boat.object.rotation.y = 2.4;
+boat.object.rotation.z = 0.1;                  // heeled on her bilge
+scene.add(boat.object);
+
+// The OCEAN — a distant view, exactly where a lagoon keeps it: a blue
+// band on the horizon beyond the dunes.
+// Sized and placed so no crest can ever poke up through the beach: the
+// whole plane lives beyond the dunes.
+const ocean = createOcean({ level: -0.6, size: 320, amplitude: 0.5,
+  wavelength: 34, deepColor: 0x145a78, shallowColor: 0x2a7d95,
+  skyColor: 0xbfe3ef });
+ocean.mesh.position.z = -220;
 scene.add(ocean.mesh);
 
-// The beachcomber: a stand-in walker (ANIMA drops straight in here —
-// wire loco.onFootstep to beach.stamp and characters write their path).
-const comber = new Mesh(new BoxGeometry(0.34, 1.1, 0.26),
-  new MeshStandardMaterial({ color: 0x7a4630 }));
-scene.add(comber);
-let stride = 0;
-let side = 1;
-
-let t = 0;
-game.onUpdate((dt) => {
-  const d = dt.delta;
-  t += d;
-  ocean.update(d);
-  beach.update(d);
-
-  // Walk the wet band: along the shore, weaving with the water's edge.
-  const x = -24 + ((t * 1.1) % 48);
-  const edge = beach.reachAt(x);
-  const z = edge.z - 1.4 + Math.sin(t * 0.7) * 0.8;
-  comber.position.set(x, beach.heightAt(x, z) + 0.55, z);
-  stride += d * 2.6;
-  if (stride > 1) {
-    stride = 0;
-    side = -side;
-    beach.stamp(x - 0.1 * side, z + side * 0.14, 0.1);   // a footprint —
-  }                                                       // if the sand is wet
-
-  game.camera.position.set(13, 5.2, -8.5);
-  game.camera.lookAt(-6, 0, 7);
+game.onUpdate((t) => {
+  lagoon.update(t.delta);
+  for (const tree of trees) tree.update(t.delta);
+  ocean.update(t.delta);
+  // FRONT VIEW: the GAMA camera looks straight up the beach — lagoon in
+  // the foreground, dunes and palms behind it, the sea on the horizon.
+  game.camera.position.set(0, 8.5, 34);
+  game.camera.lookAt(0, 0.2, -14);
 });
 game.start();`,
   },
