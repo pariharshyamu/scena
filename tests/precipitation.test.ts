@@ -113,8 +113,8 @@ describe('snow accumulation', () => {
 
 describe('rain soaks, and it dries again', () => {
   const wetOf = (m: unknown) =>
-    (m.userData as { scenaSurface: { uSurfWet: { value: number }; uSurfWetCling: { value: number } } })
-      .scenaSurface;
+    (m as { userData: { scenaSurface: { uSurfWet: { value: number }; uSurfWetCling: { value: number } } } })
+      .userData.scenaSurface;
 
   const scene = () => {
     const road = new Mesh();
