@@ -630,6 +630,17 @@ export {
 } from './props/tropics';
 export { createLagoon, type Lagoon, type LagoonOptions } from './props/lagoon';
 export {
+  createLifeguardTower,
+  createBeachUmbrella,
+  createLounger,
+  MIAMI_COLORS,
+  type BeachProp,
+  type LifeguardTowerOptions,
+  type BeachUmbrellaOptions,
+  type LoungerOptions,
+  type LoungerRecline,
+} from './props/beachkit';
+export {
   createSeamark,
   geographicRange,
   luminousRange,

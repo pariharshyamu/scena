@@ -850,101 +850,180 @@ game.start();`,
 
   {
     id: 'beach',
-    title: 'The beach: lagoon, cloth palms & the postcard',
+    title: 'Miami: the beach kit, cloth palms & clean water',
     group: 'Worldbuilding',
-    code: `// THE POSTCARD, FRONT ON. A big calm TURQUOISE lagoon people can swim
-// in — clear enough that the sandy bowl and the fish show through — with
-// dunes and greenery around it, a little fishing boat hauled up on the
-// sand, and the open ocean out on the horizon where it belongs: a
-// distant blue band, not surf at your feet.
+    code: `// MIAMI. The props that turn sand into a BEACH: pastel art-deco
+// lifeguard stands (no two the same colours), rows of striped umbrellas,
+// loungers with towels — and water that is actually CLEAN: turquoise in
+// the shallows, deep blue out, with a crisp horizon instead of a band of
+// haze. (The haze was the bug: an ocean parked at the fog's far plane
+// dissolves into the sky and reads as dust.)
 //
-// The trees are CLOTH. A palm frond is mechanically a flag pinned at
-// the stem, so every leaf here is driven by the same cloth-wave shader
-// as the banners — each with a phase of its own, nobody fluttering in
-// step. The banana leaves are three cloth strips each, because banana
-// leaves split along their veins, and the strips moving out of phase IS
-// that split. Rigid leaves read as plastic; fabric reads as alive.
-//
-// The lagoon is structurally ANIMA's WaterBody ({ surfaceY, depthAt,
-// disturb }) — hand it to a Swimming character and they swim in it.
-import { createLagoon, createPalm, createBananaTree, createSmallCraft,
-  createOcean } from 'scena3d';
+// The trees are CLOTH — every palm frond and banana leaf is driven by
+// the same wave shader as the flags, each with its own phase, so nothing
+// flutters in lockstep.
+import { createLifeguardTower, createBeachUmbrella, createLounger,
+  createPalm, createBananaTree, createSmallCraft, createOcean,
+  createSurface } from 'scena3d';
 import { Game } from 'gama3d';
-import { Mesh, SphereGeometry, PlaneGeometry, MeshStandardMaterial,
-  AmbientLight, DirectionalLight, Color, Fog } from 'three';
+import { Mesh, BoxGeometry, SphereGeometry, PlaneGeometry,
+  MeshStandardMaterial, AmbientLight, DirectionalLight, HemisphereLight,
+  Color, Fog } from 'three';
 
-const game = new Game();                       // the GAMA camera frames it
+const game = new Game();                        // the GAMA camera frames it
 const scene = game.world.scene;
-scene.background = new Color(0xbfe3ef);        // tropical noon
-scene.fog = new Fog(0xbfe3ef, 90, 220);
-scene.add(new AmbientLight(0xf2f6ff, 0.7));
-const sun = new DirectionalLight(0xfff2d8, 1.1);
-sun.position.set(-14, 26, 10);
+scene.background = new Color(0x6fc6e8);         // South Beach noon
+// Fog far ENOUGH: the sea has to live well inside it or it turns to dust.
+scene.fog = new Fog(0x9fd8ea, 260, 900);
+scene.add(new HemisphereLight(0xdff2ff, 0xe8d9a8, 0.75));
+scene.add(new AmbientLight(0xffffff, 0.25));
+const sun = new DirectionalLight(0xfff6e0, 1.35);
+sun.position.set(-30, 40, 22);
 scene.add(sun);
 
-// The sand, and the dunes that hold the lagoon.
-const sand = new Mesh(new PlaneGeometry(300, 300),
-  new MeshStandardMaterial({ color: 0xe2cf9f, roughness: 1 }));
-sand.rotation.x = -Math.PI / 2;
-sand.position.y = -0.08;              // below the lagoon's apron: no seam
+// THE BEACH PROFILE, shared by the sand AND the sea, so the two agree
+// about the waterline: dune at the back, a berm crest, then the beach
+// face diving under the water at 1 in 9. (Sand that stays flat under
+// the sea is why the first build showed no water at all.)
+const profile = (x, z) => {
+  // Steep enough that the see-through shallows are a NARROW band: a
+  // gentle face left a wide sheet of near-transparent water and the sand
+  // under it read as a tongue of beach sticking into the sea.
+  const face = Math.max(-4.2, Math.min(2.1, (z - 4) * 0.155));
+  const dune = Math.max(0, Math.min(1, (z - 34) / 18));
+  // The grain fades IN over the dry sand: a hard cutoff at the waterline
+  // cut a cliff into the beach and the sea broke over it.
+  const dry = Math.max(0, Math.min(1, (z - 7) / 10));
+  return face + dune * dune * 2.8
+    + dry * (Math.sin(x * 0.07) * 0.2 + Math.cos(z * 0.05 + x * 0.02) * 0.16);
+};
+const sandGeo = new PlaneGeometry(330, 220, 100, 80);
+sandGeo.rotateX(-Math.PI / 2);
+{
+  const pos = sandGeo.getAttribute('position');
+  const cols = [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i) + 55;
+    pos.setY(i, profile(x, z));
+    // Wet sand is darker: the band the water has just left.
+    const wet = Math.max(0, Math.min(1, (10 - z) / 9));
+    cols.push(1 - wet * 0.3, 1 - wet * 0.28, 1 - wet * 0.24);
+  }
+  sandGeo.setAttribute('color',
+    new (Object.getPrototypeOf(pos).constructor)(new Float32Array(cols), 3));
+  sandGeo.computeVertexNormals();
+}
+const sandMat = createSurface('sand', { seed: 4, color: 0xf3e6c4 });
+sandMat.vertexColors = true;
+const sand = new Mesh(sandGeo, sandMat);
+sand.position.z = 55;
 scene.add(sand);
-const duneMat = new MeshStandardMaterial({ color: 0xdcc794, roughness: 1 });
-[[-16, -10, 7, 1.8], [17, -12, 8, 2.2], [-24, -26, 12, 3],
- [26, -28, 13, 3.4], [0, -34, 16, 3.2]].forEach(([x, z, r, h]) => {
-  const dune = new Mesh(new SphereGeometry(r, 12, 8), duneMat);
-  dune.scale.set(1, h / r, 0.7);
-  dune.position.set(x, 0, z);
-  scene.add(dune);
+
+// THE SEA, clean: turquoise shallows over the shelf, deep blue out, and
+// shore-faded on the SAME profile, so the water dies exactly where the
+// beach face rises out of it.
+const ocean = createOcean({
+  level: 0, size: 700, segments: 240, amplitude: 0.42, wavelength: 23,
+  choppiness: 0.6, direction: 180, shore: profile,
+  shallowColor: 0x45dcd2, deepColor: 0x0a6fb4, skyColor: 0x9fd8ea,
 });
-
-// THE LAGOON, front and centre: turquoise over a visible sand bowl,
-// fourteen reef fish on circuits of their own.
-const lagoon = createLagoon({ seed: 7, radius: 9.5, depth: 1.9, fish: 14 });
-lagoon.object.position.set(0, 0, 3);
-scene.add(lagoon.object);
-
-// The greenery: cloth palms leaning over the water, bananas in the lee.
-const trees = [];
-[[-12.5, -3, 0.32], [-9.5, 3.5, 0.24], [12.5, -4, -0.28],
- [10.5, 4.5, -0.2], [15.5, -13, -0.35]].forEach(([x, z, lean], i) => {
-  const palm = createPalm({ seed: 30 + i, lean: Math.abs(lean) });
-  palm.object.position.set(x, 0, z);
-  palm.object.rotation.y = lean > 0 ? Math.PI / 2 : -Math.PI / 2;
-  scene.add(palm.object);
-  trees.push(palm);
-});
-[[-7.5, -7.5], [-5.8, -9.2], [7.2, -8.4]].forEach(([x, z], i) => {
-  const banana = createBananaTree({ seed: 50 + i, fruiting: i === 0 });
-  banana.object.position.set(x, 0, z);
-  scene.add(banana.object);
-  trees.push(banana);
-});
-
-// The little fishing boat, hauled up on the sand beside the pool.
-const boat = createSmallCraft({ fit: 'open', length: 4.4, seed: 12 });
-boat.object.position.set(9.2, 0.32, 11.5);
-boat.object.rotation.y = 2.4;
-boat.object.rotation.z = 0.1;                  // heeled on her bilge
-scene.add(boat.object);
-
-// The OCEAN — a distant view, exactly where a lagoon keeps it: a blue
-// band on the horizon beyond the dunes.
-// Sized and placed so no crest can ever poke up through the beach: the
-// whole plane lives beyond the dunes.
-const ocean = createOcean({ level: -0.6, size: 320, amplitude: 0.5,
-  wavelength: 34, deepColor: 0x145a78, shallowColor: 0x2a7d95,
-  skyColor: 0xbfe3ef });
-ocean.mesh.position.z = -220;
+// NOT offset: the shore sampler works in the ocean's own space, so the
+// plane has to sit on the same origin as the profile it fades against.
 scene.add(ocean.mesh);
 
+// THE LIFEGUARD STANDS — the signature of this beach. A row of them,
+// each a different pastel pair, marching down the sand.
+const kit = [];
+[[-28, 9, 3], [-3, 7, 7], [25, 10, 11]].forEach(([x, z, seed]) => {
+  const tower = createLifeguardTower({ seed });
+  tower.object.scale.setScalar(1.25);
+  tower.object.position.set(x, profile(x, z), z);
+  tower.object.rotation.y = Math.PI + (x / 90);
+  scene.add(tower.object);
+  kit.push(tower);
+});
+
+// UMBRELLAS AND LOUNGERS: rows of them, the way a rented beach looks.
+const RECLINES = ['flat', 'reading', 'upright'];
+for (let row = 0; row < 3; row++) {
+  for (let i = 0; i < 9; i++) {
+    const x = -34 + i * 8.5 + (row % 2) * 3.6;
+    const z = 14 + row * 6.5;
+    const umbrella = createBeachUmbrella({ seed: row * 20 + i });
+    umbrella.object.position.set(x, profile(x, z), z);
+    scene.add(umbrella.object);
+    kit.push(umbrella);
+    for (const side of [-1.05, 1.05]) {
+      const lounger = createLounger({
+        seed: row * 40 + i * 3 + (side > 0 ? 1 : 0),
+        recline: RECLINES[(i + row) % 3],
+      });
+      lounger.object.position.set(x + side, profile(x + side, z + 0.6), z + 0.6);
+      lounger.object.rotation.y = Math.PI + side * 0.12;
+      scene.add(lounger.object);
+      kit.push(lounger);
+    }
+  }
+}
+
+// THE GREENERY: cloth palms along the back, bananas behind them.
+[[-42, 33, 10], [-30, 31, 8.6], [-18, 33, 10.5], [-6, 31, 9],
+ [6, 32, 10.2], [18, 31, 8.8], [30, 33, 10], [42, 31, 9.4]]
+  .forEach(([x, z, h], i) => {
+  const palm = createPalm({ seed: 60 + i, height: h, lean: 0.13 });
+  palm.object.position.set(x, profile(x, z), z);
+  palm.object.rotation.y = (i % 2 ? 1 : -1) * Math.PI / 2;
+  scene.add(palm.object);
+  kit.push(palm);
+});
+[[-36, 39], [-11, 40], [14, 39], [37, 40]].forEach(([x, z], i) => {
+  const banana = createBananaTree({ seed: 80 + i, fruiting: i % 2 === 0 });
+  banana.object.position.set(x, profile(x, z), z);
+  scene.add(banana.object);
+  kit.push(banana);
+});
+
+// OCEAN DRIVE: a row of pastel deco facades behind the palms — the
+// eyebrow band over the windows is the whole style in one detail.
+[[-36, 3], [-19, 1], [-2, 4], [15, 2], [32, 5]].forEach(([x, seed], i) => {
+  const hue = [0xff9ec4, 0x6fdcd2, 0xffd166, 0xa9b8ff, 0xffab7a][i];
+  const wall = new MeshStandardMaterial({ color: hue, roughness: 0.85 });
+  const trim = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
+  const storeys = 2 + (seed % 3);
+  const w = 11 + (seed % 4);
+  const block = new Mesh(new BoxGeometry(w, storeys * 3.4, 9), wall);
+  block.position.set(x, 2.6 + storeys * 1.7, 54);
+  scene.add(block);
+  for (let f = 1; f <= storeys; f++) {
+    const brow = new Mesh(new BoxGeometry(w + 0.9, 0.35, 9.6), trim);
+    brow.position.set(x, 2.6 + f * 3.4 - 0.5, 54);
+    scene.add(brow);
+    for (const wx of [-0.3, 0, 0.3]) {
+      const glass = new Mesh(new BoxGeometry(w * 0.2, 1.3, 0.2),
+        new MeshStandardMaterial({ color: 0x2f5a72, roughness: 0.2 }));
+      glass.position.set(x + wx * w, 2.6 + f * 3.4 - 1.7, 49.4);
+      scene.add(glass);
+    }
+  }
+  const parapet = new Mesh(new BoxGeometry(w * 0.35, 1.5, 9.2), wall);
+  parapet.position.set(x, 2.6 + storeys * 3.4 + 0.75, 54);
+  scene.add(parapet);
+});
+
+// The fishing boat, hauled up clear of the water.
+const boat = createSmallCraft({ fit: 'open', length: 4.6, seed: 12 });
+boat.object.position.set(34, profile(34, 8) + 0.2, 8);
+boat.object.rotation.set(0, 2.5, 0.09);
+scene.add(boat.object);
+
 game.onUpdate((t) => {
-  lagoon.update(t.delta);
-  for (const tree of trees) tree.update(t.delta);
   ocean.update(t.delta);
-  // FRONT VIEW: the GAMA camera looks straight up the beach — lagoon in
-  // the foreground, dunes and palms behind it, the sea on the horizon.
-  game.camera.position.set(0, 8.5, 34);
-  game.camera.lookAt(0, 0.2, -14);
+  for (const prop of kit) prop.update(t.delta);
+  // FRONT VIEW, from over the water looking IN at the beach: turquoise
+  // in the foreground, then the sand and its kit, the palms, and Ocean
+  // Drive's pastel facades along the back.
+  game.camera.position.set(0, 10.5, -34);
+  game.camera.lookAt(0, 8, 36);
 });
 game.start();`,
   },
