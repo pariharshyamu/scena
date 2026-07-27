@@ -2936,6 +2936,83 @@ console.log(world.obstacles.length, 'obstacles ready for GAMA steering');
 ${orbit(33, 16, 0.045)}
 game.start();`,
   },
+  {
+    id: 'cricket',
+    title: 'The cricket ground',
+    group: 'Props',
+    code: `// A cricket field is mostly EMPTY, and the emptiness is measured: a
+// 22-yard strip, stumps 28 inches tall, the popping crease four feet in
+// front, a rope 62 metres out. The stripes are what make it read as a
+// ground — a mown outfield has direction and scale; a green disc has
+// neither. breakWicket() throws the bails and they fall where they land.
+import { createCricketGround, createBat, createCricketBall, createTree,
+         createSky, createLightingRig, applyFog, PALETTES,
+         PITCH_LENGTH } from 'scena3d';
+import { Game } from 'gama3d';
+import { Vector3 } from 'three';
+
+const palette = PALETTES.meadow;
+const game = new Game();
+const scene = game.world.scene;
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+
+const ground = createCricketGround({ seed: 3, boundary: 62 });
+scene.add(ground.object);
+for (let i = 0; i < 22; i++) {
+  const a = (i / 22) * Math.PI * 2;
+  const tree = createTree({ seed: 40 + i, species: i % 3 === 0 ? 'pine' : 'oak', palette });
+  tree.object.position.set(Math.cos(a) * 74, 0, Math.sin(a) * 74);
+  scene.add(tree.object);
+}
+
+const bat = createBat({ seed: 4 });
+bat.object.position.copy(ground.strikerEnd).add(new Vector3(0.55, 0, 0));
+bat.object.rotation.z = 0.3;
+scene.add(bat.object);
+
+// A delivery on a loop: released at the bowler's end, pitching short of a
+// length, taking the top of off — and the bails go.
+const ball = createCricketBall({ seed: 2 });
+scene.add(ball.object);
+const RELEASE = new Vector3(0, 2.1, PITCH_LENGTH / 2 - 0.4);
+const vel = new Vector3();
+let bounced = false;
+let wait = 0;
+const release = () => {
+  ball.object.position.copy(RELEASE);
+  const flight = (RELEASE.z + PITCH_LENGTH / 2 - 5) / 26;
+  vel.set(0, (0.036 - RELEASE.y) / flight + 0.5 * 9.8 * flight, -26);
+  bounced = false;
+};
+release();
+
+game.onUpdate((t) => {
+  ground.update(t.delta);
+  if (wait > 0) {
+    wait -= t.delta;
+    if (wait <= 0) { ground.resetWicket(); release(); }
+  } else {
+    vel.y -= 9.8 * t.delta;
+    ball.object.position.addScaledVector(vel, t.delta);
+    if (!bounced && ball.object.position.y <= 0.036) {
+      bounced = true;
+      ball.object.position.y = 0.036;
+      vel.y = Math.abs(vel.y) * 0.55;
+      vel.z *= 0.86;
+    }
+    if (ball.object.position.z <= -PITCH_LENGTH / 2) {
+      ground.breakWicket(-1);
+      wait = 2.4;
+    }
+  }
+  // Down the pitch from behind the bowler's arm, drifting square.
+  const a = t.elapsed * 0.09;
+  game.camera.position.set(Math.sin(a) * 4, 2.6, PITCH_LENGTH / 2 + 6);
+  game.camera.lookAt(0, 0.7, -PITCH_LENGTH / 2 + 1);
+});
+game.start();`,
+  },
 ];
 
 export function findExample(id: string): Example {

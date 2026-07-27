@@ -624,6 +624,20 @@ export {
 } from './props/bowl';
 export { createBeach, type Beach, type BeachOptions } from './props/beach';
 export {
+  createCricketGround,
+  createBat,
+  createCricketBall,
+  PITCH_LENGTH,
+  PITCH_WIDTH,
+  STUMP_HEIGHT,
+  STUMP_SPREAD,
+  CREASE_FRONT,
+  type CricketGround,
+  type CricketGroundOptions,
+  type CricketBallProp,
+  type BatOptions,
+} from './props/cricket';
+export {
   createPalm,
   createBananaTree,
   type TropicalTree,

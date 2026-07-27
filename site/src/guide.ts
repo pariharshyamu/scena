@@ -29,6 +29,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'beach', title: 'The beach: swash & wet sand', playground: 'beach' },
   { id: 'lagoon', title: 'The lagoon, palms & the postcard', playground: 'beach' },
   { id: 'beachkit', title: 'The beach kit: Miami', playground: 'beach' },
+  { id: 'cricket', title: 'The cricket ground', playground: 'cricket' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
