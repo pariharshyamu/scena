@@ -927,7 +927,14 @@ scene.add(sand);
 const ocean = createOcean({
   level: 0, size: 700, segments: 240, amplitude: 0.42, wavelength: 23,
   choppiness: 0.6, direction: 180, shore: profile,
-  shallowColor: 0x45dcd2, deepColor: 0x0a6fb4, skyColor: 0x9fd8ea,
+  shallowColor: 0x51e3d6, deepColor: 0x0a6fb4, skyColor: 0x9fd8ea,
+  // Breakers running in, and a waterline that runs up the sand and drains.
+  surf: { breakDepth: 1.8, runUp: 0.45, period: 8, bands: 2.4 },
+  // The turquoise SHELF: bright water out to 13 m of depth, which on this
+  // beach face is eighty-odd metres of it — that band IS the tropics.
+  shoalDepth: 13,
+  // And the chop that breaks the light up into moving highlights.
+  ripples: { strength: 0.4, scale: 0.8 },
 });
 // NOT offset: the shore sampler works in the ocean's own space, so the
 // plane has to sit on the same origin as the profile it fades against.

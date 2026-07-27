@@ -187,6 +187,7 @@ export {
   type AccumulateOptions,
 } from './environment/precipitation';
 export { createOcean, type Ocean, type SurfOptions,
+  type RippleOptions,
   type OceanOptions } from './environment/ocean';
 export {
   createWeather,

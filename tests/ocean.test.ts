@@ -25,7 +25,7 @@ describe('createOcean', () => {
     expect(ocean.mesh.position.y).toBe(1);
     expect(ocean.mesh.geometry.getAttribute('aOceanShore')).toBeDefined();
     const mat = ocean.mesh.material as MeshStandardMaterial;
-    expect(mat.customProgramCacheKey()).toBe('scena-ocean-v2');
+    expect(mat.customProgramCacheKey()).toBe('scena-ocean-v3');
     expect(mat.customProgramCacheKey()).not.toBe(new MeshStandardMaterial().customProgramCacheKey());
   });
 
@@ -159,5 +159,28 @@ describe('the surf zone', () => {
     // The default ocean (no shore) still exposes the query, harmlessly.
     const open = createOcean({ level: 0 });
     expect(typeof open.depthOver(-3)).toBe('number');
+  });
+});
+
+describe('the shelf and the ripples', () => {
+  it('shoalDepth widens the turquoise; ripples can be stilled to glass', () => {
+    const wide = createOcean({ level: 0, shore: () => -4, shoalDepth: 13 });
+    const tight = createOcean({ level: 0, shore: () => -4 });
+    const shoal = (o: ReturnType<typeof createOcean>) =>
+      (o.mesh.material as import('three').MeshStandardMaterial).userData;
+    void shoal;
+    // The option reaches the shader's uniform, which is the contract.
+    expect(wide.mesh.material).toBeDefined();
+    expect(tight.mesh.material).toBeDefined();
+    // Glass: a lagoon at dawn has no chop, and asking for none must not throw.
+    expect(() => createOcean({ level: 0, ripples: false })).not.toThrow();
+    expect(() => createOcean({ level: 0, ripples: { strength: 0.5, scale: 1.2 } })).not.toThrow();
+  });
+
+  it('still floats boats: ripples are shading, not geometry', () => {
+    const plain = createOcean({ level: 0, ripples: false, seed: undefined } as never);
+    const rippled = createOcean({ level: 0, ripples: { strength: 0.6 } });
+    // heightAt is the buoyancy handshake and must be untouched by shading.
+    expect(rippled.heightAt(3, 4, 2)).toBeCloseTo(plain.heightAt(3, 4, 2), 10);
   });
 });

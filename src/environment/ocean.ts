@@ -32,6 +32,14 @@ export interface SurfOptions {
   bands?: number;
 }
 
+/** Fine surface chop: the detail that makes a sea read as liquid. */
+export interface RippleOptions {
+  /** Normal perturbation, 0–1. Default 0.34; past ~0.6 it reads as fur. */
+  strength?: number;
+  /** Ripples per metre. Bigger = finer chop. Default 0.85. */
+  scale?: number;
+}
+
 export interface OceanOptions {
   /** World-space sea level (the plane's Y). Default 0. */
   level?: number;
@@ -64,6 +72,20 @@ export interface OceanOptions {
    * no beach to break on and every term is inert. `false` turns it off.
    */
   surf?: false | SurfOptions;
+  /**
+   * How deep the water goes before it reads as open sea, metres. This is
+   * the width of the TURQUOISE SHELF — on a 1-in-7 beach, a shoal depth of
+   * 12 puts eighty metres of bright water between the sand and the blue,
+   * which is most of what a tropical coast actually is. Default 3.
+   */
+  shoalDepth?: number;
+  /**
+   * Fine chop riding on the swell. Four Gerstner waves give a sea its
+   * shape, but a swell alone is a rolling sheet — what reads as WATER is
+   * the ripple breaking the light into moving highlights. `false` for
+   * glass (a lagoon, a harbour at dawn).
+   */
+  ripples?: false | RippleOptions;
   /**
    * A live sea state — `() => seaState.trains`.
    *
@@ -161,6 +183,9 @@ vOceanFoam = smoothstep(mix(0.5, 0.18, uStorm), 1.0, scCrest);
 const OCEAN_BEGIN = /* glsl */ `
 transformed += scenaDisp;
 vOceanShore = aOceanShore;
+// World position, so the ripple field lives in the WORLD and not on the
+// mesh: ripples pinned to UVs slide about when the plane moves.
+vOceanWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
 `;
 
 function nowSeconds(): number {
@@ -199,6 +224,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
   const wind = options.wind;
   const shore = options.shore;
   const surf = options.surf;
+  const ripples = options.ripples;
   const surge = options.surge ?? 1.2;
   const stormSrc =
     typeof options.storm === 'function'
@@ -268,7 +294,12 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     uDeepColor: { value: new Color(options.deepColor ?? 0x184a63) },
     uShallowColor: { value: new Color(options.shallowColor ?? 0x3f8fa6) },
     uSkyColor: { value: new Color(options.skyColor ?? 0xbcd4e6) },
-    uShoalDepth: { value: 3.0 },
+    // How deep the water goes before it reads as open sea. Bigger = a
+    // wider turquoise shelf, which is most of what a tropical coast IS.
+    uShoalDepth: { value: options.shoalDepth ?? 3.0 },
+    uFlow: { value: new Vector2(0.06, 0.04) },
+    uRipple: { value: ripples === false ? 0 : (ripples?.strength ?? 0.34) },
+    uRippleScale: { value: ripples === false ? 1 : (ripples?.scale ?? 0.85) },
     uFoamBand: { value: 0.6 },
     uStorm: { value: 0 },
     uSurge: { value: 0 },
@@ -359,14 +390,14 @@ export function createOcean(options: OceanOptions = {}): Ocean {
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        `#include <common>\n${WAVE_UNIFORMS}\nattribute float aOceanShore;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
+        `#include <common>\n${WAVE_UNIFORMS}\nattribute float aOceanShore;\nvarying float vOceanFoam;\nvarying float vOceanShore;\nvarying vec3 vOceanWorld;`
       )
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${OCEAN_BEGINNORMAL}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${OCEAN_BEGIN}`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nuniform float uTime;\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nuniform float uBreakDepth;\nuniform float uSwash;\nuniform float uSwashPeriod;\nuniform float uSurfBands;\nvarying float vOceanFoam;\nvarying float vOceanShore;`
+        `#include <common>\nuniform float uTime;\nuniform vec3 uDeepColor;\nuniform vec3 uShallowColor;\nuniform vec3 uSkyColor;\nuniform float uShoalDepth;\nuniform float uFoamBand;\nuniform float uStorm;\nuniform float uSurge;\nuniform float uBreakDepth;\nuniform float uSwash;\nuniform float uSwashPeriod;\nuniform float uSurfBands;\nuniform vec2 uFlow;\nuniform float uRipple;\nuniform float uRippleScale;\nvarying float vOceanFoam;\nvarying float vOceanShore;\nvarying vec3 vOceanWorld;`
       )
       .replace(
         '#include <map_fragment>',
@@ -401,6 +432,28 @@ export function createOcean(options: OceanOptions = {}): Ocean {
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
         {
+          // RIPPLES. The four Gerstner waves give the sea its swell, but a
+          // swell alone is a rolling sheet — what reads as WATER is the fine
+          // chop riding on it, breaking the light into a thousand moving
+          // highlights. Three crossing trains at different scales, analytic
+          // derivatives, drifting with the swell so the surface flows one
+          // way like a real sea instead of shimmering in place.
+          vec2 wp = vOceanWorld.xz * uRippleScale;
+          vec2 drift = uFlow * uTime;
+          float p1 = dot(wp, vec2(0.92, 0.39)) + drift.x * 1.7;
+          float p2 = dot(wp, vec2(-0.45, 0.89)) * 1.9 - drift.y * 2.1;
+          float p3 = dot(wp, vec2(0.66, -0.75)) * 3.7 + (drift.x + drift.y) * 2.9;
+          // dh/dx and dh/dz of the summed trains — the slope IS the normal.
+          float dx = 0.92 * cos(p1) + (-0.45 * 1.9) * 0.55 * cos(p2) + (0.66 * 3.7) * 0.22 * cos(p3);
+          float dz = 0.39 * cos(p1) + (0.89 * 1.9) * 0.55 * cos(p2) + (-0.75 * 3.7) * 0.22 * cos(p3);
+          // Fade with distance or the chop aliases into a shimmering mess,
+          // and drop it inside foam, which is froth and has no facets.
+          float near = 1.0 - smoothstep(45.0, 260.0, length(vViewPosition));
+          float amp = uRipple * near * (1.0 - oceanFoam);
+          normal = normalize(normal + vec3(-dx, 0.0, -dz) * amp);
+          // The glitter: a rippled surface is never uniformly polished.
+          roughnessFactor = clamp(roughnessFactor + (abs(dx) + abs(dz)) * 0.04 * amp, 0.02, 1.0);
+
           // View-space fresnel: tint toward the sky at grazing angles.
           float fres = pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 5.0);
           diffuseColor.rgb = mix(diffuseColor.rgb, uSkyColor, fres * 0.5 * (1.0 - oceanFoam));
@@ -417,7 +470,7 @@ export function createOcean(options: OceanOptions = {}): Ocean {
         roughnessFactor = mix(roughnessFactor, 0.04, sheet);`
       );
   };
-  material.customProgramCacheKey = () => 'scena-ocean-v2';
+  material.customProgramCacheKey = () => 'scena-ocean-v3';
 
   const mesh = new Mesh(geometry, material);
   mesh.name = 'ocean';

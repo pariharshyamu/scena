@@ -96,3 +96,21 @@ ocean.depthOver(groundY); // depth over ground of that height, swash included; 0
 ```
 
 Walk a character along the edge reading `depthOver(profile(x, z))` and they are in and out of the water as the waves come.
+
+## The shelf and the ripples
+
+Two options carry most of what makes a sea read as *that* sea:
+
+```js
+createOcean({
+  shore: profile,
+  shoalDepth: 13,                          // the turquoise shelf
+  ripples: { strength: 0.4, scale: 0.8 },  // the chop on top of the swell
+});
+```
+
+**`shoalDepth`** is how deep the water goes before it reads as open sea — the width of the bright band. On a 1-in-7 beach face, a shoal depth of 13 puts eighty-odd metres of turquoise between the sand and the blue, which is most of what a tropical coast actually *is*. The default of 3 gives the tight shelf of a steep or temperate coast.
+
+**`ripples`** are the fine chop riding on the swell. Four Gerstner waves give a sea its shape, but a swell alone is a rolling sheet — what reads as water is the ripple breaking the light into a thousand moving highlights. Three crossing trains at different scales, with analytic derivatives perturbing the normal, drifting with the swell so the surface *flows* one way like a real sea instead of shimmering in place. They fade with distance (chop that doesn't would alias into a mess) and drop out inside foam, which is froth and has no facets.
+
+It is shading, not geometry: `heightAt` is untouched, so boats float exactly as they did. `ripples: false` gives glass — a lagoon at dawn, a harbour before the wind gets up.
