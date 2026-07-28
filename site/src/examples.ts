@@ -4173,6 +4173,133 @@ window.groveDebug = () => {
   };
 };`,
   },
+  {
+    id: 'airfield',
+    title: 'The airfield: circuits & the windsock',
+    group: 'Living world',
+    code: `// THE VEHICLE KIT GROWS WINGS. A trainer flies the traffic pattern on
+// a closed loop — takeoff roll, climb-out, downwind, final, touchdown,
+// around again — banking with the curve, propeller blurring into a
+// disc at full power and back into blades at idle. The windsock is
+// INSTRUMENTATION: it reads the actual WindField, which veers slowly,
+// and the sock swings and droops to match. An airliner waits on the
+// apron, strobes popping. Runway 27's far end reads 09, because that
+// is what runways do.
+import { applyFog, createHangar, createLightingRig, createPlane,
+         createRunway, createSky, createSurface, createWindField,
+         createWindsock, PALETTES } from 'scena3d';
+import { CatmullRomCurve3, Mesh, PerspectiveCamera, PlaneGeometry,
+         Scene, Vector3, WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+const grass = new Mesh(new PlaneGeometry(160, 120),
+  createSurface('moss', { seed: 8 }));
+grass.rotation.x = -Math.PI / 2;
+scene.add(grass);
+
+// ---- The field.
+const runway = createRunway({ length: 64, width: 8, number: 27, seed: 2 });
+scene.add(runway.object);
+const hangar = createHangar({ seed: 5 });
+hangar.object.position.set(-16, 0, -14);
+hangar.object.rotation.y = 0.4;
+scene.add(hangar.object);
+const sock = createWindsock({ seed: 4 });
+sock.object.position.set(9, 0, -20);
+scene.add(sock.object);
+const wind = createWindField({ direction: 30, strength: 0.55 });
+
+// The airliner on the apron, strobes running.
+const airliner = createPlane({ style: 'airliner', seed: 9 });
+airliner.object.position.set(-24, 0, 12);
+airliner.object.rotation.y = 1.1;
+scene.add(airliner.object);
+
+// ---- The trainer and its never-ending circuit.
+const trainer = createPlane({ style: 'prop', seed: 7, color: 0xc23b3b });
+scene.add(trainer.object);
+const CIRCUIT = new CatmullRomCurve3([
+  new Vector3(0, 0.1, -26),    // holding at the threshold
+  new Vector3(0, 0.15, -6),    // the roll
+  new Vector3(0, 1.6, 12),     // rotate
+  new Vector3(0, 9, 30),       // climb-out
+  new Vector3(16, 14, 40),     // crosswind turn
+  new Vector3(30, 16, 12),     // downwind
+  new Vector3(30, 15, -26),    //
+  new Vector3(16, 11, -48),    // base
+  new Vector3(2, 5, -46),      // final
+  new Vector3(0, 1.1, -36),    // short final
+], true, 'catmullrom', 0.35);
+const LAPLEN = CIRCUIT.getLength();
+let u = 0, laps = 0;
+const pos = new Vector3(), ahead = new Vector3(), delta = new Vector3();
+
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+
+  // The wind veers, the sock reports.
+  wind.setDirection(30 + t * 4);
+  sock.update(dt, wind);
+
+  // Fly the loop at constant path speed; altitude tells the story.
+  const speed = 16;
+  const prev = u;
+  u = (u + (speed * dt) / LAPLEN) % 1;
+  if (u < prev) laps++;
+  CIRCUIT.getPointAt(u, pos);
+  CIRCUIT.getPointAt((u + 0.012) % 1, ahead);
+  trainer.object.position.copy(pos);
+  trainer.object.lookAt(ahead);
+  // Bank into the turn: roll from how hard the heading is changing.
+  delta.subVectors(ahead, pos);
+  const heading = Math.atan2(delta.x, delta.z);
+  CIRCUIT.getPointAt((u + 0.03) % 1, delta);
+  delta.sub(ahead);
+  const headingAhead = Math.atan2(delta.x, delta.z);
+  let turn = headingAhead - heading;
+  while (turn > Math.PI) turn -= Math.PI * 2;
+  while (turn < -Math.PI) turn += Math.PI * 2;
+  trainer.object.rotateZ(-turn * 6);
+
+  const climbing = ahead.y - pos.y;
+  const throttle = pos.y < 0.5 && climbing < 0.02 ? 0.85 : // the roll
+    climbing > 0.01 ? 0.95 : climbing < -0.01 ? 0.25 : 0.6;
+  trainer.update(dt, { throttle,
+    pitch: Math.min(Math.max(climbing * 6, -1), 1),
+    roll: Math.min(Math.max(-turn * 10, -1), 1) });
+  airliner.update(dt, { throttle: 0 });
+
+  camera.position.set(-34, 18, 42);
+  camera.lookAt(pos.x * 0.4 + 4, pos.y * 0.4 + 2, pos.z * 0.4 - 4);
+  renderer.render(scene, camera);
+});
+
+window.airfieldDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    u: Number(u.toFixed(3)),
+    laps,
+    alt: Number(trainer.object.position.y.toFixed(2)),
+    sockAngle: Number(sock.angle.toFixed(3)),
+    sockDroop: Number(sock.droop.toFixed(3)),
+    reciprocal: runway.reciprocal,
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

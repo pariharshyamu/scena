@@ -202,6 +202,24 @@ export {
   type LightShaftsOptions,
 } from './environment/lightShafts';
 export {
+  createPlane,
+  type AircraftProp,
+  type AircraftInput,
+  type PlaneOptions,
+} from './props/aircraft';
+export {
+  createRunway,
+  createWindsock,
+  createHangar,
+  createHelipad,
+  type Runway,
+  type RunwayOptions,
+  type Windsock,
+  type WindsockOptions,
+  type HangarOptions,
+  type HelipadOptions,
+} from './props/airfield';
+export {
   createStreetLight,
   createLanternLight,
   createNeonSign,

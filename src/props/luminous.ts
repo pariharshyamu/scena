@@ -83,7 +83,7 @@ function getHaloTexture(): DataTexture {
 }
 
 /** An additive glow sprite — the light you can see from across the map. */
-function makeHalo(color: number, scale: number): Sprite {
+export function makeHalo(color: number, scale: number): Sprite {
   const sprite = new Sprite(
     new SpriteMaterial({
       map: getHaloTexture(),
