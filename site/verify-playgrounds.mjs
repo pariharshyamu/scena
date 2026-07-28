@@ -142,10 +142,12 @@ const BASE = `http://localhost:${PORT}`;
 
 await mkdir(OUT, { recursive: true });
 
-const browser = await chromium.launch({
-  ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-});
+const launch = () =>
+  chromium.launch({
+    ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
+    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  });
+let browser = await launch();
 // "AudioContext was not allowed to start" is Chrome's autoplay policy doing
 // its job on a page nobody has clicked — for a prop with a radio in it, that
 // warning IS the correct headless behaviour, not a defect.
@@ -161,9 +163,32 @@ await page0.close();
 const list = only.length ? only : ids;
 console.log(`${list.length} example(s)\n`);
 
+// A FRESH BROWSER EVERY FEW EXAMPLES.
+//
+// GPU state accumulates across a sweep and the heaviest scene eventually
+// captures as a cleared buffer — which reads as "this example is broken"
+// when it renders perfectly on its own. That was measurable rather than a
+// hunch: the transmission example passed FIRST in a 25-example run
+// (distinct 443) and came back blank LAST in the same 25 (distinct 0).
+// Position, not chance.
+//
+// Closing the page does not fix it and neither does a fresh BrowserContext —
+// both were tried, and the last-place blank survived both. The accumulation
+// is in the browser process, so the only thing that actually clears it is a
+// new one. A verification gate that fails by running order is worse than no
+// gate at all, because it teaches you to ignore it.
+const RECYCLE_EVERY = 10;
+
 const rows = [];
+let done = 0;
 for (const id of list) {
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  if (done > 0 && done % RECYCLE_EVERY === 0) {
+    await browser.close();
+    browser = await launch();
+  }
+  done++;
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const page = await context.newPage();
   const errs = [];
   // EVERY frame, not just the top one. The example runs inside an iframe, so a
   // listener on the page alone hears nothing at all when it throws.
@@ -232,6 +257,7 @@ for (const id of list) {
   );
   if (blank || errs.length) await page.screenshot({ path: `${OUT}/pg-${id}.png` });
   await page.close();
+  await context.close();
 }
 
 const bad = rows.filter((r) => r.blank || r.errs);

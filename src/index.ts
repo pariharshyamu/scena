@@ -162,6 +162,12 @@ export {
 export { createTerrain, type Terrain, type TerrainOptions } from './environment/terrain';
 export { createSky, type Sky, type SkyOptions } from './environment/sky';
 export {
+  applyEnvironment,
+  createEnvironmentMap,
+  type EnvironmentOptions,
+  type SceneEnvironment,
+} from './environment/environment';
+export {
   createLightingRig,
   applyFog,
   type LightingRig,

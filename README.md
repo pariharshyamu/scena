@@ -100,6 +100,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Water with shoreline masks; terrain sand bands
 - [x] Day-night cycle: one `timeOfDay` drives sun, sky, fog and lamps igniting at dusk
 - [x] Wind sway on scattered vegetation (per-instance phase)
+- [x] `applyEnvironment` — a procedural IBL painted from the sky's own gradient, sun included, so metals have something to reflect (they render black without one)
 - [x] Surface **physical tier**: velvet (sheen), silk & brushed metal (anisotropy), nacre (iridescence), ice (transmission) — the only kinds that build a `MeshPhysicalMaterial`
 - [x] Surface **industrial tier**: corrugated iron, asphalt, tread plate, galvanised spangle, copper patina, columnar basalt — parallel ribs, hard-edged aggregate, warped Voronoi cells, and a crust that takes the metalness with it
 - [x] Surface **wear states**: `wet` — water that fills from the bottom (joints and hollows first), darkens by porosity, and is driven by the rain via `precipitation.soak()`

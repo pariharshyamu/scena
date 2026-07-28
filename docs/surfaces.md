@@ -194,6 +194,41 @@ One tuning note learned the hard way: real zinc spangle is millimetres across, b
 > Metals need an environment map to reflect. `galvanised`, `diamondPlate` and `copperPatina` are deliberately kept off full metalness so they still read under a plain directional light — a scene with no IBL renders a mirror as black.
 
 
+## Metal needs something to reflect
+
+A metal has **no diffuse colour**. Everything you see on it is a reflection — so a metal in a scene with nothing to reflect renders black. That is not the material being broken; it is the material being right about a world with no sky in it.
+
+`createSky` draws a beautiful gradient dome, and it does not help at all: a dome is *geometry*, and three cannot reflect geometry. Reflection needs an environment map.
+
+```js
+const rig = createLightingRig('day');
+scene.add(createSky({ palette }).mesh, rig.group);
+applyEnvironment(scene, { palette, sun: rig.sun });   // now chrome is chrome
+```
+
+`applyEnvironment` paints the **same gradient the sky is drawing** into a tiny equirectangular `DataTexture` — sky above, ground bounce below, and the sun burned in where the lighting rig actually put it. Nothing is fetched and nothing is loaded, which is the same bet the rest of the library makes; three PMREM-filters it on first use, so rough surfaces get a blurred version and polished ones a sharp one.
+
+Three details that matter more than they sound:
+
+- **The ground half is not decoration.** A sky-only hemisphere leaves the underside of everything metal a black hole. Light bounces; it does not stop at the horizon.
+- **The sun has to be in the right place.** A sky with no sun gives polished metal an even sheen and no highlight, which reads as plastic — and a highlight in the *wrong* place is worse than none, because it disagrees with every shadow in the scene. Pass the rig's own light and they agree by construction.
+- **An environment is ambient light with a direction**, so it does the job the rig's flat `AmbientLight` is standing in for. Leave both at full strength and the scene washes out. Either drop `intensity`, or dial the rig's ambient back — the example does the latter, in both halves, so the only difference between them is the one line.
+
+It affects every PBR material in the scene, not just the metals, and that is the point: `applyEnvironment` is what the whole catalogue was quietly missing. `chrome`, `steel`, `brass`, `galvanised`, `diamondPlate`, `copperPatina`, `brushedMetal` and `nacre` all read properly with it and are all compromised without it — which is why the presets ship at conservative metalness, so they still look like something under a bare directional light.
+
+`refresh()` re-paints it when the sun moves or the palette changes (a day cycle wants this); `dispose()` takes it off the scene.
+
+### When only some things should reflect
+
+`scene.environment` **cannot be opted out of by a single material**. three overwrites `material.envMapIntensity` with `scene.environmentIntensity` for every material that has no `envMap` of its own, so setting it to zero on one material does nothing at all. Use `createEnvironmentMap` and hand the texture out yourself:
+
+```js
+const map = createEnvironmentMap({ palette, sun: rig.sun });
+chrome.envMap = map;      // this one reflects
+plaster.envMap = null;    // this one does not
+```
+
+
 ## The physical tier
 
 Five surfaces defined by a light response `MeshStandardMaterial` has no term for. These are the only kinds in the catalogue that build a **`MeshPhysicalMaterial`** — the other 52 keep the cheap material they have always had, and a test walks all of them to prove it.

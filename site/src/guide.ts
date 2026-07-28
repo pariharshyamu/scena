@@ -40,6 +40,8 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  'metal-needs-something-to-reflect': 'environment',
+  'when-only-some-things-should-reflect': 'environment',
   'the-physical-tier': 'physical',
   'what-it-costs': 'physical',
   'the-honest-limits': 'physical',
