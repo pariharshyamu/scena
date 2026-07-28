@@ -236,6 +236,32 @@ export {
 } from './environment/effects';
 export { createTrail, type Trail, type TrailOptions } from './environment/trail';
 export {
+  createPickup,
+  createPickupField,
+  type Pickup,
+  type PickupKind,
+  type PickupState,
+  type PickupOptions,
+  type PickupField,
+  type PickupFieldOptions,
+  type FieldTrigger,
+} from './props/pickups';
+export {
+  createCheckpoint,
+  createZone,
+  createBeacon,
+  createFinishGate,
+  type Checkpoint,
+  type CheckpointState,
+  type CheckpointOptions,
+  type Zone,
+  type ZoneOptions,
+  type Beacon,
+  type BeaconOptions,
+  type FinishGate,
+  type FinishGateOptions,
+} from './props/markers';
+export {
   createMarks,
   type Marks,
   type MarksOptions,

@@ -250,14 +250,18 @@ for (const id of list) {
     }
   }
   if (!pix.ok && failures.length) pix.why = failures.join(' | ');
+  // A caught runner error draws no scene, but whatever the example mounted
+  // before throwing can vary enough pixels to pass the blank check — GAMA's
+  // juice example shipped a draft that way. The banner is part of the
+  // verdict, not decoration.
   const banner = await page.evaluate(() => {
-    const el = document.querySelector('.error, [data-error], .runner-error');
+    const el = document.querySelector('.pg-error, #error, .error, [data-error], .runner-error');
     return el ? el.textContent.trim().slice(0, 160) : '';
   });
   // Empty = one colour over almost everything and nothing varying.
   const blank = !pix.ok || (pix.flattest > 0.985 && pix.stdev < 1.5);
   rows.push({ id, blank, errs: errs.length, banner, ...pix });
-  const flag = blank ? 'BLANK' : errs.length ? 'errs ' : '  ok ';
+  const flag = blank ? 'BLANK' : banner ? 'ERROR' : errs.length ? 'errs ' : '  ok ';
   console.log(
     `${flag} ${id.padEnd(16)} distinct ${String(pix.distinct ?? 0).padStart(5)}` +
     ` flattest ${String(pix.flattest ?? 1).padStart(5)} stdev ${String(pix.stdev ?? 0).padStart(6)}` +
@@ -266,12 +270,12 @@ for (const id of list) {
     (banner ? `  BANNER: ${banner}` : '') +
     (errs.length ? `\n        ${errs.slice(0, 3).join('\n        ')}` : '')
   );
-  if (blank || errs.length) await page.screenshot({ path: `${OUT}/pg-${id}.png` });
+  if (blank || banner || errs.length) await page.screenshot({ path: `${OUT}/pg-${id}.png` });
   await page.close();
   await context.close();
 }
 
-const bad = rows.filter((r) => r.blank || r.errs);
+const bad = rows.filter((r) => r.blank || r.banner || r.errs);
 console.log(`\n${rows.length - bad.length}/${rows.length} render something.`);
 if (bad.length) console.log('PROBLEMS:', bad.map((r) => r.id).join(', '));
 await browser.close();
