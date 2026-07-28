@@ -32,6 +32,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'cricket', title: 'The cricket ground', playground: 'cricket' },
   { id: 'feel', title: 'Game feel: effects, trails & marks', playground: 'feel' },
   { id: 'pickups', title: 'Pickups & markers', playground: 'arcade' },
+  { id: 'hazards', title: 'Hazards & the pressure plate', playground: 'gauntlet' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
@@ -42,6 +43,9 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  'moving-platforms': 'gauntlet',
+  'crumbling-platforms': 'gauntlet',
+  'the-pressure-plate': 'gauntlet',
   pickups: 'arcade',
   'the-field-coin-run-density': 'arcade',
   markers: 'arcade',

@@ -3572,6 +3572,154 @@ window.arcadeDebug = () => {
   };
 };`,
   },
+  {
+    id: 'gauntlet',
+    title: 'Hazards & the pressure plate',
+    group: 'Living world',
+    code: `// WHERE MOVEMENT ITSELF IS THE GAME. A rider crosses the moving
+// platform (its delta is EXACTLY what a rider adds to stay aboard); the
+// crumbling slab shudders its warning before it drops; the pad squashes
+// and launches the ball; the pendulum owns its arc; the spikes snap out
+// fast and withdraw slowly (the tell); the conveyor walks its crate;
+// and the pressure plate — GAMA's MechanismSource, structurally —
+// raises the gate whenever the patroller stands on it.
+import { applyFog, createBouncePad, createConveyor,
+         createCrumblingPlatform, createLightingRig, createPendulum,
+         createPlatform, createPressurePlate, createSky, createSpikeTrap,
+         createSurface, PALETTES } from 'scena3d';
+import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         SphereGeometry, Vector3, WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+const floor = new Mesh(new PlaneGeometry(60, 60),
+  createSurface('slate', { seed: 4, color: 0x6f7680 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+// The moving platform, with a rider that stays aboard by adding delta.
+const platform = createPlatform({ motion: 'linear', seed: 3,
+  from: new Vector3(-6, 0.9, -3), to: new Vector3(-1.5, 0.9, -3), period: 5 });
+scene.add(platform.group);
+const rider = new Mesh(new BoxGeometry(0.5, 0.5, 0.5),
+  createSurface('paint', { seed: 8, color: 0x2f6fd0 }));
+scene.add(rider);
+
+const crumble = createCrumblingPlatform({ seed: 5, delay: 0.8, respawn: 2.5 });
+crumble.group.position.set(1.5, 0.9, -3);
+scene.add(crumble.group);
+
+const pad = createBouncePad({ seed: 6, strength: 9 });
+pad.group.position.set(5, 0, -3);
+scene.add(pad.group);
+const ball = new Mesh(new SphereGeometry(0.35, 18, 12),
+  createSurface('terracotta', { seed: 7 }));
+scene.add(ball);
+let ballV = 0, ballY = 3;
+
+const pendulum = createPendulum({ seed: 9, length: 3.2, period: 2.4 });
+pendulum.group.position.set(-4.5, 4.6, 2.5);
+scene.add(pendulum.group);
+const beam = new Mesh(new BoxGeometry(3.2, 0.18, 0.18),
+  createSurface('wood', { seed: 10 }));
+beam.position.set(-4.5, 4.7, 2.5);
+scene.add(beam);
+
+const spikes = createSpikeTrap({ seed: 11, period: 2.6 });
+spikes.group.position.set(-0.5, 0, 2.5);
+scene.add(spikes.group);
+
+const belt = createConveyor({ seed: 12, length: 5, speed: 1.2 });
+belt.group.position.set(4.5, 0, 2.5);
+scene.add(belt.group);
+const crate = new Mesh(new BoxGeometry(0.6, 0.6, 0.6),
+  createSurface('plank', { seed: 13 }));
+scene.add(crate);
+let crateX = -2.2;
+
+// THE PLATE AND THE GATE. In a real game gama3d's linkMechanism does
+// this wiring; here the gate reads plate.open directly.
+const plate = createPressurePlate({ seed: 14 });
+plate.group.position.set(-1.5, 0, 6.5);
+scene.add(plate.group);
+const gate = new Mesh(new BoxGeometry(2.4, 2.2, 0.24),
+  createSurface('galvanised', { seed: 15 }));
+gate.position.set(1.5, 1.1, 6.5);
+scene.add(gate);
+let gateLift = 0;
+
+// The patroller that works the plate.
+const patroller = new Mesh(new BoxGeometry(0.45, 0.9, 0.45),
+  createSurface('paint', { seed: 16, color: 0x34d399 }));
+scene.add(patroller);
+
+let last = 0, crumbleTimer = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+
+  platform.update(dt);
+  rider.position.copy(platform.group.position);
+  rider.position.y += platform.top + 0.25;
+
+  crumble.update(dt);
+  crumbleTimer += dt;
+  if (crumbleTimer > 5.5 && crumble.state === 'solid') {
+    crumbleTimer = 0;
+    crumble.disturb(); // someone stepped on it
+  }
+
+  // The ball and the pad: gravity down, bounce() when they meet.
+  ballV -= 9.8 * dt;
+  ballY += ballV * dt;
+  if (ballY < 0.75 && ballV < 0) ballV = pad.bounce() * 0.55;
+  ball.position.set(5, ballY, -3);
+  pad.update(dt);
+
+  pendulum.update(dt);
+  spikes.update(dt);
+
+  belt.update(dt);
+  crateX += belt.velocity.x * dt;
+  if (crateX > 2.2) crateX = -2.2;
+  crate.position.set(4.5 + crateX, 0.52, 2.5);
+
+  // The patroller paces over the plate and away; the gate follows.
+  const px = -1.5 + Math.sin(t * 0.5) * 2.6;
+  patroller.position.set(px, 0.45, 6.5);
+  const onPlate = Math.abs(px - plate.group.position.x) < plate.trigger.radius;
+  plate.occupy(onPlate ? 1 : 0);
+  plate.update(dt);
+  gateLift += ((plate.open ? 1.8 : 0) - gateLift) * Math.min(dt * 3, 1);
+  gate.position.y = 1.1 + gateLift;
+
+  camera.position.set(Math.sin(t * 0.08) * 3, 7.6, 13.2);
+  camera.lookAt(0, 0.8, 1);
+  renderer.render(scene, camera);
+});
+
+window.gauntletDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    crumbleState: crumble.state,
+    spikesOut: spikes.dangerous,
+    plateOpen: plate.open,
+    gateLift: Number(gateLift.toFixed(2)),
+    beltVx: Number(belt.velocity.x.toFixed(2)),
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

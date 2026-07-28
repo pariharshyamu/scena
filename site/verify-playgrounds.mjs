@@ -160,6 +160,15 @@ const ids = await page0.evaluate(() =>
   [...document.querySelectorAll('select option')].map((o) => o.value)
 );
 await page0.close();
+// Explicit ids must EXIST: the playground falls back to example #1 for
+// unknown ids, so a typo'd id would happily verify the wrong page under
+// the right name. That happened; hence this.
+for (const id of only) {
+  if (!ids.includes(id)) {
+    console.error(`unknown example id: ${id}`);
+    process.exit(2);
+  }
+}
 const list = only.length ? only : ids;
 console.log(`${list.length} example(s)\n`);
 
