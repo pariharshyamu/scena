@@ -85,3 +85,24 @@ trips, street lamps ripple on, the neon buzzes its bad letter, window
 panes warm (bungalow `nightGlow` panes fed to the cycle), and the
 budget's six lights follow the dollying camera — `duskDebug()` reports
 `granted` pinned at 6 while `lit` climbs to 13.
+
+## createLightShafts — god rays for the out-of-doors
+
+```ts
+const shafts = createLightShafts({ count: 8, area: 7, length: 5.5,
+  dust: 22, seed: 4, cycle });
+scene.add(shafts.group);
+// per frame: shafts.update(dt);
+```
+
+`createInteriorLight` casts shafts from windows; this is the same light
+let loose — seeded sunbeams slanting through a canopy, a ruin's broken
+roof, a cavern mouth. Every beam is a pair of crossed additive cards
+fading along the run, and ALL of them share one merged geometry and one
+material: the whole grove is a single draw call. Dust motes drift
+forever down the beams and wrap back to the canopy — always falling,
+never arriving. Bind a day cycle (structurally, anything with
+`sunElevation`) and the shafts live with the sun: full at midday, gone
+by dusk. Pairs with the underwater module's `createCaustics` — the
+same family of light-you-can-see, patched into a pool bed's material —
+as the `grove` playground shows.

@@ -4085,6 +4085,94 @@ window.tempestDebug = () => {
 };
 window.tempestStrike = () => storm.strike({ distance: 8, energy: 1 });`,
   },
+  {
+    id: 'grove',
+    title: 'The sunbeam grove',
+    group: 'Living world',
+    code: `// ATMOSPHERE YOU CAN SEE. God rays slant through the canopy — every
+// beam and its crossed cards merged into ONE draw call — with dust
+// motes forever falling down the light and never arriving. At the
+// spring, the OTHER trick from the same family: caustics, patched
+// into the pool bed's material, dancing on the sand regardless of
+// the hour. Neither reads as an effect; both read as morning.
+import { applyFog, createCaustics, createLightingRig, createLightShafts,
+         createSky, createSurface, createTree, PALETTES } from 'scena3d';
+import { CircleGeometry, Mesh, MeshStandardMaterial, PerspectiveCamera,
+         PlaneGeometry, Scene, WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const rig = createLightingRig('golden-hour');
+rig.ambient.intensity = 0.32; // dim clearing — the shafts are the light
+rig.sun.intensity = 0.7;
+scene.add(createSky({ palette }).mesh, rig.group);
+applyFog(scene, 'haze', palette);
+
+const ground = new Mesh(new PlaneGeometry(60, 60),
+  createSurface('moss', { seed: 12 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// The ring of trees the light comes through.
+for (let i = 0; i < 11; i++) {
+  const angle = (i / 11) * Math.PI * 2;
+  const r = 11 + (i % 3) * 2.5;
+  const tree = createTree({ seed: 40 + i, palette });
+  tree.object.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+  scene.add(tree.object);
+}
+
+// ---- The beams and their dust.
+const shafts = createLightShafts({ count: 8, area: 7, length: 5.5,
+  dust: 22, seed: 4, tilt: 0.38, azimuth: 0.9 });
+scene.add(shafts.group);
+
+// ---- The spring: a sand bed with caustics, under a skin of water.
+const bed = new Mesh(new CircleGeometry(3.2, 28),
+  createSurface('sand', { seed: 7 }));
+bed.rotation.x = -Math.PI / 2;
+bed.position.set(2.5, 0.02, 3);
+scene.add(bed);
+const caustics = createCaustics({ intensity: 0.65, scale: 1.4 });
+caustics.bind(bed.material);
+const skin = new Mesh(new CircleGeometry(3.2, 28),
+  new MeshStandardMaterial({ color: 0x2e6f86, transparent: true,
+    opacity: 0.35, roughness: 0.15 }));
+skin.rotation.x = -Math.PI / 2;
+skin.position.set(2.5, 0.14, 3);
+scene.add(skin);
+
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+  shafts.update(dt);
+  caustics.update(dt);
+  camera.position.set(Math.sin(t * 0.05) * 8, 3.1, Math.cos(t * 0.05) * 8 + 1);
+  camera.lookAt(0, 1.2, 0);
+  renderer.render(scene, camera);
+});
+
+window.groveDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  const motes = shafts.group.children.find((c) => c.isPoints);
+  const p = motes.geometry.getAttribute('position');
+  return {
+    glError: gl.getError(),
+    strength: Number(shafts.strength.toFixed(3)),
+    mote0: [p.getX(0), p.getY(0), p.getZ(0)].map((v) => Number(v.toFixed(3))),
+    causticTime: Number(caustics.uniforms.uCausticTime.value.toFixed(2)),
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

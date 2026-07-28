@@ -46,6 +46,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  'createlightshafts-god-rays-for-the-out-of-doors': 'grove',
   createlightning: 'tempest',
   createfireworks: 'tempest',
   'the-tempest-playground': 'tempest',

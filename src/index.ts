@@ -197,6 +197,11 @@ export {
   type LaunchOptions,
 } from './environment/fireworks';
 export {
+  createLightShafts,
+  type LightShafts,
+  type LightShaftsOptions,
+} from './environment/lightShafts';
+export {
   createStreetLight,
   createLanternLight,
   createNeonSign,
