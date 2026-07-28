@@ -3852,6 +3852,129 @@ window.smashDebug = () => {
   };
 };`,
   },
+  {
+    id: 'dusk',
+    title: 'Night falls on Main Street',
+    group: 'Living world',
+    code: `// THE LIGHT BUDGET AT DUSK. Thirteen fixtures claim a real light;
+// SIX exist. Every fixture keeps its cheap glow (emissive + additive
+// halo) always — the budget grants the real PointLights to the best
+// claims near the camera, hysteretically, so panning never strobes.
+// Watch the day cycle drop the sun: the PHOTOCELL trips and the street
+// ripples alight lamp by lamp (seeded stagger — never all at once),
+// the neon buzzes its one bad letter, and the beacon starts its sweep.
+import { applyFog, createBungalow, createDayCycle, createLightBudget,
+         createLanternLight, createLightingRig, createNeonSign,
+         createPhotocell, createRevolvingBeacon, createSky,
+         createStreetLight, createStringLights, createSurface,
+         PALETTES } from 'scena3d';
+import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         WebGLRenderer } from 'three';
+
+const palette = PALETTES.urban;
+const scene = new Scene();
+const camera = new PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const sky = createSky({ palette });
+const rig = createLightingRig('day');
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+
+const ground = new Mesh(new PlaneGeometry(90, 50),
+  createSurface('concrete', { seed: 3 }));
+ground.rotation.x = -Math.PI / 2;
+const road = new Mesh(new BoxGeometry(90, 0.05, 7),
+  createSurface('asphalt', { seed: 4 }));
+road.position.set(0, 0.026, 0);
+scene.add(ground, road);
+
+// The street: three homes on the far side (their window panes are
+// nightGlow materials, so the day cycle warms them after dark).
+const homes = [[-16, 11], [1, 12], [17, 13]].map(([x, seed], i) => {
+  const home = createBungalow({ seed, floors: i === 1 ? 2 : 1, palette });
+  home.object.position.set(x, 0, -10.5);
+  scene.add(home.object);
+  return home;
+});
+
+// ---- The fixtures. Every one glows for free; each CLAIMS a real light.
+const fixtures = [];
+for (let i = 0; i < 6; i++) {
+  const lamp = createStreetLight({ style: 'modern', seed: 20 + i });
+  lamp.object.position.set(-17.5 + i * 7, 0, 4);
+  lamp.object.rotation.y = Math.PI / 2; // arm cranes over the road
+  fixtures.push(lamp);
+}
+const porchA = createLanternLight({ seed: 8 });
+porchA.object.position.set(-14.2, 0.9, -7.4);
+const porchB = createLanternLight({ seed: 9 });
+porchB.object.position.set(15.1, 0.9, -7.4);
+fixtures.push(porchA, porchB);
+
+const open = createNeonSign('OPEN', { color: 0x53f0c7, height: 0.42, seed: 5 });
+open.object.position.set(1, 2.6, -6.8);
+const motel = createNeonSign('MOTEL', { color: 0xff4fa3, height: 0.6, seed: 6 });
+motel.object.position.set(17, 3.3, -6.9);
+fixtures.push(open, motel);
+
+for (const x of [-8, 9]) {
+  const strand = createStringLights({ span: 11, sag: 0.7, count: 15,
+    seed: 30 + x });
+  strand.object.position.set(x, 3.6, -1.5);
+  strand.object.rotation.y = Math.PI / 2; // strung across the street
+  fixtures.push(strand);
+}
+
+const beacon = createRevolvingBeacon({ height: 5, seed: 2 });
+beacon.object.position.set(30, 0, -16);
+fixtures.push(beacon);
+for (const f of fixtures) scene.add(f.object);
+
+// ---- The budget: 13 claims, 6 real lights, spent near the camera.
+const budget = createLightBudget({ max: 6 });
+scene.add(budget.group);
+for (const f of fixtures) budget.register(f.claim);
+
+// ---- Dusk falls fast (36 s days), and the photocell trips the street.
+const cycle = createDayCycle({ sky, rig, scene, lamps: homes,
+  dayLength: 36, timeOfDay: 0.62 });
+const cell = createPhotocell(cycle, fixtures, { seed: 9, spread: 4 });
+
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+
+  cycle.update(dt);
+  cell.update(dt);
+  for (const f of fixtures) f.update?.(dt);
+
+  camera.position.set(Math.sin(t * 0.045) * 11, 4.4, 11.5);
+  camera.lookAt(Math.sin(t * 0.045) * 5, 1.6, -4);
+  budget.update(camera.position); // the scarce lights follow the view
+  renderer.render(scene, camera);
+});
+
+window.duskDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    timeOfDay: Number(cycle.timeOfDay.toFixed(3)),
+    sunElevation: Number(cycle.sunElevation.toFixed(3)),
+    cell: cell.state,
+    pending: cell.pending,
+    granted: budget.active,
+    lit: fixtures.filter((f) => f.lit).length,
+    fixtures: fixtures.length,
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

@@ -177,6 +177,31 @@ export {
 export { createWater, aboveWater, type Water, type WaterOptions } from './environment/water';
 export { createDayCycle, type DayCycle, type DayCycleOptions } from './environment/dayCycle';
 export {
+  createLightBudget,
+  type LightBudget,
+  type LightBudgetOptions,
+  type LightClaim,
+  type LightGrant,
+} from './environment/lightBudget';
+export {
+  createStreetLight,
+  createLanternLight,
+  createNeonSign,
+  createStringLights,
+  createRevolvingBeacon,
+  createPhotocell,
+  type Luminous,
+  type LuminousClaim,
+  type StreetLightOptions,
+  type LanternLightOptions,
+  type NeonSign,
+  type NeonSignOptions,
+  type StringLightsOptions,
+  type RevolvingBeaconOptions,
+  type Photocell,
+  type PhotocellOptions,
+} from './props/luminous';
+export {
   createWindField,
   applyWind,
   type WindField,

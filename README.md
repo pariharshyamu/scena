@@ -109,6 +109,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Pickups & markers: `createPickup` (7 kinds, collect/respawn state machine, live `{center,radius}` triggers), `createPickupField` (one draw call), checkpoint/zone/beacon/finish-gate markers
 - [x] Hazards: moving/crumbling platforms (rider `delta`), bounce pad, pendulum blade (live tip hazard), spike trap, chevron conveyor, and the `MechanismSource` pressure plate (`linkMechanism(plate, door)`)
 - [x] Destructibles: seeded pre-fractured breakables with `loot` markers, target dummy (damped-pendulum wobble, topple), flip-digit vector-font scoreboard, and stumps whose bails FLY
+- [x] Luminous props & the light budget: `createLightBudget` (pooled real lights, hysteretic granting), street lights, lantern lights, buzzing neon from the vector font, festoon string lights, revolving beacon, and `createPhotocell` (seeded staggered dusk ignition)
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
 - [x] Kits: ASCII maps → grid-snapped dungeon/compound pieces (`assembleKit`)

@@ -34,6 +34,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'pickups', title: 'Pickups & markers', playground: 'arcade' },
   { id: 'hazards', title: 'Hazards & the pressure plate', playground: 'gauntlet' },
   { id: 'destructibles', title: 'Destructibles & the scoreboard', playground: 'smash' },
+  { id: 'luminous', title: 'Luminous props & the light budget', playground: 'dusk' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
@@ -44,6 +45,11 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  'the-three-faces-of-a-fixture': 'dusk',
+  createlightbudget: 'dusk',
+  'the-kit': 'dusk',
+  'createphotocell-why-streets-ripple-alight': 'dusk',
+  'the-dusk-playground': 'dusk',
   breakables: 'smash',
   'the-scoreboard': 'smash',
   'the-stumps-crickets-missing-feedback': 'smash',
