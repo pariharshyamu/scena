@@ -110,6 +110,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Hazards: moving/crumbling platforms (rider `delta`), bounce pad, pendulum blade (live tip hazard), spike trap, chevron conveyor, and the `MechanismSource` pressure plate (`linkMechanism(plate, door)`)
 - [x] Destructibles: seeded pre-fractured breakables with `loot` markers, target dummy (damped-pendulum wobble, topple), flip-digit vector-font scoreboard, and stumps whose bails FLY
 - [x] Luminous props & the light budget: `createLightBudget` (pooled real lights, hysteretic granting), street lights, lantern lights, buzzing neon from the vector font, festoon string lights, revolving beacon, and `createPhotocell` (seeded staggered dusk ignition)
+- [x] The sky's drama: `createLightning` (two-pulse flash through structural targets, seeded forked bolts, thunder delayed by distance) and `createFireworks` (one-InstancedMesh rockets and drooping shells, oldest-recycled under a cap)
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
 - [x] Kits: ASCII maps → grid-snapped dungeon/compound pieces (`assembleKit`)

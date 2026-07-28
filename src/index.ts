@@ -184,6 +184,19 @@ export {
   type LightGrant,
 } from './environment/lightBudget';
 export {
+  createLightning,
+  type Lightning,
+  type LightningOptions,
+  type LightningTargets,
+  type Strike,
+} from './environment/lightning';
+export {
+  createFireworks,
+  type Fireworks,
+  type FireworksOptions,
+  type LaunchOptions,
+} from './environment/fireworks';
+export {
   createStreetLight,
   createLanternLight,
   createNeonSign,

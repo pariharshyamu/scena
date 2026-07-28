@@ -3975,6 +3975,116 @@ window.duskDebug = () => {
   };
 };`,
   },
+  {
+    id: 'tempest',
+    title: 'Tempest & the fireworks after',
+    group: 'Living world',
+    code: `// THE SKY'S DRAMA, in a loop: sixteen seconds of STORM — rain,
+// seeded forked bolts, a two-pulse flash driven through ambient, sky
+// and fog (and decayed back to EXACTLY where they were), thunder
+// arriving late in proportion to distance — then the clouds part and
+// the FIREWORKS answer: seeded rockets, spherical shells drooping
+// under gravity, one InstancedMesh for the whole finale.
+import { applyFog, createBungalow, createFireworks, createLightning,
+         createLightingRig, createPrecipitation, createSky,
+         createSurface, PALETTES } from 'scena3d';
+import { Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         WebGLRenderer } from 'three';
+
+const palette = PALETTES.dusk;
+const scene = new Scene();
+const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const sky = createSky({ topColor: 0x171a2e, bottomColor: 0x2c2438 });
+const rig = createLightingRig('night');
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+scene.background = null; // the sky dome is the backdrop; fog flashes instead
+
+const ground = new Mesh(new PlaneGeometry(90, 60),
+  createSurface('moss', { seed: 6 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+for (const [x, seed] of [[-13, 21], [3, 22], [16, 23]]) {
+  const home = createBungalow({ seed, floors: 1, palette });
+  home.object.position.set(x, 0, -13);
+  scene.add(home.object);
+}
+
+// ---- The storm.
+const rain = createPrecipitation({ type: 'rain', count: 4200 });
+scene.add(rain.object);
+let thunders = 0;
+const storm = createLightning({
+  seed: 5,
+  targets: { ambient: rig.ambient, fog: scene.fog },
+  cadence: 3.5,
+  soundSpeed: 60,
+  onThunder: () => thunders++,
+});
+scene.add(storm.group);
+
+// ---- The show.
+let bursts = 0;
+const show = createFireworks({ seed: 11, onBurst: () => bursts++ });
+scene.add(show.group);
+
+// ---- The loop: storm → the clouds part → fireworks → again.
+let phase = 'storm', phaseClock = 0, launchClock = 0;
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+  phaseClock += dt;
+
+  if (phase === 'storm') {
+    storm.storminess = Math.min(phaseClock / 3, 1);
+    rain.setIntensity(Math.min(phaseClock / 3, 1));
+    if (phaseClock > 16) { phase = 'clearing'; phaseClock = 0; }
+  } else if (phase === 'clearing') {
+    storm.storminess = 0;
+    rain.setIntensity(Math.max(1 - phaseClock / 2.5, 0));
+    if (phaseClock > 3) { phase = 'show'; phaseClock = 0; launchClock = 0; }
+  } else {
+    launchClock -= dt;
+    if (launchClock <= 0 && phaseClock < 10) {
+      launchClock = 0.9;
+      show.launch({ x: -6 + (bursts % 3) * 6, y: 0, z: -2 });
+    }
+    if (phaseClock > 14) { phase = 'storm'; phaseClock = 0; }
+  }
+
+  storm.update(dt);
+  rain.update(dt);
+  show.update(dt);
+
+  camera.position.set(Math.sin(t * 0.04) * 6, 5.5, 17);
+  camera.lookAt(0, 5, -6);
+  renderer.render(scene, camera);
+});
+
+window.tempestDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    phase,
+    flash: Number(storm.flash.toFixed(3)),
+    strikes: storm.strikes,
+    thunders,
+    bursts,
+    rockets: show.rockets,
+    sparks: show.sparks,
+    ambient: Number(rig.ambient.intensity.toFixed(3)),
+    drawCalls: renderer.info.render.calls,
+  };
+};
+window.tempestStrike = () => storm.strike({ distance: 8, energy: 1 });`,
+  },
 ];
 
 
