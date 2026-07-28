@@ -113,6 +113,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] The sky's drama: `createLightning` (two-pulse flash through structural targets, seeded forked bolts, thunder delayed by distance) and `createFireworks` (one-InstancedMesh rockets and drooping shells, oldest-recycled under a cap)
 - [x] Atmosphere: `createLightShafts` — outdoor god rays (merged one-draw-call beam cards, drifting wrap-around dust motes, day-cycle-aware strength), pairing with the existing underwater `createCaustics` in the sunbeam-grove demo
 - [x] Aviation: `createPlane` (prop trainer + airliner — blur-disc propellers, deflecting control surfaces, folding gear, nav-light claims, pilot slot) and the airfield kit (`createRunway` with reciprocal numbers, WindField-reading `createWindsock`, `createHangar`, `createHelipad`)
+- [x] Helicopter: `createHelicopter` — spool-inertia rotors with parked-blade droop and blur discs, cyclic disc tilt, skids, and an aimable nose searchlight whose luminous claim outranks the street (the visible half of a GAMA Flashlight)
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
 - [x] Kits: ASCII maps → grid-snapped dungeon/compound pieces (`assembleKit`)

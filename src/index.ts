@@ -203,9 +203,13 @@ export {
 } from './environment/lightShafts';
 export {
   createPlane,
+  createHelicopter,
   type AircraftProp,
   type AircraftInput,
   type PlaneOptions,
+  type HelicopterProp,
+  type HelicopterInput,
+  type HelicopterOptions,
 } from './props/aircraft';
 export {
   createRunway,

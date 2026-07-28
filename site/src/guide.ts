@@ -48,6 +48,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
   createplane: 'airfield',
+  createhelicopter: 'heliport',
   'the-airfield': 'airfield',
   'the-airfield-playground': 'airfield',
   'createlightshafts-god-rays-for-the-out-of-doors': 'grove',

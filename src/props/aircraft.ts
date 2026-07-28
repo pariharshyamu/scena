@@ -384,3 +384,243 @@ export function createPlane(options: PlaneOptions = {}): AircraftProp {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Helicopter
+
+export interface HelicopterInput {
+  /** Rotor spool, 0..1 — blades blur past ~0.5, and droop when parked. */
+  rotor?: number;
+  /** Cyclic: tilts the rotor disc to show intent, -1..1 each. */
+  cyclicPitch?: number;
+  cyclicRoll?: number;
+  /** The nose searchlight. */
+  light?: boolean;
+}
+
+export interface HelicopterProp extends Prop {
+  update(dt: number, input?: HelicopterInput): void;
+  /** Nav lights + the searchlight — register with a LightBudget. */
+  claims: LuminousClaim[];
+  /** Aim pivot for the searchlight: rotate to sweep the beam. */
+  searchlight: Object3D;
+  /** Searchlight on/off (the claim and beam follow). */
+  setSearchlight(on: boolean): void;
+  readonly searchlightOn: boolean;
+  /** Current rotor spool, 0..1 (lerps toward the input). */
+  readonly rotor: number;
+}
+
+export interface HelicopterOptions {
+  seed?: number;
+  color?: number;
+  palette?: Palette;
+}
+
+/**
+ * A utility helicopter: cabin, boom, skids, a main rotor that droops
+ * when parked and blurs into a disc when spooled, a tail rotor doing
+ * the same sideways, and a nose SEARCHLIGHT — an aimable pivot with an
+ * additive beam and a luminous claim, ready to be the visible half of a
+ * GAMA `Flashlight` sweeping an `Illumination` field.
+ */
+export function createHelicopter(options: HelicopterOptions = {}): HelicopterProp {
+  const seed = options.seed ?? 1;
+  const rng = new Rng(seed);
+  const palette = options.palette ?? DEFAULT_PALETTE;
+  const bodyColor = options.color ?? rng.pick([0xd8a13a, 0xc23b3b, 0x3a6ea5, palette.metal]);
+  const skin = createSurface('paintedMetal', { color: bodyColor, seed });
+  const dark = createSurface('paintedMetal', { color: 0x2b3340, seed: seed + 1 });
+  const glass = createGlass({ tint: 0x9fb8c8 });
+
+  const group = new Group();
+  group.name = 'helicopter';
+  const deckY = 1.0;
+
+  // Cabin + boom + fin.
+  const cabin = new Mesh(new BoxGeometry(1.5, 1.3, 2.6), skin);
+  cabin.position.set(0, deckY + 0.35, 0.5);
+  const nose = new Mesh(new BoxGeometry(1.2, 0.9, 0.8), glass);
+  nose.position.set(0, deckY + 0.3, 1.95);
+  const boom = new Mesh(new BoxGeometry(0.4, 0.45, 3.2), skin);
+  boom.position.set(0, deckY + 0.5, -2.2);
+  const fin = new Mesh(new BoxGeometry(0.09, 0.9, 0.6), skin);
+  fin.position.set(0, deckY + 1.0, -3.7);
+  group.add(cabin, nose, boom, fin);
+
+  // Skids.
+  for (const side of [-1, 1]) {
+    const rail = new Mesh(new BoxGeometry(0.09, 0.09, 2.6), dark);
+    rail.position.set(side * 0.85, 0.1, 0.4);
+    group.add(rail);
+    for (const z of [-0.4, 1.2]) {
+      const strut = new Mesh(new CylinderGeometry(0.04, 0.04, 0.85, 5), dark);
+      strut.position.set(side * 0.75, 0.55, z);
+      strut.rotation.z = side * 0.25;
+      group.add(strut);
+    }
+  }
+
+  // The main rotor: mast, hub, blades on their own pivots (for droop),
+  // and the blur disc that replaces them at speed.
+  const mast = new Group(); // tilts with the cyclic
+  mast.position.set(0, deckY + 1.1, 0.3);
+  const mastPole = new Mesh(new CylinderGeometry(0.07, 0.09, 0.5, 6), dark);
+  mastPole.position.y = 0.1;
+  mast.add(mastPole);
+  const rotorHead = new Group(); // spins
+  rotorHead.position.y = 0.35;
+  const bladePivots: Object3D[] = [];
+  for (let i = 0; i < 3; i++) {
+    const pivot = new Object3D();
+    pivot.rotation.y = (i / 3) * Math.PI * 2;
+    const blade = new Mesh(new BoxGeometry(0.24, 0.04, 3.4), dark);
+    blade.position.z = 1.75;
+    pivot.add(blade);
+    rotorHead.add(pivot);
+    bladePivots.push(pivot);
+  }
+  mast.add(rotorHead);
+  const mainBlurMaterial = new MeshBasicMaterial({
+    color: 0xdadfe8,
+    transparent: true,
+    opacity: 0,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  const mainBlur = new Mesh(new CircleGeometry(3.55, 24), mainBlurMaterial);
+  mainBlur.rotation.x = -Math.PI / 2;
+  mainBlur.position.y = 0.36;
+  mast.add(mainBlur);
+  group.add(mast);
+
+  // The tail rotor, doing the same job sideways.
+  const tailRotor = new Group();
+  tailRotor.position.set(0.28, deckY + 1.0, -3.7);
+  for (const angle of [0, Math.PI / 2]) {
+    const blade = new Mesh(new BoxGeometry(0.05, 0.9, 0.12), dark);
+    blade.rotation.x = angle;
+    tailRotor.add(blade);
+  }
+  const tailBlur = new Mesh(new CircleGeometry(0.55, 14), mainBlurMaterial);
+  tailBlur.rotation.y = Math.PI / 2;
+  tailRotor.add(tailBlur);
+  group.add(tailRotor);
+
+  // Nav lights, off the shared helper.
+  const navLights: NavLight[] = [];
+  const claims: LuminousClaim[] = [];
+  let lit = true;
+  for (const [color, x, strobe] of [
+    [0xff3b30, -0.8, false],
+    [0x34d058, 0.8, false],
+    [0xffffff, 0, true],
+  ] as Array<[number, number, boolean]>) {
+    const { light, claim } = navLight(group, color, x, deckY + 0.95, strobe ? -3.9 : 0.6, strobe);
+    claim.isLit = () => lit;
+    navLights.push(light);
+    claims.push(claim);
+  }
+
+  // The searchlight: an aimable pivot under the nose with a lens, a
+  // long additive beam, and a claim that outranks the street below.
+  const searchlight = new Object3D();
+  searchlight.position.set(0, deckY - 0.35, 1.7);
+  const lensMaterial = new MeshStandardMaterial({
+    color: 0xfff6d8,
+    emissive: 0xfff6d8,
+    emissiveIntensity: 2.4,
+  });
+  const housing = new Mesh(new CylinderGeometry(0.16, 0.2, 0.3, 10), dark);
+  housing.rotation.x = Math.PI / 2;
+  const lens = new Mesh(new CircleGeometry(0.17, 10), lensMaterial);
+  lens.position.z = 0.16;
+  const beamMaterial = new MeshBasicMaterial({
+    color: 0xfff2c0,
+    transparent: true,
+    opacity: 0.16,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  const beam = new Mesh(new ConeGeometry(2.4, 14, 14, 1, true), beamMaterial);
+  beam.rotation.x = -Math.PI / 2;
+  beam.position.z = 7.16;
+  const beamHalo = makeHalo(0xfff6d8, 1.1);
+  const lightAnchor = new Object3D();
+  lightAnchor.position.z = 0.3;
+  searchlight.add(housing, lens, beam, beamHalo, lightAnchor);
+  searchlight.rotation.x = 0.5; // resting aim: down and ahead
+  group.add(searchlight);
+  let lightOn = false;
+  claims.push({
+    anchor: lightAnchor,
+    color: 0xfff6d8,
+    intensity: 5,
+    radius: 16,
+    priority: 1.5,
+    isLit: () => lightOn,
+  });
+
+  let rotorSpeed = 0;
+  let spin = 0;
+  let strobeClock = rng.range(0, 2);
+
+  const setSearchlight = (on: boolean): void => {
+    lightOn = on;
+    lensMaterial.emissiveIntensity = on ? 2.4 : 0.1;
+    beam.visible = on;
+    beamHalo.visible = on;
+  };
+  setSearchlight(false);
+
+  return {
+    object: group,
+    obstacleRadius: 3.6,
+    slots: [createSlot('pilot', 'drive', group, -0.35, deckY - 0.35, 0.9)],
+    claims,
+    searchlight,
+    setSearchlight,
+    get searchlightOn() {
+      return lightOn;
+    },
+    get rotor() {
+      return rotorSpeed;
+    },
+    update(dt, input = {}) {
+      const step = Number.isFinite(dt) ? Math.max(dt, 0) : 0;
+      const target = Math.min(Math.max(input.rotor ?? 0, 0), 1);
+      rotorSpeed += Math.min(Math.max(target - rotorSpeed, -step / 3), step / 3); // spool takes time
+      spin += step * rotorSpeed * 28;
+      rotorHead.rotation.y = spin;
+      tailRotor.rotation.x = spin * 4.7;
+
+      // Parked blades droop; spun blades cone flat with the lift.
+      const droop = 0.09 * (1 - Math.min(rotorSpeed * 1.6, 1));
+      for (const pivot of bladePivots) pivot.rotation.x = droop;
+
+      // Past half spool the blades read as a disc.
+      const blur = Math.min(Math.max((rotorSpeed - 0.5) / 0.25, 0), 1);
+      mainBlurMaterial.opacity = blur * 0.26;
+      mainBlur.visible = blur > 0;
+      tailBlur.visible = blur > 0;
+
+      // The cyclic tilts the DISC — the fuselage follows it elsewhere.
+      const cp = Math.min(Math.max(input.cyclicPitch ?? 0, -1), 1);
+      const cr = Math.min(Math.max(input.cyclicRoll ?? 0, -1), 1);
+      mast.rotation.x = cp * 0.12;
+      mast.rotation.z = -cr * 0.12;
+
+      if (input.light !== undefined && input.light !== lightOn) setSearchlight(input.light);
+
+      strobeClock += step;
+      const flash = strobeClock % 1.1;
+      const strobeOn = flash < 0.06 || (flash > 0.16 && flash < 0.22);
+      for (const nav of navLights) {
+        if (!nav.strobe) continue;
+        nav.material.emissiveIntensity = lit && strobeOn ? nav.base * 1.6 : 0.05;
+        nav.halo.visible = lit && strobeOn;
+      }
+    },
+  };
+}

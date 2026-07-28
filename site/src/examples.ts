@@ -4300,6 +4300,128 @@ window.airfieldDebug = () => {
   };
 };`,
   },
+  {
+    id: 'heliport',
+    title: 'Night ops at the heliport',
+    group: 'Living world',
+    code: `// THE HELICOPTER'S NIGHT SHIFT. Spool up (rotors take their time and
+// the blades DROOP until they fly), lift from the H, orbit the pad
+// with the nose searchlight sweeping the ground — its claim outranks
+// the street lamps, so the LightBudget hands it a real light the
+// moment it switches on — then settle back onto the pad and wind
+// down. Watch the blur discs come and go with the spool.
+import { applyFog, createHelicopter, createHelipad, createHangar,
+         createLightBudget, createLightingRig, createSky,
+         createStreetLight, createSurface, PALETTES } from 'scena3d';
+import { Mesh, PerspectiveCamera, PlaneGeometry, Scene, Vector3,
+         WebGLRenderer } from 'three';
+
+const palette = PALETTES.dusk;
+const scene = new Scene();
+const camera = new PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const sky = createSky({ topColor: 0x0b1026, bottomColor: 0x2c2438 });
+const rig = createLightingRig('night');
+rig.ambient.intensity = 0.22;
+scene.add(sky.mesh, rig.group);
+applyFog(scene, 'haze', palette);
+const apron = new Mesh(new PlaneGeometry(70, 60),
+  createSurface('concrete', { seed: 3 }));
+apron.rotation.x = -Math.PI / 2;
+scene.add(apron);
+
+const pad = createHelipad({ radius: 3.4, seed: 2 });
+scene.add(pad.object);
+const hangar = createHangar({ seed: 7 });
+hangar.object.position.set(-14, 0, -10);
+hangar.object.rotation.y = 0.5;
+scene.add(hangar.object);
+
+// Two apron lamps and the budget the searchlight will raid.
+const budget = createLightBudget({ max: 3 });
+scene.add(budget.group);
+const lamps = [[-8, 6], [9, -7]].map(([x, z]) => {
+  const lamp = createStreetLight({ style: 'modern', seed: 20 + x });
+  lamp.object.position.set(x, 0, z);
+  scene.add(lamp.object);
+  budget.register(lamp.claim);
+  return lamp;
+});
+
+const heli = createHelicopter({ seed: 4, color: 0xd8a13a });
+scene.add(heli.object);
+for (const claim of heli.claims) budget.register(claim);
+
+// ---- The night shift, phase by phase.
+let phase = 'spool', clock = 0, orbitAngle = 0;
+const heliPos = new Vector3(0, 0, 0);
+
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+  clock += dt;
+
+  let rotor = 0, light = false, cyclicRoll = 0;
+  if (phase === 'spool') {
+    rotor = 1;
+    if (heli.rotor > 0.95) { phase = 'lift'; clock = 0; }
+  } else if (phase === 'lift') {
+    rotor = 1;
+    heliPos.y = Math.min(heliPos.y + 2.2 * dt, 9);
+    if (heliPos.y >= 9) { phase = 'orbit'; clock = 0; }
+  } else if (phase === 'orbit') {
+    rotor = 1; light = true; cyclicRoll = 0.6;
+    orbitAngle += dt * 0.45;
+    heliPos.x = Math.sin(orbitAngle) * 10;
+    heliPos.z = Math.cos(orbitAngle) * 10;
+    heli.object.rotation.y = orbitAngle + Math.PI / 2; // nose along the orbit
+    // The searchlight holds the PAD while the ship circles it.
+    heli.searchlight.rotation.y = Math.PI / 2 + Math.sin(clock * 0.8) * 0.35;
+    if (clock > 14) { phase = 'return'; clock = 0; }
+  } else if (phase === 'return') {
+    rotor = 1; light = true;
+    heliPos.x += (0 - heliPos.x) * Math.min(dt * 1.2, 1);
+    heliPos.z += (0 - heliPos.z) * Math.min(dt * 1.2, 1);
+    if (Math.abs(heliPos.x) < 0.3 && Math.abs(heliPos.z) < 0.3) {
+      phase = 'land'; clock = 0; }
+  } else if (phase === 'land') {
+    rotor = 0.9;
+    heliPos.y = Math.max(heliPos.y - 1.6 * dt, 0);
+    if (heliPos.y <= 0) { phase = 'cool'; clock = 0; }
+  } else {
+    rotor = 0; light = false;
+    if (heli.rotor < 0.03 && clock > 2) { phase = 'spool'; clock = 0; }
+  }
+
+  heli.object.position.copy(heliPos);
+  heli.object.position.y += 0.15; // skids on the pad, not in it
+  heli.update(dt, { rotor, light, cyclicRoll });
+  budget.update(camera.position);
+
+  camera.position.set(Math.sin(t * 0.06) * 16, 7.5, Math.cos(t * 0.06) * 16);
+  camera.lookAt(heliPos.x * 0.5, Math.max(heliPos.y * 0.7, 1.2), heliPos.z * 0.5);
+  renderer.render(scene, camera);
+});
+
+window.heliportDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    phase,
+    rotor: Number(heli.rotor.toFixed(2)),
+    alt: Number(heliPos.y.toFixed(1)),
+    light: heli.searchlightOn,
+    granted: budget.active,
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

@@ -114,3 +114,42 @@ describe('the rest of the field', () => {
     expect(pad.object.children.length).toBeGreaterThanOrEqual(3); // slab, ring, H
   });
 });
+
+describe('createHelicopter', () => {
+  it('spools with inertia: blades droop parked, blur past half spool', async () => {
+    const { createHelicopter } = await import('../src');
+    const heli = createHelicopter({ seed: 3 });
+    expect(heli.rotor).toBe(0);
+    heli.update(0.5, { rotor: 1 });
+    expect(heli.rotor).toBeLessThan(0.3); // spooling takes time, not a frame
+    for (let i = 0; i < 20; i++) heli.update(0.3, { rotor: 1 });
+    expect(heli.rotor).toBeCloseTo(1);
+    // The disc: a horizontal blur circle is now visible somewhere in there.
+    let blurVisible = false;
+    heli.object.traverse((c) => {
+      const m = c as Mesh;
+      if (m.isMesh && m.geometry?.type === 'CircleGeometry' && m.visible) {
+        const material = m.material as MeshBasicMaterial;
+        if (material.transparent && material.opacity > 0.1) blurVisible = true;
+      }
+    });
+    expect(blurVisible).toBe(true);
+    for (let i = 0; i < 30; i++) heli.update(0.3, { rotor: 0 });
+    expect(heli.rotor).toBeCloseTo(0);
+  });
+
+  it('the searchlight is an aimable claim that outranks the street', async () => {
+    const { createHelicopter } = await import('../src');
+    const heli = createHelicopter({ seed: 5 });
+    const beamClaim = heli.claims.find((c) => c.priority > 1)!;
+    expect(beamClaim.isLit()).toBe(false); // dark until someone needs finding
+    heli.setSearchlight(true);
+    expect(beamClaim.isLit()).toBe(true);
+    expect(heli.searchlightOn).toBe(true);
+    heli.searchlight.rotation.y = 0.8; // sweep — the anchor rides the pivot
+    expect(beamClaim.anchor.parent).toBe(heli.searchlight);
+    heli.update(1 / 60, { light: false }); // input can drive it too
+    expect(beamClaim.isLit()).toBe(false);
+    expect(heli.slots!.some((s) => s.kind === 'pilot')).toBe(true);
+  });
+});

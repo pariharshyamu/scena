@@ -46,3 +46,32 @@ around again — banking with the curve, throttle following the climb.
 Probes watched altitude cycle 0.9 → 15.2 → 0.03 → 9.9 with the lap
 counter ticking, and the sock's angle veer in lockstep with the
 turning wind.
+
+## createHelicopter
+
+```ts
+const heli = createHelicopter({ seed: 4 });
+scene.add(heli.object);
+for (const claim of heli.claims) budget.register(claim);
+// per frame: heli.update(dt, { rotor, cyclicPitch, cyclicRoll, light });
+```
+
+The rotors have inertia — spooling takes seconds, not a frame — and the
+blades **droop** when parked, coning flat as the lift comes in; past
+half spool both rotors blur into translucent discs, the tail rotor
+doing the same job sideways. The cyclic tilts the rotor *disc* (the
+fuselage attitude is the flight controller's job, elsewhere). Skids,
+nav lights and the tail strobe come from the same kit as the planes.
+
+The crown piece is the nose **searchlight**: an aimable pivot with an
+additive beam and a luminous claim whose priority outranks the street
+lamps — the LightBudget hands it a real light the moment it switches
+on. It is built to be the visible half of a GAMA `Flashlight` sweeping
+an `Illumination` field: aim the pivot where the Flashlight aims, and
+the beam the player sees and the exposure the game computes never
+disagree.
+
+The `heliport` playground flies the night shift on rails: spool, lift
+from the H, orbit with the light holding the pad, return, settle, wind
+down, again — probes tracked the phase machine end to end with the
+budget pinned at its maximum throughout.
