@@ -33,6 +33,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'feel', title: 'Game feel: effects, trails & marks', playground: 'feel' },
   { id: 'pickups', title: 'Pickups & markers', playground: 'arcade' },
   { id: 'hazards', title: 'Hazards & the pressure plate', playground: 'gauntlet' },
+  { id: 'destructibles', title: 'Destructibles & the scoreboard', playground: 'smash' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
@@ -43,6 +44,9 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  breakables: 'smash',
+  'the-scoreboard': 'smash',
+  'the-stumps-crickets-missing-feedback': 'smash',
   'moving-platforms': 'gauntlet',
   'crumbling-platforms': 'gauntlet',
   'the-pressure-plate': 'gauntlet',

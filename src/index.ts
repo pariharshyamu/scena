@@ -287,6 +287,22 @@ export {
   type PressurePlateOptions,
 } from './props/hazards';
 export {
+  createBreakable,
+  createTargetDummy,
+  createScoreboard,
+  createStumps,
+  type Breakable,
+  type BreakableKind,
+  type BreakableState,
+  type BreakableOptions,
+  type TargetDummy,
+  type TargetDummyOptions,
+  type Scoreboard,
+  type ScoreboardOptions,
+  type Stumps,
+  type StumpsOptions,
+} from './props/destructibles';
+export {
   createMarks,
   type Marks,
   type MarksOptions,

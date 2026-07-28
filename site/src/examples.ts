@@ -3720,6 +3720,138 @@ window.gauntletDebug = () => {
   };
 };`,
   },
+  {
+    id: 'smash',
+    title: 'Destructibles & the scoreboard',
+    group: 'Living world',
+    code: `// FEEDBACK BY COMING APART. Every few seconds the unseen striker takes
+// another breakable — shell swaps for its seeded pre-fractured shards,
+// a coin appears where the loot marker says, and the scoreboard FLIPS
+// up the count (the vector font's first job with moving parts). The
+// dummy takes its knocks and rings down; and at the wicket, the single
+// most satisfying piece of feedback in cricket finally happens here:
+// THE BAILS FLY.
+import { applyFog, createBreakable, createEffects, createLightingRig,
+         createPickup, createScoreboard, createSky, createStumps,
+         createSurface, createTargetDummy, PALETTES } from 'scena3d';
+import { Mesh, PerspectiveCamera, PlaneGeometry, Scene, Vector3,
+         WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'clear', palette);
+const floor = new Mesh(new PlaneGeometry(60, 60),
+  createSurface('moss', { seed: 4 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+const fx = createEffects({ seed: 3 });
+scene.add(fx.group);
+
+// The row of victims.
+const breakables = [
+  createBreakable('crate', { seed: 5 }),
+  createBreakable('barrel', { seed: 6 }),
+  createBreakable('pot', { seed: 7 }),
+  createBreakable('crate', { seed: 8 }),
+];
+breakables.forEach((b, i) => {
+  b.group.position.set(-4.5 + i * 3, 0, -1);
+  scene.add(b.group);
+});
+// Loot: a coin waits hidden inside each, appears when the shards fly.
+const loots = breakables.map((b, i) => {
+  const coin = createPickup('coin', { seed: 20 + i });
+  coin.group.position.copy(b.group.position).add(b.loot);
+  coin.collect(); // start hidden
+  coin.update(1);
+  scene.add(coin.group);
+  return coin;
+});
+
+const board = createScoreboard({ seed: 9, digits: 3 });
+board.group.position.set(0, 0, -6.5);
+scene.add(board.group);
+
+const dummy = createTargetDummy({ seed: 10 });
+dummy.group.position.set(4.2, 0, 1.6);
+scene.add(dummy.group);
+
+const stumps = createStumps({ seed: 11 });
+stumps.group.position.set(-3.2, 0, 1.8);
+scene.add(stumps.group);
+
+let smashed = 0, nextSmash = 2, nextHit = 1.3, nextBall = 4, resetAt = Infinity;
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+
+  // The striker works down the row.
+  if (t > nextSmash) {
+    nextSmash = t + 2.6;
+    const next = breakables.find((b) => b.state === 'intact');
+    if (next) {
+      next.break({ x: 1.5, z: -1 });
+      smashed++;
+      board.set(smashed);
+      loots[breakables.indexOf(next)].respawn(); // the coin appears
+      fx.burst('debris', next.group.position.clone().setY(0.6));
+      fx.burst('dust', next.group.position.clone().setY(0.4));
+    } else if (resetAt === Infinity) {
+      resetAt = t + 3;
+    }
+  }
+  if (t > resetAt) {
+    resetAt = Infinity;
+    for (const b of breakables) b.reset();
+    for (const c of loots) { if (c.state === 'idle') c.collect(); }
+    stumps.reset();
+  }
+
+  if (t > nextHit) {
+    nextHit = t + 1.9;
+    dummy.hit({ x: 4.2 + Math.sin(t), z: 6 }, 0.8 + Math.sin(t * 0.7) * 0.4);
+    fx.burst('dust', dummy.group.position.clone().setY(1.2), { count: 4 });
+  }
+
+  if (t > nextBall && !stumps.struck) {
+    stumps.strike({ x: 0.2, z: 1 }, 1.1);
+    fx.ring(stumps.group.position.clone().setY(0.02), { radius: 0.9 });
+  }
+
+  for (const b of breakables) b.update(dt);
+  for (const c of loots) c.update(dt);
+  board.update(dt);
+  dummy.update(dt);
+  stumps.update(dt);
+  fx.update(dt);
+
+  camera.position.set(Math.sin(t * 0.09) * 3, 5.2, 9.8);
+  camera.lookAt(0, 0.7, -0.8);
+  renderer.render(scene, camera);
+});
+
+window.smashDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    smashed,
+    boardValue: board.value,
+    states: breakables.map((b) => b.state),
+    bailsFlown: stumps.struck,
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 
