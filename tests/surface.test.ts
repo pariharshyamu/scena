@@ -305,10 +305,12 @@ describe('the industrial six', () => {
 
   it('and the original catalogue is untouched by it', () => {
     // A new tier that quietly restyled the existing catalogue would be a
-    // much worse bug than one that did not work. (`ice` is in the physical
-    // tier and uses the cells for its fracture planes, so it is excluded
-    // here and covered by its own test below.)
-    const LATER = [...SIX, 'velvet', 'silk', 'brushedMetal', 'nacre', 'ice'] as SurfaceKind[];
+    // much worse bug than one that did not work. (`ice` and `gemstone` are
+    // in the physical tier and use the cells — fracture planes and
+    // inclusions — so they are excluded here and covered below.)
+    const LATER = [
+      ...SIX, 'velvet', 'silk', 'brushedMetal', 'nacre', 'ice', 'gemstone',
+    ] as SurfaceKind[];
     for (const kind of KINDS) {
       if (LATER.includes(kind)) continue;
       const u = compilePatched(createSurface(kind)).uniforms;
@@ -373,7 +375,9 @@ describe('the industrial six', () => {
 });
 
 describe('the physical tier', () => {
-  const PHYSICAL = ['velvet', 'silk', 'brushedMetal', 'nacre', 'ice'] as SurfaceKind[];
+  const PHYSICAL = [
+    'velvet', 'silk', 'brushedMetal', 'nacre', 'ice', 'gemstone',
+  ] as SurfaceKind[];
 
   /** Same as compilePatched, but against three's PHYSICAL shader. */
   function compilePhysical(mat: MeshStandardMaterial): Shader {
@@ -437,17 +441,48 @@ describe('the physical tier', () => {
     expect(ice.transmission).toBeGreaterThan(0.5);
     expect(ice.ior).toBeCloseTo(1.31, 5);       // ice, not glass
     expect(ice.attenuationDistance).toBeCloseTo(1.4, 5);
+
+    const gem = createSurface('gemstone') as MeshPhysicalMaterial;
+    expect(gem.dispersion).toBeGreaterThan(0);
+    expect(gem.ior).toBeGreaterThan(2);         // gem-grade, not window glass
   });
 
-  it('ONLY ice pays for transmission', () => {
+  it('DISPERSION NEEDS SOMETHING TO DISPERSE', () => {
+    // three splits the refraction into three rays over
+    // ior ± (ior - 1) * 0.025 * dispersion, sampling the transmission
+    // buffer once per channel. With no transmission there is no refraction
+    // to split, so the property would be paid for and never seen.
+    const gem = createSurface('gemstone') as MeshPhysicalMaterial;
+    expect(gem.transmission).toBeGreaterThan(0);
+    expect(gem.thickness).toBeGreaterThan(0);
+    // And the spread scales with the IOR, so the same setting on glass
+    // throws far less colour than it does on a stone. Check it is worth
+    // seeing: a full channel separation of at least a tenth of an index.
+    const halfSpread = (gem.ior - 1) * 0.025 * gem.dispersion;
+    expect(halfSpread).toBeGreaterThan(0.1);
+  });
+
+  it('ONLY ice and gemstone pay for transmission — and only gemstone for dispersion', () => {
     // Transmission makes three render the scene a second time into a
-    // buffer. A tier that switched it on for a fabric would be a
+    // buffer, and dispersion samples that buffer three times instead of
+    // once. A tier that switched either on for a fabric would be a
     // performance bug disguised as a material.
     for (const kind of KINDS) {
-      const mat = createSurface(kind);
-      if (kind === 'ice') continue;
-      expect((mat as MeshPhysicalMaterial).transmission ?? 0, kind).toBe(0);
+      const mat = createSurface(kind) as MeshPhysicalMaterial;
+      if (kind !== 'ice' && kind !== 'gemstone') {
+        expect(mat.transmission ?? 0, kind).toBe(0);
+      }
+      if (kind !== 'gemstone') expect(mat.dispersion ?? 0, kind).toBe(0);
     }
+  });
+
+  it('a gemstone is FACETED, and the facets are the flat shading', () => {
+    // Half of what makes a cut stone read as one is that its faces are
+    // flat and meet at hard edges. Smooth-shade it and the same material
+    // is a marble.
+    expect(SURFACE_PRESETS.gemstone.flat).toBe(true);
+    // And no bump: a perturbed normal on a facet is a scratched stone.
+    expect(SURFACE_PRESETS.gemstone.bump).toBe(0);
   });
 
   it('ice keeps its fracture planes: the cells run inside the transmission', () => {

@@ -63,10 +63,17 @@ await build({
   ],
 });
 
-copyFileSync(
-  join(root, 'node_modules/three/build/three.module.js'),
-  join(pub, 'vendor', 'three.module.js')
-);
+// three r185 SPLIT ITS BUILD: three.module.js is no longer the whole
+// library, it imports the bulk of it from ./three.core.js alongside. Copy
+// only the one and the browser 404s the other, and the entire playground
+// dies before a single example runs — so copy every build file the module
+// entry can reach.
+for (const file of ['three.module.js', 'three.core.js']) {
+  copyFileSync(
+    join(root, 'node_modules/three/build', file),
+    join(pub, 'vendor', file)
+  );
+}
 
 for (const file of readdirSync(join(root, 'docs'))) {
   copyFileSync(join(root, 'docs', file), join(pub, 'docs', file));

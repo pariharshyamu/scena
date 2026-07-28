@@ -231,7 +231,7 @@ plaster.envMap = null;    // this one does not
 
 ## The physical tier
 
-Five surfaces defined by a light response `MeshStandardMaterial` has no term for. These are the only kinds in the catalogue that build a **`MeshPhysicalMaterial`** — the other 52 keep the cheap material they have always had, and a test walks all of them to prove it.
+Six surfaces defined by a light response `MeshStandardMaterial` has no term for. These are the only kinds in the catalogue that build a **`MeshPhysicalMaterial`** — the other 52 keep the cheap material they have always had, and a test walks all of them to prove it.
 
 | | the term | why nothing else gets you there |
 |---|---|---|
@@ -240,6 +240,7 @@ Five surfaces defined by a light response `MeshStandardMaterial` has no term for
 | `brushedMetal` | `anisotropy` | the linisher went one way, and the streak is all that separates it from plain steel |
 | `nacre` | `iridescence` | thin-film interference: the hue depends on the film's thickness and your angle |
 | `ice` | `transmission` | light goes *through* |
+| `gemstone` | `dispersion` | a different index of refraction per wavelength: white light in, colour out |
 
 ```js
 createSurface('velvet', { color: 0x243b6b });   // that is all
@@ -247,11 +248,24 @@ createSurface('velvet', { color: 0x243b6b });   // that is all
 
 Everything else still applies: they are seeded, they weather, and rain still soaks them.
 
+### Why a stone is cut
+
+Glass and diamond are both transparent. The difference you can see across a room is **dispersion**: a real transparent solid bends every wavelength by a slightly different amount, so a beam of white light comes out of it separated. Facets exist to make that happen more often.
+
+three refracts red, green and blue separately over `ior ± (ior − 1) × 0.025 × dispersion` — note the IOR is in there twice, so the same `dispersion` setting on a window's 1.5 throws a fraction of the colour it does on a gem-grade 2.2. `gemstone` ships at `ior: 2.2, dispersion: 14` — a shade past physical, so the fringe reads at a glance rather than only under a zoom.
+
+Two things make it read, and both are on the caller as much as the preset:
+
+- **Facets.** `gemstone` sets `flat: true` and no bump at all, so a low-poly solid — `OctahedronGeometry` is literally the shape — shades as a cut stone. Give it a smooth sphere and the same material is a marble.
+- **Something hard-edged behind it.** Dispersion *separates* colours; a smooth sky gradient has nothing to separate. Put a bright edge behind the stone and the rainbow appears along it.
+
+It is view-dependent, so a still gem hides what a turning one shows.
+
 ### What it costs
 
-A physical material is a bigger shader, and **`transmission` makes three render the scene a second time** into a buffer. That is why `createGlass` fakes its glass rather than transmitting it, and why only `ice` switches transmission on — a tier that enabled it for a fabric would be a performance bug wearing a material's clothes. Use these on **objects**, not on facades.
+A physical material is a bigger shader, and **`transmission` makes three render the scene a second time** into a buffer. That is why `createGlass` fakes its glass rather than transmitting it, and why only `ice` and `gemstone` switch transmission on — a tier that enabled it for a fabric would be a performance bug wearing a material's clothes. `dispersion` costs more again: it samples that buffer once per colour channel instead of once, and it is only switched on where it is the entire point. Use these on **objects**, not on facades.
 
-Two programs, not fifty-seven: every standard surface compiles to one, every physical surface to the other.
+Two programs, not fifty-eight: every standard surface compiles to one, every physical surface to the other.
 
 ### The honest limits
 

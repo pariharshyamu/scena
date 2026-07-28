@@ -3123,7 +3123,7 @@ game.start();`,
     id: 'physical',
     title: 'The physical tier',
     group: 'Worldbuilding',
-    code: `// Five light responses MeshStandardMaterial has no term for at all —
+    code: `// Six light responses MeshStandardMaterial has no term for at all —
 // the only kinds in the catalogue that build a MeshPhysicalMaterial.
 //
 //   velvet        sheen        dark head-on, bright at every grazing edge
@@ -3131,13 +3131,17 @@ game.start();`,
 //   brushedMetal  anisotropy   the linisher went one way
 //   nacre         iridescence  thin-film: hue depends on thickness and angle
 //   ice           transmission light goes THROUGH (three renders twice)
+//   gemstone      dispersion   a different IOR per wavelength: white light
+//                              in, colour out — why stones are cut at all
 //
 // Spheres, not boxes: sheen and anisotropy are about the way a highlight
-// WRAPS, and a flat face has nothing to wrap around.
+// WRAPS, and a flat face has nothing to wrap around. The gemstone is the
+// exception — the facets are half of what makes a cut stone read as one.
 import { createSurface, createSky, createLightingRig, applyFog,
          PALETTES } from 'scena3d';
 import { Game } from 'gama3d';
-import { Mesh, PlaneGeometry, SphereGeometry, TorusKnotGeometry } from 'three';
+import { BoxGeometry, Mesh, OctahedronGeometry, PlaneGeometry,
+         SphereGeometry, TorusKnotGeometry } from 'three';
 
 const palette = PALETTES.meadow;
 const game = new Game();
@@ -3150,24 +3154,46 @@ const floor = new Mesh(new PlaneGeometry(60, 60),
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-const KINDS = ['velvet', 'silk', 'brushedMetal', 'nacre', 'ice'];
-KINDS.forEach((kind, i) => {
-  const ball = new Mesh(new SphereGeometry(0.62, 40, 28),
+const KINDS = ['velvet', 'silk', 'brushedMetal', 'nacre', 'ice', 'gemstone'];
+const ball = new SphereGeometry(0.62, 40, 28);
+const gem = new OctahedronGeometry(0.8, 0);
+// ONE row, not two: stacked front-to-back, any camera low enough to see
+// the panel hides the back row behind the front one, and any camera high
+// enough to separate the rows puts floor behind everything instead.
+const meshes = KINDS.map((kind, i) => {
+  const mesh = new Mesh(kind === 'gemstone' ? gem : ball,
     createSurface(kind, { seed: 3 + i }));
-  ball.position.set((i - 2) * 1.55, 0.75, 0);
-  scene.add(ball);
+  mesh.position.set((i - 2.5) * 1.45, 0.85, 0);
+  scene.add(mesh);
+  return mesh;
 });
 
-// Something behind the ice, so the transmission has something to distort.
+// A STRIPED LIGHT PANEL BEHIND THE ROW, and it is not decoration.
+// Transmission needs a subject to distort, and dispersion needs a hard
+// EDGE — separating colours out of a smooth sky gradient separates
+// nothing. Bright bars with dark gaps give the whole row edges to work
+// with, and they backlight the velvet, which is where a sheen rim reads
+// best anyway.
+for (let k = 0; k < 9; k++) {
+  const bar = new Mesh(new BoxGeometry(0.7, 3.4, 0.2),
+    createSurface('crystal', { seed: 5 + k }));
+  bar.position.set((k - 4) * 1.15, 1.7, -5);
+  scene.add(bar);
+}
+
+// A solid object behind the ice too, so its transmission has a shape to
+// bend and not only stripes.
 const knot = new Mesh(new TorusKnotGeometry(0.42, 0.14, 90, 12),
   createSurface('brass', { seed: 9 }));
-knot.position.set(3.1, 0.78, -1.9);
+knot.position.set(2.17, 0.9, -2.3);
 scene.add(knot);
 
 game.onUpdate((t) => {
   knot.rotation.y = t.elapsed * 0.5;
-  game.camera.position.set(Math.sin(t.elapsed * 0.15) * 1.4, 1.5, 7.6);
-  game.camera.lookAt(0, 0.74, 0);
+  // The gem turns: dispersion is view-dependent, so a still stone hides it.
+  meshes[5].rotation.set(0.35, t.elapsed * 0.6, 0);
+  game.camera.position.set(Math.sin(t.elapsed * 0.15), 1.7, 13.9);
+  game.camera.lookAt(0, 0.9, 0);
 });
 game.start();`,
   },

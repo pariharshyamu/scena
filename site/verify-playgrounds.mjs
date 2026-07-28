@@ -165,18 +165,16 @@ console.log(`${list.length} example(s)\n`);
 
 // A FRESH BROWSER EVERY FEW EXAMPLES.
 //
-// GPU state accumulates across a sweep and the heaviest scene eventually
-// captures as a cleared buffer — which reads as "this example is broken"
-// when it renders perfectly on its own. That was measurable rather than a
-// hunch: the transmission example passed FIRST in a 25-example run
-// (distinct 443) and came back blank LAST in the same 25 (distinct 0).
-// Position, not chance.
+// This is a hygiene measure, not a fix. It was added under a wrong diagnosis
+// — the heaviest example passed FIRST in a 25-example sweep (distinct 443)
+// and came back blank LAST in the same 25 (distinct 0), which looked like
+// GPU state accumulating in the browser process. It was not. Captures were
+// timing out, and they timed out more often late in a sweep because the
+// machine was busier and a software-rendered frame took longer. See
+// SHOT_TIMEOUT below for the real cause.
 //
-// Closing the page does not fix it and neither does a fresh BrowserContext —
-// both were tried, and the last-place blank survived both. The accumulation
-// is in the browser process, so the only thing that actually clears it is a
-// new one. A verification gate that fails by running order is worse than no
-// gate at all, because it teaches you to ignore it.
+// Recycling stays because a long sweep in one browser process does drift
+// slower, and a fresh one costs about a second. It is no longer load-bearing.
 const RECYCLE_EVERY = 10;
 
 const rows = [];
@@ -198,48 +196,60 @@ for (const id of list) {
     if ((m.type() === 'error' || m.type() === 'warning') && !benign(t)) errs.push(`${m.type()}: ${t}`);
   });
   await page.goto(`${BASE}/playground.html?example=${id}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(3500);
+  await page.waitForTimeout(6000);
 
   // SCREENSHOT THE CANVAS and measure the picture. Reading the framebuffer
   // back does not work: three.js leaves `preserveDrawingBuffer` off, so every
   // canvas answers pure black and a verifier built on it calls a working scene
   // blank — which is how the last one passed an empty frame in both directions.
-  // An element screenshot forces a fresh compositor capture of the WebGL
-  // canvas, and with preserveDrawingBuffer off SwiftShader sometimes hands
-  // back a cleared buffer — a black frame for a scene that is rendering
-  // perfectly well on the page. The page-level capture can lose the same
-  // race. So a single blank capture is NOT a verdict: try the element, fall
-  // back to a page screenshot clipped to the canvas box (pixels already
-  // composited, no fresh readback), and give the whole sequence three goes
-  // with a breath between them. Only an example that is blank every way,
-  // every time, is blank.
   const looksBlank = (m) => m.flattest > 0.985 && m.stdev < 1.5;
+
+  // GIVE A CAPTURE THE TIME A FRAME ACTUALLY TAKES.
+  //
+  // A screenshot of a WebGL canvas has to wait for a frame, and under
+  // SwiftShader — a software rasteriser — a heavy scene renders at seconds
+  // per frame, not frames per second. `physical` is the worst of them:
+  // transmission, thick-film interference and a PMREM chain at 756×799
+  // measure at ~5 s a frame, so every capture route takes 10–12 s. Against
+  // an 8 s timeout every one of them threw.
+  //
+  // And a thrown capture printed as `distinct 0 / flattest 1 / stdev 0` —
+  // the DEFAULTS for a row with no measurement — which reads exactly like a
+  // blank frame and is nothing of the sort. That misreading cost real time:
+  // captures failed more often late in a sweep, when the machine was busier
+  // and frame times were longer, and "fails by position, not by content"
+  // looked like GPU state accumulating across examples. It was frame time
+  // crossing a timeout. Hence the generous budget here, and hence `why` on
+  // every failed row — an unprinted exception is indistinguishable from an
+  // empty picture.
+  const SHOT_TIMEOUT = 45000;
+  const shootClip = async () => {
+    const box = await page.frameLocator('iframe').locator('canvas').boundingBox();
+    if (!box || box.width < 8 || box.height < 8) throw new Error('no canvas box');
+    return page.screenshot({ clip: box, timeout: SHOT_TIMEOUT });
+  };
+  const shootElement = () =>
+    page.frameLocator('iframe').locator('canvas').screenshot({ timeout: SHOT_TIMEOUT });
+
   let pix = { ok: false };
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Every path's failure is kept. Letting a later error overwrite an earlier
+  // one hides which capture actually broke, and a diagnosis built on the last
+  // error in a fallback chain is a diagnosis of the backstop.
+  const failures = [];
+  for (let attempt = 0; attempt < 3 && !(pix.ok && !looksBlank(pix)); attempt++) {
     if (attempt) await page.waitForTimeout(1500);
-    try {
-      const shot = await page
-        .frameLocator('iframe')
-        .locator('canvas')
-        .screenshot({ timeout: 8000 });
-      pix = { ok: true, ...measure(decodePng(shot)) };
-    } catch (e) {
-      pix = { ok: false, why: String(e).slice(0, 80) };
-    }
-    if (pix.ok && !looksBlank(pix)) break;
-    try {
-      const box = await page.frameLocator('iframe').locator('canvas').boundingBox();
-      if (box && box.width > 8 && box.height > 8) {
-        const whole = await page.screenshot({
-          clip: { x: box.x, y: box.y, width: box.width, height: box.height },
-          timeout: 8000,
-        });
-        const again = measure(decodePng(whole));
-        if (!looksBlank(again)) pix = { ok: true, via: 'page-clip', ...again };
+    for (const [via, shoot] of [['page-clip', shootClip], ['element', shootElement]]) {
+      try {
+        const shot = await shoot();
+        const m = measure(decodePng(shot));
+        if (!pix.ok || looksBlank(pix)) pix = { ok: true, via, ...m };
+        if (!looksBlank(m)) break;
+      } catch (e) {
+        failures.push(`${via}: ${String(e).split('\n')[0].slice(0, 80)}`);
       }
-    } catch { /* keep the element reading */ }
-    if (pix.ok && !looksBlank(pix)) break;
+    }
   }
+  if (!pix.ok && failures.length) pix.why = failures.join(' | ');
   const banner = await page.evaluate(() => {
     const el = document.querySelector('.error, [data-error], .runner-error');
     return el ? el.textContent.trim().slice(0, 160) : '';
@@ -252,6 +262,7 @@ for (const id of list) {
     `${flag} ${id.padEnd(16)} distinct ${String(pix.distinct ?? 0).padStart(5)}` +
     ` flattest ${String(pix.flattest ?? 1).padStart(5)} stdev ${String(pix.stdev ?? 0).padStart(6)}` +
     ` mean ${String(pix.mean ?? 0).padStart(5)}` +
+    (pix.why ? `  WHY: ${pix.why}` : '') +
     (banner ? `  BANNER: ${banner}` : '') +
     (errs.length ? `\n        ${errs.slice(0, 3).join('\n        ')}` : '')
   );

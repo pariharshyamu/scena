@@ -1,6 +1,6 @@
 {
   "name": "scena3d",
-  "version": "0.91.0",
+  "version": "0.92.0",
   "description": "SCENA — SCenes & ENvironment Assets: a 3D world-building library on top of three.js. Seeded procedural props, terrain, sky and scattering — with gameplay metadata (obstacles, walkability) that game libraries like GAMA understand.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -88,9 +88,9 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "@types/three": "^0.165.0",
+    "@types/three": "^0.185.1",
     "gama3d": "^0.9.0",
-    "three": "^0.165.0",
+    "three": "^0.185.1",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "vite": "^5.2.0",

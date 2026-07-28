@@ -48,8 +48,8 @@ describe('applyEnvironment', () => {
     // request, and an environment map is the most tempting place to break
     // that. This one is a Float32Array.
     const env = applyEnvironment(new Scene(), {});
-    expect(env.texture.image.data).toBeInstanceOf(Float32Array);
-    expect(env.texture.image.data.length).toBe(128 * 64 * 4);
+    expect(env.texture.image.data!).toBeInstanceOf(Float32Array);
+    expect(env.texture.image.data!.length).toBe(128 * 64 * 4);
   });
 
   it('SKY ABOVE, GROUND BELOW — and the ground half is the point', () => {

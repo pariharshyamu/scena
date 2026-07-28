@@ -87,7 +87,8 @@ export type SurfaceKind =
   | 'silk'
   | 'brushedMetal'
   | 'nacre'
-  | 'ice';
+  | 'ice'
+  | 'gemstone';
 
 export interface SurfaceParams {
   /**
@@ -200,8 +201,22 @@ export interface SurfaceParams {
   transmission?: number;
   /** How thick the volume is, for transmission. */
   thickness?: number;
-  /** Index of refraction (water 1.33, ice 1.31, glass 1.5). */
+  /** Index of refraction (water 1.33, ice 1.31, glass 1.5, diamond 2.42). */
   ior?: number;
+  /**
+   * Chromatic dispersion: how far apart the red and blue refractions fall.
+   *
+   * A real transparent solid has a DIFFERENT index of refraction for every
+   * wavelength, which is why a cut stone throws colour and a window does not.
+   * three refracts red, green and blue separately over
+   * `ior ± (ior - 1) * 0.025 * dispersion`, so the spread grows with the IOR
+   * as well — 0 is a plain glass, 10 on a diamond-grade IOR is a gemstone.
+   *
+   * Needs `transmission` and a non-zero `thickness`: with nothing passing
+   * through the volume there is nothing to split. Costs a third transmission
+   * sample per pixel.
+   */
+  dispersion?: number;
   /** Colour light picks up on its way through, as a hex int. */
   attenuationColor?: number;
   /** How far light travels before it is fully attenuated, in metres. */
@@ -811,6 +826,28 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     physical: true, transmission: 0.85, thickness: 0.5, ior: 1.31,
     attenuationColor: 0x9fd4e8, attenuationDistance: 1.4,
   },
+  // WHY A STONE IS CUT AT ALL. Glass and diamond are both transparent; the
+  // difference you can see across a room is that diamond has a different
+  // index of refraction for every wavelength, so the white light that goes
+  // in comes out separated. Facets exist to make that happen more often.
+  //
+  // Both halves of that are here. `dispersion` does the splitting — and the
+  // spread scales with the IOR, so a gem-grade 2.2 throws far more colour
+  // than a window's 1.5 at the same setting. `flat: true` does the facets:
+  // flat shading on a low-poly solid IS a cut stone, and the coarse cells
+  // are the inclusions that stop it looking like moulded acrylic.
+  gemstone: {
+    baseColor: 0xe6f4ff,
+    roughness: 0.03, metalness: 0, scale: 3.5, albedoVar: 0.03, tint: 0x8fc2e8,
+    tintAmount: 0.08, ao: 0.02, bump: 0, roughVar: 0.015, grain: 0,
+    grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+    cells: 0.5, cellScale: 2.2, cellEdge: 0.12, cellJitter: 0.25,
+    // A long attenuation distance on purpose. The colour is supposed to come
+    // OUT of the stone, and one that swallows the light on its way through
+    // is a dark blob whatever the IOR is doing.
+    physical: true, transmission: 1, thickness: 0.55, ior: 2.2, dispersion: 14,
+    attenuationColor: 0xb8e4ff, attenuationDistance: 2.4,
+  },
 };
 
 export interface SurfaceOptions extends Partial<SurfaceParams> {
@@ -1238,6 +1275,10 @@ export function createSurface(kind: SurfaceKind, options: SurfaceOptions = {}): 
           transmission: p.transmission,
           thickness: p.thickness ?? 0.5,
           ior: p.ior ?? 1.5,
+          // Only when asked for: three compiles USE_DISPERSION the moment
+          // this crosses zero, and that is three transmission samples a
+          // pixel instead of one.
+          ...(p.dispersion ? { dispersion: p.dispersion } : {}),
           ...(p.attenuationColor === undefined ? {} : {
             attenuationColor: new Color(p.attenuationColor),
             attenuationDistance: p.attenuationDistance ?? 1,

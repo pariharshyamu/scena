@@ -43,6 +43,7 @@ const SECTION_PLAYGROUNDS: Record<string, string> = {
   'metal-needs-something-to-reflect': 'environment',
   'when-only-some-things-should-reflect': 'environment',
   'the-physical-tier': 'physical',
+  'why-a-stone-is-cut': 'physical',
   'what-it-costs': 'physical',
   'the-honest-limits': 'physical',
   'the-industrial-six': 'industrial',
