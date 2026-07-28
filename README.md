@@ -105,6 +105,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 - [x] Surface **industrial tier**: corrugated iron, asphalt, tread plate, galvanised spangle, copper patina, columnar basalt — parallel ribs, hard-edged aggregate, warped Voronoi cells, and a crust that takes the metalness with it
 - [x] Surface **wear states**: `wet` — water that fills from the bottom (joints and hollows first), darkens by porosity, and is driven by the rain via `precipitation.soak()`
 - [x] Paths: one curve = visual ribbon + scatter keep-out + GAMA patrol route
+- [x] Game feel: `createEffects` burst pool (dust/sparks/debris/splash/confetti + rings, two draw calls), `createTrail` fading ribbon, `createMarks` skid/footprint/scorch decals (one instanced draw)
 - [x] Seed-stability snapshot tests (output frozen within a minor version)
 - [x] Buildings (house, watchtower, well) and ruins; `createVillage` hamlet generator with the full gameplay handshake
 - [x] Kits: ASCII maps → grid-snapped dungeon/compound pieces (`assembleKit`)

@@ -226,6 +226,22 @@ export {
 export { createFlock, type Flock, type FlockOptions, type FlockType } from './environment/flock';
 export { createHerd, type Herd, type HerdOptions, type HerdType } from './environment/herd';
 export { createPath, type WorldPath, type PathOptions } from './environment/path';
+export {
+  createEffects,
+  type Effects,
+  type EffectsOptions,
+  type BurstKind,
+  type BurstOptions,
+  type RingOptions,
+} from './environment/effects';
+export { createTrail, type Trail, type TrailOptions } from './environment/trail';
+export {
+  createMarks,
+  type Marks,
+  type MarksOptions,
+  type GroundMarkKind,
+  type StampOptions,
+} from './environment/marks';
 
 // Generators
 export { createVillage, type Village, type VillageOptions } from './generators/village';

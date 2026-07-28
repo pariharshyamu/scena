@@ -30,6 +30,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'lagoon', title: 'The lagoon, palms & the postcard', playground: 'beach' },
   { id: 'beachkit', title: 'The beach kit: Miami', playground: 'beach' },
   { id: 'cricket', title: 'The cricket ground', playground: 'cricket' },
+  { id: 'feel', title: 'Game feel: effects, trails & marks', playground: 'feel' },
   { id: 'flock', title: 'Flocks & schools', playground: 'flock' },
   { id: 'herd', title: 'Herds & grazing', playground: 'herd' },
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
@@ -40,6 +41,9 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 
 /** Playground examples relevant to sections, keyed by heading id. */
 const SECTION_PLAYGROUNDS: Record<string, string> = {
+  bursts: 'feel',
+  trails: 'feel',
+  marks: 'feel',
   'metal-needs-something-to-reflect': 'environment',
   'when-only-some-things-should-reflect': 'environment',
   'the-physical-tier': 'physical',
