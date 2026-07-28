@@ -153,3 +153,57 @@ describe('createHelicopter', () => {
     expect(heli.slots!.some((s) => s.kind === 'pilot')).toBe(true);
   });
 });
+
+describe('createFighterJet', () => {
+  it('the burner lights past 80% throttle and breathes when it does', async () => {
+    const { createFighterJet } = await import('../src');
+    const jet = createFighterJet({ seed: 4 });
+    let flame: MeshBasicMaterial | null = null;
+    jet.object.traverse((c) => {
+      const m = (c as Mesh).material as MeshBasicMaterial | undefined;
+      if (m?.transparent && (c as Mesh).geometry?.type === 'ConeGeometry' && m.color?.getHex() === 0xffa242) flame = m;
+    });
+    jet.update(0.1, { throttle: 0.6 });
+    expect(flame!.opacity).toBe(0); // dry power: no flame
+    jet.update(0.1, { throttle: 0.95 });
+    expect(flame!.opacity).toBeGreaterThan(0.3); // burner lit
+    const first = flame!.opacity;
+    jet.update(0.13, { throttle: 0.95 });
+    expect(flame!.opacity).not.toBe(first); // and it FLICKERS
+    jet.update(0.1, { throttle: 0.5, afterburner: true });
+    expect(flame!.opacity).toBeGreaterThan(0.3); // commanded overrides
+  });
+
+  it('elevons MIX pitch and roll — that is what elevons are', async () => {
+    const { createFighterJet } = await import('../src');
+    const jet = createFighterJet({ seed: 5 });
+    const hinges: Object3D[] = [];
+    jet.object.traverse((c) => {
+      if (c.type === 'Object3D' && c.children.length === 1 &&
+          Math.abs(c.position.x) > 1.5 && Math.abs(c.position.x) < 3) hinges.push(c);
+    });
+    expect(hinges.length).toBe(2);
+    jet.update(1 / 60, { pitch: 1, roll: 0 });
+    expect(hinges[0].rotation.x).toBeCloseTo(hinges[1].rotation.x); // pure pitch: together
+    jet.update(1 / 60, { pitch: 0, roll: 1 });
+    expect(hinges[0].rotation.x).toBeCloseTo(-hinges[1].rotation.x); // pure roll: opposed
+    jet.update(1 / 60, { pitch: 0.5, roll: 0.5 });
+    expect(Math.abs(hinges[0].rotation.x)).not.toBeCloseTo(Math.abs(hinges[1].rotation.x)); // mixed
+  });
+
+  it('hardpoints hand GAMA a world-space launch pose and stop carrying', async () => {
+    const { createFighterJet } = await import('../src');
+    const jet = createFighterJet({ seed: 6, hardpoints: 2 });
+    jet.object.position.set(10, 20, 5);
+    jet.object.rotation.y = Math.PI / 2; // nose along +x
+    jet.object.updateMatrixWorld(true);
+    expect(jet.armed).toBe(2);
+    const launch = jet.launchFrom(0)!;
+    expect(jet.armed).toBe(1);
+    expect(launch.position.y).toBeGreaterThan(19); // up where the wing is
+    expect(launch.direction.x).toBeCloseTo(1, 1); // fired the way the nose points
+    expect(jet.launchFrom(0)).toBeNull(); // that rail is spent
+    jet.rearm();
+    expect(jet.armed).toBe(2);
+  });
+});

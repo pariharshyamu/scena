@@ -5,11 +5,14 @@ import {
   ConeGeometry,
   CylinderGeometry,
   DoubleSide,
+  ExtrudeGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  Shape,
+  Vector3,
 } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
@@ -612,6 +615,264 @@ export function createHelicopter(options: HelicopterOptions = {}): HelicopterPro
       mast.rotation.z = -cr * 0.12;
 
       if (input.light !== undefined && input.light !== lightOn) setSearchlight(input.light);
+
+      strobeClock += step;
+      const flash = strobeClock % 1.1;
+      const strobeOn = flash < 0.06 || (flash > 0.16 && flash < 0.22);
+      for (const nav of navLights) {
+        if (!nav.strobe) continue;
+        nav.material.emissiveIntensity = lit && strobeOn ? nav.base * 1.6 : 0.05;
+        nav.halo.visible = lit && strobeOn;
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fighter jet
+
+export interface FighterInput extends AircraftInput {
+  /** Light the burner regardless of throttle (default: throttle > 0.8). */
+  afterburner?: boolean;
+}
+
+export interface FighterProp extends Prop {
+  update(dt: number, input?: FighterInput): void;
+  claims: LuminousClaim[];
+  setLit(on: boolean): void;
+  readonly lit: boolean;
+  /** Under-wing anchors, each carrying a dummy round until launched. */
+  hardpoints: Object3D[];
+  /** Rounds still hanging. */
+  readonly armed: number;
+  /**
+   * Take the round off hardpoint `i`: hides the dummy and returns the
+   * launch pose in WORLD space — hand it straight to GAMA `Missiles.fire`.
+   * Null if that rail is already empty.
+   */
+  launchFrom(i: number): { position: { x: number; y: number; z: number };
+    direction: { x: number; y: number; z: number } } | null;
+  /** Hang fresh rounds on every rail. */
+  rearm(): void;
+  wingspan: number;
+  length: number;
+}
+
+export interface FighterOptions {
+  seed?: number;
+  color?: number;
+  palette?: Palette;
+  /** Rails under the wings. Default 2. */
+  hardpoints?: number;
+}
+
+/**
+ * A delta-wing fighter: extruded delta, ELEVONS (each surface mixes
+ * pitch and roll — that's what elevons are), a big fin, retractable
+ * gear, and an afterburner whose flame lights past 80% throttle and
+ * flickers on its own seeded nerve. The under-wing hardpoints carry
+ * dummy rounds; `launchFrom(i)` hands GAMA's `Missiles` a world-space
+ * launch pose and hides the round, so the missile the game flies is
+ * the missile the wing stops carrying.
+ */
+export function createFighterJet(options: FighterOptions = {}): FighterProp {
+  const seed = options.seed ?? 1;
+  const rng = new Rng(seed);
+  const palette = options.palette ?? DEFAULT_PALETTE;
+  const bodyColor = options.color ?? rng.pick([0x5d6a78, 0x3a4550, 0x6e7a68, palette.metal]);
+  const skin = createSurface('paintedMetal', { color: bodyColor, seed });
+  const dark = createSurface('paintedMetal', { color: 0x262c33, seed: seed + 1 });
+  const glass = createGlass({ tint: 0x88b0c8 });
+
+  const group = new Group();
+  group.name = 'fighter';
+  const deckY = 1.35;
+  const railCount = Math.min(Math.max(options.hardpoints ?? 2, 1), 4);
+
+  // Fuselage: a long box with a needle nose and a canopy bump.
+  const body = new Mesh(new BoxGeometry(1.1, 0.9, 9), skin);
+  body.position.set(0, deckY, 0);
+  const noseCone = new Mesh(new ConeGeometry(0.5, 2.6, 8), skin);
+  noseCone.rotation.x = Math.PI / 2;
+  noseCone.position.set(0, deckY, 5.8);
+  const canopy = new Mesh(new BoxGeometry(0.7, 0.5, 1.7), glass);
+  canopy.position.set(0, deckY + 0.6, 2.6);
+  const intakeL = new Mesh(new BoxGeometry(0.5, 0.6, 2.4), dark);
+  intakeL.position.set(-0.8, deckY - 0.1, 1.2);
+  const intakeR = intakeL.clone();
+  intakeR.position.x = 0.8;
+  group.add(body, noseCone, canopy, intakeL, intakeR);
+
+  // The delta: one thin extruded triangle across both sides.
+  const half = 4.6;
+  const chord = 5.6;
+  const deltaShape = new Shape();
+  deltaShape.moveTo(-half, -chord / 2);
+  deltaShape.lineTo(half, -chord / 2);
+  deltaShape.lineTo(0, chord / 2);
+  deltaShape.lineTo(-half, -chord / 2);
+  const deltaGeometry = new ExtrudeGeometry(deltaShape, { depth: 0.12, bevelEnabled: false });
+  deltaGeometry.rotateX(-Math.PI / 2);
+  const delta = new Mesh(deltaGeometry, skin);
+  delta.position.set(0, deckY - 0.15, -1.2);
+  group.add(delta);
+
+  // Elevons: two trailing surfaces that MIX pitch and roll.
+  const elevons: Object3D[] = [];
+  for (const side of [-1, 1]) {
+    const surface = new Mesh(new BoxGeometry(2.6, 0.08, 0.7), dark);
+    surface.position.set(0, 0, -0.35);
+    const hinge = new Object3D();
+    hinge.position.set(side * 2.2, deckY - 0.1, -3.9);
+    hinge.add(surface);
+    group.add(hinge);
+    elevons.push(hinge);
+  }
+  const fin = new Mesh(new BoxGeometry(0.12, 2.1, 1.9), skin);
+  fin.position.set(0, deckY + 1.15, -3.6);
+  fin.rotation.x = -0.4;
+  group.add(fin);
+  const rudderMesh = new Mesh(new BoxGeometry(0.1, 1.5, 0.6), dark);
+  rudderMesh.position.set(0, 0.7, -0.3);
+  const rudder = new Object3D();
+  rudder.position.set(0, deckY + 0.6, -4.35);
+  rudder.add(rudderMesh);
+  group.add(rudder);
+
+  // The burner: nozzle, hot core, and the flame that lights past 80%.
+  const nozzle = new Mesh(new CylinderGeometry(0.42, 0.36, 0.7, 10), dark);
+  nozzle.rotation.x = Math.PI / 2;
+  nozzle.position.set(0, deckY, -4.6);
+  group.add(nozzle);
+  const flameMaterial = new MeshBasicMaterial({
+    color: 0xffa242,
+    transparent: true,
+    opacity: 0,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  const flame = new Mesh(new ConeGeometry(0.34, 2.6, 10, 1, true), flameMaterial);
+  flame.rotation.x = Math.PI / 2;
+  flame.position.set(0, deckY, -6.2);
+  const flameHalo = makeHalo(0xffa242, 1.3);
+  flameHalo.position.set(0, deckY, -5.2);
+  flameHalo.visible = false;
+  group.add(flame, flameHalo);
+
+  // Hardpoints: rails under the delta, each with a dummy round hanging.
+  const hardpoints: Object3D[] = [];
+  const rounds: Mesh[] = [];
+  for (let i = 0; i < railCount; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const spread = 1.3 + Math.floor(i / 2) * 1.1;
+    const rail = new Object3D();
+    rail.position.set(side * spread, deckY - 0.55, -1.4);
+    const pylon = new Mesh(new BoxGeometry(0.08, 0.28, 0.6), dark);
+    pylon.position.y = 0.14;
+    const round = new Mesh(new ConeGeometry(0.13, 1.6, 6), dark);
+    round.rotation.x = Math.PI / 2;
+    rail.add(pylon, round);
+    group.add(rail);
+    hardpoints.push(rail);
+    rounds.push(round);
+  }
+
+  // Gear, folding like the airliner's.
+  const gear = new Group();
+  for (const [x, z] of [
+    [-0.9, -0.8],
+    [0.9, -0.8],
+    [0, 4.2],
+  ]) {
+    const strut = new Mesh(new BoxGeometry(0.1, 1.1, 0.14), dark);
+    strut.position.set(x, 0.75, z);
+    const tire = new Mesh(new CylinderGeometry(0.28, 0.28, 0.2, 10), dark);
+    tire.rotation.z = Math.PI / 2;
+    tire.position.set(x, 0.28, z);
+    gear.add(strut, tire);
+  }
+  group.add(gear);
+
+  const navLights: NavLight[] = [];
+  const claims: LuminousClaim[] = [];
+  let lit = true;
+  for (const [color, x, z, strobe] of [
+    [0xff3b30, -half, -3.9, false],
+    [0x34d058, half, -3.9, false],
+    [0xffffff, 0, -4.6, true],
+  ] as Array<[number, number, number, boolean]>) {
+    const { light, claim } = navLight(group, color, x, deckY - 0.1, z, strobe);
+    claim.isLit = () => lit;
+    navLights.push(light);
+    claims.push(claim);
+  }
+
+  let gearState = 1;
+  let strobeClock = rng.range(0, 2);
+  let flick = rng.range(0, 10);
+  const launchScratch = new Vector3();
+  const dirScratch = new Vector3();
+
+  return {
+    object: group,
+    obstacleRadius: 6,
+    slots: [createSlot('pilot', 'drive', group, 0, deckY - 0.55, 2.5)],
+    claims,
+    hardpoints,
+    wingspan: half * 2,
+    length: 12,
+    get lit() {
+      return lit;
+    },
+    get armed() {
+      return rounds.filter((r) => r.visible).length;
+    },
+    setLit(on: boolean) {
+      lit = on;
+      for (const nav of navLights) {
+        nav.material.emissiveIntensity = on ? nav.base : 0.05;
+        nav.halo.visible = on;
+      }
+    },
+    launchFrom(i: number) {
+      const round = rounds[i];
+      if (!round || !round.visible) return null;
+      round.visible = false;
+      round.getWorldPosition(launchScratch);
+      dirScratch.set(0, 0, 1).applyQuaternion(group.quaternion);
+      return {
+        position: { x: launchScratch.x, y: launchScratch.y, z: launchScratch.z },
+        direction: { x: dirScratch.x, y: dirScratch.y, z: dirScratch.z },
+      };
+    },
+    rearm() {
+      for (const round of rounds) round.visible = true;
+    },
+    update(dt, input = {}) {
+      const step = Number.isFinite(dt) ? Math.max(dt, 0) : 0;
+      const throttle = Math.min(Math.max(input.throttle ?? 0, 0), 1);
+      const pitch = Math.min(Math.max(input.pitch ?? 0, -1), 1);
+      const roll = Math.min(Math.max(input.roll ?? 0, -1), 1);
+      const yawIn = Math.min(Math.max(input.yaw ?? 0, -1), 1);
+
+      // Elevons: each side is pitch PLUS its share of roll.
+      elevons[0].rotation.x = -(pitch + roll) * 0.4;
+      elevons[1].rotation.x = -(pitch - roll) * 0.4;
+      rudder.rotation.y = -yawIn * 0.45;
+
+      // The burner: past 80% throttle (or commanded), flame and flicker.
+      const burning = input.afterburner ?? throttle > 0.8;
+      flick += step;
+      const wave = 0.85 + Math.sin(flick * 31) * Math.sin(flick * 17) * 0.15;
+      flameMaterial.opacity = burning ? 0.55 * wave : 0;
+      flame.visible = burning;
+      flame.scale.set(1, wave * (0.8 + throttle * 0.5), 1);
+      flameHalo.visible = burning;
+
+      const target = (input.gearDown ?? true) ? 1 : 0;
+      gearState += Math.min(Math.max(target - gearState, -step / 1.2), step / 1.2);
+      gear.position.y = (1 - gearState) * 1.2;
+      gear.visible = gearState > 0.02;
 
       strobeClock += step;
       const flash = strobeClock % 1.1;

@@ -4422,6 +4422,121 @@ window.heliportDebug = () => {
   };
 };`,
   },
+  {
+    id: 'jets',
+    title: 'Jets: the flypast',
+    group: 'Living world',
+    code: `// THE FAST MOVERS. Two delta-wing fighters fly the display circuit in
+// echelon — elevons mixing pitch and roll with the curve, gear folding
+// after the low pass, AFTERBURNERS lighting in the climb (watch the
+// flame breathe — it has its own seeded nerve). On each lap the lead
+// clears a hardpoint: the round leaves the rail with a burst, because
+// the missile a game flies should be the missile the wing stops
+// carrying. GAMA's Missiles takes the pose from launchFrom() verbatim.
+import { applyFog, createEffects, createFighterJet, createLightingRig,
+         createRunway, createSky, createSurface, PALETTES } from 'scena3d';
+import { CatmullRomCurve3, Mesh, PerspectiveCamera, PlaneGeometry,
+         Scene, Vector3, WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 900);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+const grass = new Mesh(new PlaneGeometry(220, 160),
+  createSurface('moss', { seed: 5 }));
+grass.rotation.x = -Math.PI / 2;
+scene.add(grass);
+scene.add(createRunway({ length: 70, width: 9, number: 9, seed: 3 }).object);
+const fx = createEffects({ seed: 8 });
+scene.add(fx.group);
+
+const lead = createFighterJet({ seed: 7, color: 0x5d6a78 });
+const wing = createFighterJet({ seed: 8, color: 0x3a4550 });
+scene.add(lead.object, wing.object);
+
+// The display line: low pass down the runway, pull up, wide return.
+const LOOP = new CatmullRomCurve3([
+  new Vector3(0, 3, -60),
+  new Vector3(0, 2.2, 0),      // the low pass
+  new Vector3(0, 3.5, 40),
+  new Vector3(-8, 16, 75),     // the pull — burners
+  new Vector3(-40, 26, 60),
+  new Vector3(-60, 28, 0),
+  new Vector3(-40, 22, -70),
+  new Vector3(-6, 10, -85),
+], true, 'catmullrom', 0.4);
+const LEN = LOOP.getLength();
+let u = 0, laps = 0, fired = false;
+const pos = new Vector3(), ahead = new Vector3(), wpos = new Vector3();
+
+let last = 0;
+renderer.setAnimationLoop((ms) => {
+  const t = ms / 1000;
+  const dt = Math.min(Math.max(t - last, 0), 0.1);
+  last = t;
+
+  const prev = u;
+  u = (u + (34 * dt) / LEN) % 1;
+  if (u < prev) { laps++; lead.rearm(); fired = false; }
+  LOOP.getPointAt(u, pos);
+  LOOP.getPointAt((u + 0.01) % 1, ahead);
+
+  const climbing = ahead.y - pos.y;
+  const throttle = climbing > 0.08 ? 0.95 : 0.65; // burners in the pull
+  const gearDown = pos.y < 6 && !climbing;
+
+  const place = (jet, at, look) => {
+    jet.object.position.copy(at);
+    jet.object.lookAt(look);
+  };
+  place(lead, pos, ahead);
+  // Wingman: echelon right, a length back and a wing out.
+  LOOP.getPointAt((u - 0.012 + 1) % 1, wpos);
+  wpos.x += 7; wpos.y += 1.5;
+  const wlook = ahead.clone(); wlook.x += 7; wlook.y += 1.5;
+  place(wing, wpos, wlook);
+
+  // Elevons follow the curve's bend.
+  LOOP.getPointAt((u + 0.03) % 1, wlook);
+  const turn = Math.atan2(wlook.x - ahead.x, wlook.z - ahead.z) -
+               Math.atan2(ahead.x - pos.x, ahead.z - pos.z);
+  const roll = Math.min(Math.max(-turn * 6, -1), 1);
+  lead.update(dt, { throttle, gearDown, roll,
+    pitch: Math.min(Math.max(climbing * 4, -1), 1) });
+  wing.update(dt, { throttle, gearDown, roll: roll * 0.9,
+    pitch: Math.min(Math.max(climbing * 4, -1), 1) });
+
+  // Top of the pull: the lead clears a rail.
+  if (!fired && u > 0.45 && u < 0.55) {
+    fired = true;
+    const launch = lead.launchFrom(laps % 2);
+    if (launch) fx.burst('sparks', launch.position);
+  }
+
+  camera.position.set(34, 14, 30);
+  camera.lookAt(pos.x, Math.max(pos.y, 2), pos.z);
+  fx.update(dt);
+  renderer.render(scene, camera);
+});
+
+window.jetsDebug = () => {
+  renderer.render(scene, camera);
+  const gl = renderer.getContext();
+  return {
+    glError: gl.getError(),
+    u: Number(u.toFixed(3)),
+    laps,
+    alt: Number(lead.object.position.y.toFixed(1)),
+    armed: lead.armed,
+    drawCalls: renderer.info.render.calls,
+  };
+};`,
+  },
 ];
 
 

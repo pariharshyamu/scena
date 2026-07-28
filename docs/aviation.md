@@ -75,3 +75,30 @@ The `heliport` playground flies the night shift on rails: spool, lift
 from the H, orbit with the light holding the pad, return, settle, wind
 down, again — probes tracked the phase machine end to end with the
 budget pinned at its maximum throughout.
+
+## createFighterJet
+
+```ts
+const jet = createFighterJet({ hardpoints: 2 });
+scene.add(jet.object);
+// per frame: jet.update(dt, { throttle, pitch, roll, yaw, gearDown, afterburner });
+// firing: const launch = jet.launchFrom(0);
+//         if (launch) missiles.fire(launch.position, launch.direction, target);
+```
+
+A delta-wing fighter: extruded delta, **elevons** — each trailing
+surface mixes pitch and roll, because that is what elevons are (pure
+pitch moves them together, pure roll opposes them, both tested) — a
+big fin, folding gear, and an **afterburner** whose flame lights past
+80% throttle (or on command) and breathes on its own seeded nerve.
+
+The under-wing **hardpoints** carry dummy rounds. `launchFrom(i)`
+hides the round and returns the launch pose in world space — position
+and nose direction — shaped exactly for GAMA's `Missiles.fire`, so the
+missile the game flies is the missile the wing stops carrying.
+`rearm()` hangs fresh ones.
+
+The `jets` playground flies a two-ship display circuit in echelon:
+low pass over the numbers, burners in the pull (probes watched `armed`
+drop 2 → 1 as the lead cleared a rail at the top), gear cycling, and
+elevons following the curve.

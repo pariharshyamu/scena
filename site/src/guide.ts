@@ -49,6 +49,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
 const SECTION_PLAYGROUNDS: Record<string, string> = {
   createplane: 'airfield',
   createhelicopter: 'heliport',
+  createfighterjet: 'jets',
   'the-airfield': 'airfield',
   'the-airfield-playground': 'airfield',
   'createlightshafts-god-rays-for-the-out-of-doors': 'grove',

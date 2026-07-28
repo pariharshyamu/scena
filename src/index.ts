@@ -204,12 +204,16 @@ export {
 export {
   createPlane,
   createHelicopter,
+  createFighterJet,
   type AircraftProp,
   type AircraftInput,
   type PlaneOptions,
   type HelicopterProp,
   type HelicopterInput,
   type HelicopterOptions,
+  type FighterProp,
+  type FighterInput,
+  type FighterOptions,
 } from './props/aircraft';
 export {
   createRunway,
