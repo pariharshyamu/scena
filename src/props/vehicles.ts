@@ -6,10 +6,12 @@ import {
   MeshStandardMaterial,
   Object3D,
   TorusGeometry,
+  type Material,
 } from 'three';
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
+import { sharedBy } from '../materials/shared';
 import { createGlass } from '../materials/glass';
 import { createSlot } from '../core/types';
 import type { Prop } from '../core/types';
@@ -49,15 +51,27 @@ interface Wheel {
   steers: boolean;
 }
 
+/** Tire rubber. One per vehicle, shared by all of its wheels. */
+const tireRubber = (): MeshStandardMaterial =>
+  new MeshStandardMaterial({ color: 0x1d2126, roughness: 0.9 });
+
+/** A lamp lens, keyed on its colour so a pair of headlamps is one material. */
+const lampMaterial = (lit: number): MeshStandardMaterial =>
+  new MeshStandardMaterial({ color: lit, emissive: lit, emissiveIntensity: 0.5 });
+
 /** A tire + hub on a spin pivot, axle along local x. */
-function makeWheel(radius: number, width: number, seed: number): { pivot: Object3D; spin: Object3D } {
+function makeWheel(
+  radius: number,
+  width: number,
+  seed: number,
+  rubber: Material
+): { pivot: Object3D; spin: Object3D } {
   const pivot = new Object3D(); // yaw pivot (steering)
   const spin = new Object3D(); // roll pivot (speed)
   pivot.add(spin);
-  const tire = new Mesh(
-    new TorusGeometry(radius * 0.78, radius * 0.24, 6, 12),
-    new MeshStandardMaterial({ color: 0x1d2126, roughness: 0.9 })
-  );
+  // The rubber comes in from the vehicle, one for all four wheels. Built here
+  // it was four identical materials per car — see `npm run geometry`.
+  const tire = new Mesh(new TorusGeometry(radius * 0.78, radius * 0.24, 6, 12), rubber);
   tire.rotation.y = Math.PI / 2;
   const hub = new Mesh(
     new CylinderGeometry(radius * 0.55, radius * 0.55, width, 8),
@@ -90,6 +104,7 @@ export function createCar(options: VehicleOptions = {}): VehicleProp {
   const seed = options.seed ?? 1;
   const rng = new Rng(seed);
   const palette = options.palette ?? DEFAULT_PALETTE;
+  const lampGlow = sharedBy(lampMaterial);
   const bodyColor = options.color ?? rng.pick([0xb8433a, 0x3a6ea5, 0x3f7f5c, 0xd8d5cc, palette.metal]);
   const body = createSurface('paintedMetal', { color: bodyColor, seed });
   const trim = new MeshStandardMaterial({ color: 0x22262b, flatShading: true });
@@ -116,10 +131,9 @@ export function createCar(options: VehicleOptions = {}): VehicleProp {
     pane.position.set(side * 0.82, 1.18, -0.35);
     group.add(pane);
     for (const [z, lit] of [[1.95, 0xfff2cc], [-1.95, 0xd8402a]] as const) {
-      const lamp = new Mesh(
-        new BoxGeometry(0.3, 0.12, 0.06),
-        new MeshStandardMaterial({ color: lit, emissive: lit, emissiveIntensity: 0.5 })
-      );
+      // Keyed on the colour: a car has two headlamps and two tail lamps, and
+      // that is two materials, not four.
+      const lamp = new Mesh(new BoxGeometry(0.3, 0.12, 0.06), lampGlow(lit));
       lamp.position.set(side * 0.6, 0.78, z);
       group.add(lamp);
     }
@@ -130,11 +144,12 @@ export function createCar(options: VehicleOptions = {}): VehicleProp {
   bumperR.position.z = -2.0;
   group.add(bumperF, bumperR);
 
+  const rubber = tireRubber();
   const wheels: Wheel[] = [];
   const spins: Object3D[] = [];
   const R = 0.34;
   for (const [x, z, steers] of [[-0.86, 1.32, true], [0.86, 1.32, true], [-0.86, -1.32, false], [0.86, -1.32, false]] as const) {
-    const { pivot, spin } = makeWheel(R, 0.16, seed + wheels.length);
+    const { pivot, spin } = makeWheel(R, 0.16, seed + wheels.length, rubber);
     pivot.position.set(x, R, z);
     group.add(pivot);
     wheels.push({ node: pivot, radius: R, steers });
@@ -189,10 +204,11 @@ export function createBike(options: VehicleOptions = {}): VehicleProp {
   bars.position.set(0, 1.0, 0.45); // GRIPS.handlebar
   group.add(bars);
 
+  const rubber = tireRubber();
   const wheels: Wheel[] = [];
   const spins: Object3D[] = [];
   for (const [z, steers] of [[0.62, true], [-0.62, false]] as const) {
-    const { pivot, spin } = makeWheel(R, 0.05, seed + wheels.length);
+    const { pivot, spin } = makeWheel(R, 0.05, seed + wheels.length, rubber);
     pivot.position.set(0, R, z);
     group.add(pivot);
     wheels.push({ node: pivot, radius: R, steers });
@@ -248,13 +264,14 @@ export function createTractor(options: VehicleOptions = {}): VehicleProp {
     group.add(post);
   }
 
+  const rubber = tireRubber();
   const wheels: Wheel[] = [];
   const spins: Object3D[] = [];
   for (const [x, z, radius, steers] of [
     [-0.62, 1.05, 0.36, true], [0.62, 1.05, 0.36, true],
     [-0.72, -0.75, 0.68, false], [0.72, -0.75, 0.68, false],
   ] as const) {
-    const { pivot, spin } = makeWheel(radius, radius * 0.5, seed + wheels.length);
+    const { pivot, spin } = makeWheel(radius, radius * 0.5, seed + wheels.length, rubber);
     pivot.position.set(x, radius, z);
     group.add(pivot);
     wheels.push({ node: pivot, radius, steers });
@@ -301,6 +318,7 @@ export function createTruck(options: VehicleOptions = {}): VehicleProp {
   frameRail.position.set(0, 0.6, 0.2);
   group.add(frameRail);
 
+  const rubber = tireRubber();
   const wheels: Wheel[] = [];
   const spins: Object3D[] = [];
   const R = 0.42;
@@ -309,7 +327,7 @@ export function createTruck(options: VehicleOptions = {}): VehicleProp {
     [-1.0, -0.4, false], [1.0, -0.4, false],
     [-1.0, -1.6, false], [1.0, -1.6, false],
   ] as const) {
-    const { pivot, spin } = makeWheel(R, 0.24, seed + wheels.length);
+    const { pivot, spin } = makeWheel(R, 0.24, seed + wheels.length, rubber);
     pivot.position.set(x, R, z);
     group.add(pivot);
     wheels.push({ node: pivot, radius: R, steers });

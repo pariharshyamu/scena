@@ -3,6 +3,7 @@ import { renderMarkdown } from './markdown';
 const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'getting-started', title: 'Getting started', playground: 'world' },
   { id: 'imports', title: 'What an import costs' },
+  { id: 'geometry', title: 'What a prop costs to draw' },
   { id: 'environment', title: 'Terrain, sky, water, weather', playground: 'living' },
   { id: 'props', title: 'Props & palettes', playground: 'props' },
   { id: 'surfaces', title: 'Procedural surfaces', playground: 'surfaces' },

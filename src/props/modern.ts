@@ -75,8 +75,13 @@ export function createRailing(options: RailingOptions = {}): Prop {
       group.add(cable);
     }
   } else if (style === 'glass') {
+    // ONE glass for the whole run. Every bay in a balustrade is the same pane,
+    // and building it inside the loop gave a seven-bay railing seven identical
+    // materials for the renderer to bind separately — `npm run geometry`
+    // counts exactly this.
+    const glass = createGlass();
     for (let i = 0; i < bays; i++) {
-      const pane = new Mesh(new BoxGeometry(bayW - 0.12, height - 0.2, 0.02), createGlass());
+      const pane = new Mesh(new BoxGeometry(bayW - 0.12, height - 0.2, 0.02), glass);
       pane.position.set(-length / 2 + (i + 0.5) * bayW, (height - 0.2) / 2 + 0.06, 0);
       group.add(pane);
     }

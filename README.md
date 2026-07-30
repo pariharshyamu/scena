@@ -136,7 +136,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 
 ```bash
 npm install
-npm test          # 1591 vitest unit tests (determinism, metadata, scatter rules, snapshots)
+npm test          # 1602 vitest unit tests (determinism, metadata, scatter rules, snapshots)
 npm run typecheck
 npm run build     # tsup → dist (ESM + CJS + d.ts)
 npm run dev       # the SCENA × GAMA living-forest demo
@@ -144,16 +144,22 @@ npm run dev:manifest  # the same kind of world, built from one JSON manifest
 ```
 
 And the parts a unit test cannot do — a prop that must LOOK right is not
-verified by asserting its vertex count, and what an import COSTS is invisible
-to every other check:
+verified by asserting its vertex count, and what a prop COSTS is invisible to
+every other check:
 
 ```bash
 npm run verify:playgrounds   # every example, headless, measured by pixels
 npm run size                 # import cost against committed budgets
+npm run geometry             # draw calls, buffers and materials, per prop
 npm run entries:check        # the sub-path entries match the root barrel
 ```
 
-Both run in CI on every push
+`geometry` is the frame cost, where `size` is the load cost. It found a glass
+railing building one material per bay, a car one rubber per wheel, and a stall
+one material per loaf — see [docs/geometry.md](docs/geometry.md), including the
+twenty false positives its own first version reported.
+
+All of them run in CI on every push
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Release notes live in
 [CHANGELOG.md](CHANGELOG.md).
 

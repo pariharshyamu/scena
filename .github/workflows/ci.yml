@@ -50,6 +50,12 @@ jobs:
       # file, and no test, screenshot or type could see it.
       - run: npm run size
 
+      # The other cost, the one paid every frame instead of once: draw calls,
+      # GPU buffers and materials per prop. Exact integers, so compared
+      # exactly. It found a glass railing building one material per bay, a car
+      # building one rubber per wheel, and a stall one material per loaf.
+      - run: npm run geometry
+
   browser:
     name: every example renders
     needs: check

@@ -28,6 +28,18 @@ stated rather than papered over:
 
 ### 2026-07-30
 
+- **0.104.0** — `npm run geometry`: what a prop costs to DRAW, in exact
+  integers — draw calls, GPU buffers and materials per prop, against committed
+  ceilings. It found three props allocating materials they could share: a glass
+  railing built one per bay (7 identical panes), a car one rubber per wheel and
+  one lens per lamp (15 material instances → 10), and a stall one per loaf
+  (18 → 10). The gate's own first run was **wrong about 20 of the 34** it
+  reported, because `createSurface` keeps its parameters — including the
+  weathering `uSurfSeed` — in a uniform bag on `userData` that the check could
+  not see; the near-miss was collapsing a stall's three per-basket wood
+  surfaces into one and stamping the baskets out identically. Adds `sharedBy`
+  (internal) and a counter-invariant test that the baskets keep three distinct
+  seeds
 - **0.103.0** — Six sub-path entry points, and the build defect they exposed.
   `createCrate` cost **20 kB** gzipped from the published package and **11 kB**
   from the same code built from source. The barrel was not at fault — esbuild

@@ -11,6 +11,7 @@ import {
 import { Rng } from '../core/random';
 import { DEFAULT_PALETTE, type Palette } from '../core/palette';
 import { createSurface } from '../materials/surface';
+import { sharedBy } from '../materials/shared';
 import type { Prop } from '../core/types';
 
 export type StallGoods = 'produce' | 'pottery' | 'bakery' | 'textiles';
@@ -53,6 +54,10 @@ export function createStall(options: StallOptions = {}): Prop {
   const plank = createSurface('plank', { color: palette.wood, seed: seed + 3 });
   const stripe = new MeshStandardMaterial({ color: clothColor, roughness: 0.95, flatShading: true });
   const cream = new MeshStandardMaterial({ color: CLOTH_CREAM, roughness: 0.95, flatShading: true });
+  // The goods are drawn from small colour palettes, so a material built per
+  // loaf or per bolt is mostly a duplicate of the last one. One per COLOUR,
+  // cached for this stall only — see `sharedBy` for why not at module scope.
+  const matte = sharedBy(matteMaterial);
 
   const W = 2.6; // width (x)
   const D = 1.7; // depth (z), front at +D/2
@@ -118,7 +123,7 @@ export function createStall(options: StallOptions = {}): Prop {
   if (goods === 'produce') {
     for (const x of acrossCounter(3)) {
       group.add(basket(rng, x, counterY, D / 2 - 0.42, palette, seed));
-      fruitPile(rng, x, counterY + 0.16, D / 2 - 0.42).forEach((f) => group.add(f));
+      fruitPile(rng, x, counterY + 0.16, D / 2 - 0.42, matte).forEach((f) => group.add(f));
     }
   } else if (goods === 'bakery') {
     for (const x of acrossCounter(3)) {
@@ -167,11 +172,15 @@ export function createStall(options: StallOptions = {}): Prop {
 
 // ---- goods helpers -----------------------------------------------------
 
-function matte(color: number): MeshStandardMaterial {
+function matteMaterial(color: number): MeshStandardMaterial {
   return new MeshStandardMaterial({ color, roughness: 0.85, flatShading: true });
 }
 
 function basket(rng: Rng, x: number, y: number, z: number, palette: Palette, seed: number): Mesh {
+  // A weathering seed per basket, so three baskets on one counter do not look
+  // stamped out. They ARE three materials and that is deliberate — the seed
+  // reaches the shader as `uSurfSeed`, which is why `npm run geometry` reads
+  // the surface uniform bag rather than trusting the standard fields.
   const b = new Mesh(
     new CylinderGeometry(0.2, 0.16, 0.2, 9),
     createSurface('wood', { color: palette.wood, seed: seed + Math.floor(x * 100) })
@@ -180,9 +189,14 @@ function basket(rng: Rng, x: number, y: number, z: number, palette: Palette, see
   return b;
 }
 
-function fruitPile(rng: Rng, x: number, y: number, z: number): Mesh[] {
-  const color = rng.pick(FRUIT_COLORS);
-  const mat = matte(color);
+function fruitPile(
+  rng: Rng,
+  x: number,
+  y: number,
+  z: number,
+  matte: (color: number) => Material
+): Mesh[] {
+  const mat = matte(rng.pick(FRUIT_COLORS));
   const out: Mesh[] = [];
   const n = rng.int(5, 8);
   for (let i = 0; i < n; i++) {
