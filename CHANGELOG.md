@@ -28,6 +28,14 @@ stated rather than papered over:
 
 ### 2026-07-30
 
+- **0.104.1** — A documented claim, measured and found wrong. `docs/imports.md`
+  blamed all **9.3 kB** of `scena3d/materials` on `SURFACE_PRESETS` being one
+  unshakeable record, and proposed a value-taking `createSurface(WOOD)` as the
+  fix. The table is **2.8 kB of the 9.3**; the shader and factory are the other
+  ~6.5 and no import shape can shake them, so that fix would buy about a
+  quarter of what it read like — at a cost of 58 new public exports. A second
+  `npm run size` probe pins the split so the attribution stays honest. No API
+  change
 - **0.104.0** — `npm run geometry`: what a prop costs to DRAW, in exact
   integers — draw calls, GPU buffers and materials per prop, against committed
   ceilings. It found three props allocating materials they could share: a glass

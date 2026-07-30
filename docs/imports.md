@@ -84,13 +84,39 @@ is what a gate is for:
 
 ## What this does not fix
 
-**`scena3d/materials` is still 9.3 kB for any surface at all**, because
-`SURFACE_PRESETS` is a single record covering every kind and a bundler cannot
-tree-shake properties out of one object literal. `createSurface('wood')`
-resolves its kind at runtime, so every preset has to be reachable — a
-string-keyed factory is inherently unshakeable.
+**`scena3d/materials` is still 9.3 kB for any surface at all.** Two probes in
+`npm run size` say where it goes, and the answer is not the one this section
+used to give:
 
-Fixing that means a second, value-taking form (`createSurface(WOOD)`) so a prop
-can import one preset instead of the table. It is a real improvement and it is
-not in this release; the 9.3 kB is honest and documented rather than quietly
-present.
+```
+  surface           9.3 kB   the material tier: shader + factory + every preset
+  surface presets   2.8 kB   the table alone — asking for ONE preset drags all 58
+```
+
+`SURFACE_PRESETS` really is unshakeable: it is a single record covering every
+kind, a bundler cannot tree-shake properties out of one object literal, and
+`createSurface('wood')` resolves its kind at runtime, so every preset has to be
+reachable. Importing `SURFACE_PRESETS.wood` costs the same 2.8 kB as importing
+the whole table, which the second probe pins.
+
+But that is **2.8 kB of 9.3**. The other ~6.5 is the surface shader and the
+factory around it, and no import shape can shake those — every surface needs
+the same GLSL. This section previously blamed the whole 9.3 kB on the preset
+table and proposed a value-taking form (`createSurface(WOOD)`) as the fix. That
+form would work, and it would take a one-surface import from 9.3 kB to about
+6.7 — roughly a quarter, not the near-elimination the old wording implied. At
+58 presets that is 58 new public exports for 2.6 kB, and the trade is a good
+deal worse than it read.
+
+Measured before writing, which is the only reason the number is right: the
+floor was found by cutting the preset table down to a single entry in a scratch
+copy of the source and re-bundling. There is no committed probe for it, because
+a probe running against `dist/` cannot remove a table from the source — the
+first attempt imported `createSurface` and one preset together, read 9.3 kB,
+and was the `surface` probe under another name.
+
+So the real target is the shader, not the table, and that is a larger and
+riskier change: splitting the GLSL into chunks a preset opts into, so a `wood`
+surface stops carrying the masonry tiling, the snow cap and the emissive glow
+it never uses. Not in this release either — but now it is the right thing that
+is missing, rather than the wrong one.

@@ -85,8 +85,26 @@ const PROBES = [
   {
     name: 'surface',
     budget: 11,
-    note: 'the material tier alone — SURFACE_PRESETS is one record of every kind',
+    note: 'the material tier alone — shader + machinery + every preset',
     code: `import { createSurface } from '${DIST}/materials.js'; console.log(createSurface);`,
+  },
+  // `surface presets` exists to take the `surface` number apart, because
+  // docs/imports.md blamed all 9.3 kB on SURFACE_PRESETS being one unshakeable
+  // record. Measured, the table is 2.8 kB of it; the shader and the factory
+  // are the other ~6.5, and no import shape can shake those. So the
+  // value-taking form that claim implied would buy about a quarter of what it
+  // sounded like — worth knowing before anybody spends 58 new exports on it.
+  //
+  // There is deliberately no third probe for the floor. Measuring it needs the
+  // preset table REMOVED from the source, which a probe against `dist/` cannot
+  // do — the first attempt imported `createSurface` and one preset together,
+  // read 9.3 kB, and was simply the `surface` probe wearing a different name.
+  // A probe that cannot isolate what it claims to isolate is worse than none.
+  {
+    name: 'surface presets',
+    budget: 4,
+    note: 'the preset table alone — asking for ONE preset still drags all 58',
+    code: `import { SURFACE_PRESETS } from '${DIST}/materials.js'; console.log(SURFACE_PRESETS.wood);`,
   },
   {
     name: 'village',
