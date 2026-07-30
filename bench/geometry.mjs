@@ -188,6 +188,19 @@ const BUDGETS = {
   helicopter: { draws: 34, geometries: 30, triangles: 480 },
   plane: { draws: 35, geometries: 33, triangles: 540 },
   fighterJet: { draws: 35, geometries: 30, triangles: 520 },
+  // Rail. `track` and `platform` scale with LENGTH, so their budgets are the
+  // real test of the instancing — the 700 m fixture below would be thousands
+  // of draws if a sleeper or a bench were a Mesh each. A bench was, and this
+  // is where that would have shown up.
+  // Measured, then given headroom — the first pass at these was guessed and
+  // four of the five were wrong, which is the argument for the gate in one
+  // line. `track` is 4 draws for 700 m and 22k triangles; `platform` is 8 for
+  // 360 m, all of it instanced.
+  track: { draws: 5, geometries: 5, triangles: 27000 }, // measured 4, 4, 22446
+  platform: { draws: 10, geometries: 10, triangles: 2400 }, // measured 8, 8, 1928
+  locomotive: { draws: 25, geometries: 25, triangles: 780 }, // measured 21, 21, 620
+  carriage: { draws: 27, geometries: 27, triangles: 800 }, // measured 23, 23, 644
+  wagon: { draws: 21, geometries: 21, triangles: 720 }, // measured 17, 17, 572
 };
 
 const BUILD = {
@@ -208,7 +221,26 @@ const BUILD = {
   helicopter: () => S.createHelicopter({ seed: 1 }),
   plane: () => S.createPlane({ seed: 1 }),
   fighterJet: () => S.createFighterJet({ seed: 1 }),
+  track: () => S.createTrack(RAIL_LINE),
+  platform: () =>
+    S.createStationPlatform(S.createTrack(RAIL_LINE), {
+      from: 100,
+      to: 460,
+      name: 'HAVENBROOK',
+      doorOffsets: [-6, -12, -25, -31],
+    }),
+  locomotive: () => S.createLocomotive({ seed: 1 }),
+  carriage: () => S.createCarriage({ seed: 1 }),
+  wagon: () => S.createWagon({ seed: 1, kind: 'van' }),
 };
+
+/** 700 m with a bend in it — long enough that bad instancing cannot hide. */
+const RAIL_LINE = [
+  { x: 0, z: 0 },
+  { x: 200, z: 0 },
+  { x: 400, z: 120 },
+  { x: 700, z: 120 },
+];
 
 const rows = [];
 const failures = [];

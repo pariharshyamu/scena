@@ -103,7 +103,7 @@ const PROBES = [
   {
     name: 'surface presets',
     budget: 4,
-    note: 'the preset table alone — asking for ONE preset still drags all 58',
+    note: 'the preset table alone — asking for ONE preset still drags all 59',
     code: `import { SURFACE_PRESETS } from '${DIST}/materials.js'; console.log(SURFACE_PRESETS.wood);`,
   },
   {

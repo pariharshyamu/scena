@@ -136,7 +136,7 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 
 ```bash
 npm install
-npm test          # 1602 vitest unit tests (determinism, metadata, scatter rules, snapshots)
+npm test          # 1622 vitest unit tests (determinism, metadata, scatter rules, snapshots)
 npm run typecheck
 npm run build     # tsup → dist (ESM + CJS + d.ts)
 npm run dev       # the SCENA × GAMA living-forest demo

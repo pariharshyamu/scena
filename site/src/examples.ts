@@ -4174,6 +4174,111 @@ window.groveDebug = () => {
 };`,
   },
   {
+    id: 'railway',
+    title: 'The branch line: track, consist & platform',
+    group: 'Living world',
+    code: `// RAIL IS THE ONE VEHICLE CLASS THAT DOES NOT STEER. A train's whole
+// position is ONE NUMBER - how far along the track - and track.at(d)
+// turns that number into a place and a facing. Everything else here
+// follows from it: the consist, the wheel roll, the station stop.
+//
+// Watch the carriages on the bend. Each sits on the MIDPOINT of its two
+// bogies and faces the CHORD between them, not the tangent at its
+// centre - the difference between a train and a string of boxes
+// shrink-wrapped to a spline.
+//
+// The yellow markings are where the doors are expected to land. The
+// train stops on its mark and they line up to a few centimetres.
+import { createTrack, createStationPlatform, createLocomotive, createCarriage,
+         createConsist, createSky, createLightingRig, applyFog, createSurface,
+         createTree, PALETTES } from 'scena3d';
+import { Mesh, PlaneGeometry, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+
+const palette = PALETTES.meadow;
+const scene = new Scene();
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+
+const ground = new Mesh(new PlaneGeometry(1400, 1400), createSurface('grass', { seed: 2 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// The line: a straight, a sweeping right-hander, another straight.
+const line = createTrack([
+  { x: -320, z: -40 }, { x: -80, z: -40 },
+  { x: 90, z: 60 }, { x: 340, z: 60 },
+]);
+scene.add(line.object);
+
+const train = createConsist(line, [
+  createLocomotive({ seed: 4 }),
+  createCarriage({ seed: 11 }),
+  createCarriage({ seed: 12 }),
+  createCarriage({ seed: 13 }),
+]);
+scene.add(train.object);
+
+// Door offsets measured back from the train's front - what the platform
+// puts its markings at.
+const offsets = [];
+let run = 0;
+for (const v of train.vehicles) {
+  for (const d of v.doors) offsets.push(-(run + v.length / 2 + d));
+  run += v.length + 0.6;
+}
+const platform = createStationPlatform(line, {
+  from: 150, to: 150 + train.length + 16,
+  name: 'HAVENBROOK', doorOffsets: offsets, side: 'left',
+});
+scene.add(platform.object);
+
+for (let i = 0; i < 14; i++) {
+  const t = createTree({ species: 'oak', seed: 40 + i, height: 7 + (i % 3), palette });
+  t.object.position.set(-300 + i * 46, 0, i % 2 ? -95 : 120);
+  scene.add(t.object);
+}
+
+// The whole simulation: one scalar, eased to a stop on the mark, a dwell,
+// then away again. A real driver gets a brake curve; this is its shape.
+// It starts on the approach, not at the far end of the line: the whole
+// point of the demo is the arrival, and a visitor should not have to wait
+// out 240 m of straight track to see it.
+const STOP = platform.stopMark;
+const START = STOP - 95;
+let distance = START, dwell = 0;
+const camera = new PerspectiveCamera(55, innerWidth / innerHeight, 0.5, 2000);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const remaining = STOP - distance;
+  if (remaining > 0.05) {
+    distance += Math.max(1.5, Math.min(22, remaining * 0.28)) * dt;
+  } else if (dwell < 5) {
+    dwell += dt;
+  } else {
+    distance += Math.min(20, (distance - STOP) * 0.5 + 2) * dt;
+    if (distance > line.length - 6) { distance = START; dwell = 0; }
+  }
+  train.place(distance);
+
+  const view = line.at(STOP + 26);
+  camera.position.set(view.position.x - 26, 11, view.position.z - 32);
+  camera.lookAt(train.vehicles[0].object.position);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+  },
+  {
     id: 'airfield',
     title: 'The airfield: circuits & the windsock',
     group: 'Living world',

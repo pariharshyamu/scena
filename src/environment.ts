@@ -136,3 +136,9 @@ export {
   type SeaCondition,
   type Train,
 } from './environment/seaState';
+export {
+  createTrack,
+  type RailTrack,
+  type TrackOptions,
+  type TrackPoint,
+} from './environment/track';

@@ -1047,3 +1047,28 @@ export {
   type PlaceOptions,
   type DressOptions,
 } from './core/place';
+// Rail. The one vehicle class where the vehicle does not choose where it goes:
+// a train's whole position is one number along a track, which is what makes
+// exact schedules and centimetre platform alignment possible at all.
+export {
+  createTrack,
+  type RailTrack,
+  type TrackOptions,
+  type TrackPoint,
+} from './environment/track';
+export {
+  createLocomotive,
+  createCarriage,
+  createWagon,
+  createConsist,
+  type RollingStock,
+  type RollingStockOptions,
+  type WagonOptions,
+  type Consist,
+  type ConsistOptions,
+} from './props/rollingstock';
+export {
+  createStationPlatform,
+  type StationPlatform,
+  type StationPlatformOptions,
+} from './props/platform';

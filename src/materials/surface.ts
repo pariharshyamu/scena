@@ -34,6 +34,7 @@ export type SurfaceKind =
   | 'sand'
   | 'gravel'
   | 'mud'
+  | 'grass'
   // Tier 1 — stone & masonry
   | 'sandstone'
   | 'granite'
@@ -361,6 +362,17 @@ export const SURFACE_PRESETS: Record<SurfaceKind, SurfaceParams> = {
     roughness: 0.52, metalness: 0.85, scale: 4.5, albedoVar: 0.16, tint: 0x2a2118,
     tintAmount: 0.18, ao: 0.22, bump: 0.16, roughVar: 0.2, grain: 0,
     grainScale: 1, grainAxis: V(0, 1, 0), flat: true,
+  },
+  // Turf. There is a `createGrass` prop for blades you can see individually;
+  // this is the ground they stand in, and the ground on its own from any
+  // distance. `moss` is NOT this — it is a grey-green cap that grows ON stone,
+  // and reaching for it as a lawn gives a field the colour of a damp wall.
+  // (Written after doing exactly that.)
+  grass: {
+    baseColor: 0x5c7a3c,
+    roughness: 0.97, metalness: 0, scale: 5.5, albedoVar: 0.26, tint: 0x33471f,
+    tintAmount: 0.24, ao: 0.24, bump: 0.22, roughVar: 0.08, grain: 0.22,
+    grainScale: 11.0, grainAxis: V(0, 0, 1), flat: true,
   },
   // Packed earth: broad soft variation, strong low-frequency patches.
   dirt: {

@@ -794,3 +794,19 @@ export {
   type ClutterKitOptions,
   type ClutterTheme,
 } from './props/clutter';
+export {
+  createLocomotive,
+  createCarriage,
+  createWagon,
+  createConsist,
+  type RollingStock,
+  type RollingStockOptions,
+  type WagonOptions,
+  type Consist,
+  type ConsistOptions,
+} from './props/rollingstock';
+export {
+  createStationPlatform,
+  type StationPlatform,
+  type StationPlatformOptions,
+} from './props/platform';

@@ -28,6 +28,20 @@ stated rather than papered over:
 
 ### 2026-07-30
 
+- **0.105.0** — **Rail**, the one vehicle class that does not steer: a train's
+  whole position is one number, and `track.at(d)` turns it into a place and a
+  facing. `createTrack` (rails, instanced sleepers, ballast — **four draw calls
+  for 737 m and 1,133 sleepers**), `createLocomotive` / `createCarriage` /
+  `createWagon`, `createConsist` (bogie-chord placement, wheels rolled by
+  distance not time), and `createStationPlatform`, which publishes `stopMark`
+  and `doorMarks` so "the doors landed 40 cm past their markings" is a number —
+  held to 10 cm on the straight. Three measurements changed the code:
+  three.js's default `arcLengthDivisions` made "equally spaced" points **8.3%
+  uneven** on a long line (now 0.00%); the platform's benches were one mesh
+  each, costing a 390 m platform 15 draw calls; and `createSurface('grass')`
+  did not exist. Also adds the **`grass` surface** — `createGrass` exists as a
+  prop, so reaching for it as a surface is the obvious move, and `moss` is a
+  grey-green cap for stone that gives a field the colour of a damp wall
 - **0.104.1** — A documented claim, measured and found wrong. `docs/imports.md`
   blamed all **9.3 kB** of `scena3d/materials` on `SURFACE_PRESETS` being one
   unshakeable record, and proposed a value-taking `createSurface(WOOD)` as the
