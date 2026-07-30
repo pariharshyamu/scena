@@ -28,6 +28,26 @@ stated rather than papered over:
 
 ### 2026-07-30
 
+- **0.103.0** — Six sub-path entry points, and the build defect they exposed.
+  `createCrate` cost **20 kB** gzipped from the published package and **11 kB**
+  from the same code built from source. The barrel was not at fault — esbuild
+  shakes `src/index.ts` perfectly, and importing through it costs exactly what
+  importing `src/props/crate.ts` costs. `tsup src/index.ts` flattening 122
+  modules into one file was: module boundaries are where a bundler's
+  tree-shaking gets its granularity, and `--splitting` does nothing with a
+  single entry point because there is nothing to split against. Building
+  `scena3d/{core,materials,text,props,environment,scene}` alongside the root is
+  what forced the split, so **the root import dropped to 11 kB for every
+  consumer who changed nothing.** The entries are generated from the barrel by
+  `scripts/entries.mjs` with `entries:check` in CI, five tests pin the
+  partition (complete, non-overlapping, same bindings as the root), and
+  `npm run size` holds seven realistic imports to committed ceilings. See
+  [docs/imports.md](docs/imports.md) — including what this does *not* fix:
+  `SURFACE_PRESETS` is one record of every kind, so any surface still costs
+  9.3 kB.
+
+### 2026-07-30
+
 - **0.102.1** — CI on every push, this changelog, and `playwright` as a
   devDependency so `verify:playgrounds` runs on a fresh clone
 

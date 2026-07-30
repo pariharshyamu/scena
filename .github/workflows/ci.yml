@@ -37,9 +37,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The sub-path entries are GENERATED from the root barrel. A generated
+      # file that drifts from its source is worse than none: `scena3d/props`
+      # would silently lack a prop the root has.
+      - run: npm run entries:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # What an import actually costs, against committed ceilings. This is the
+      # gate that would have caught the defect it was written for: one crate
+      # cost 20 kB gzipped because the published bundle was a single flattened
+      # file, and no test, screenshot or type could see it.
+      - run: npm run size
 
   browser:
     name: every example renders

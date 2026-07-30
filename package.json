@@ -1,6 +1,6 @@
 {
   "name": "scena3d",
-  "version": "0.102.1",
+  "version": "0.103.0",
   "description": "SCENA — SCenes & ENvironment Assets: a 3D world-building library on top of three.js. Seeded procedural props, terrain, sky and scattering — with gameplay metadata (obstacles, walkability) that game libraries like GAMA understand.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -11,6 +11,36 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./materials": {
+      "types": "./dist/materials.d.ts",
+      "import": "./dist/materials.js",
+      "require": "./dist/materials.cjs"
+    },
+    "./text": {
+      "types": "./dist/text.d.ts",
+      "import": "./dist/text.js",
+      "require": "./dist/text.cjs"
+    },
+    "./props": {
+      "types": "./dist/props.d.ts",
+      "import": "./dist/props.js",
+      "require": "./dist/props.cjs"
+    },
+    "./environment": {
+      "types": "./dist/environment.d.ts",
+      "import": "./dist/environment.js",
+      "require": "./dist/environment.cjs"
+    },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js",
+      "require": "./dist/scene.cjs"
     }
   },
   "files": [
@@ -20,12 +50,12 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean",
+    "build": "tsup src/index.ts src/core.ts src/materials.ts src/text.ts src/props.ts src/environment.ts src/scene.ts --format esm,cjs --dts --sourcemap --clean",
     "dev": "vite examples/forest",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run entries:check && npm run typecheck && npm test && npm run build",
     "dev:manifest": "vite examples/manifest",
     "dev:surfaces": "vite examples/surfaces",
     "dev:market": "vite examples/market",
@@ -60,7 +90,10 @@
     "site:publish": "npm run site:build && node site/publish-docs.mjs",
     "verify:playgrounds": "npm run site:build && node site/verify-playgrounds.mjs",
     "dev:feel": "vite examples/feel",
-    "dev:arcade": "vite examples/arcade"
+    "dev:arcade": "vite examples/arcade",
+    "entries": "node scripts/entries.mjs",
+    "entries:check": "node scripts/entries.mjs --check",
+    "size": "node bench/size.mjs"
   },
   "repository": {
     "type": "git",
@@ -92,6 +125,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "@types/three": "^0.185.1",
+    "@vitest/coverage-v8": "^1.6.1",
     "gama3d": "^0.27.0",
     "playwright": "^1.56.1",
     "three": "^0.185.1",

@@ -45,6 +45,12 @@ const forest = scatter({
 scene.add(forest.group);               // InstancedMeshes — a few draw calls
 ```
 
+Six sub-path entries — `scena3d/core`, `/materials`, `/text`, `/props`,
+`/environment`, `/scene` — let an import say what it depends on. The root import
+costs the same, which is the point: building them forced the published package
+to have module boundaries, and one crate went from 20 kB gzipped to 11 kB for
+everyone who changed nothing. [What an import costs →](docs/imports.md)
+
 ## The GAMA handshake
 
 ```ts
@@ -137,11 +143,14 @@ npm run dev       # the SCENA × GAMA living-forest demo
 npm run dev:manifest  # the same kind of world, built from one JSON manifest
 ```
 
-And the part a unit test cannot do — a prop that must LOOK right is not
-verified by asserting its vertex count:
+And the parts a unit test cannot do — a prop that must LOOK right is not
+verified by asserting its vertex count, and what an import COSTS is invisible
+to every other check:
 
 ```bash
 npm run verify:playgrounds   # every example, headless, measured by pixels
+npm run size                 # import cost against committed budgets
+npm run entries:check        # the sub-path entries match the root barrel
 ```
 
 Both run in CI on every push

@@ -19,6 +19,24 @@
     "paths": {
       "scena3d": [
         "./src/index.ts"
+      ],
+      "scena3d/core": [
+        "./src/core.ts"
+      ],
+      "scena3d/materials": [
+        "./src/materials.ts"
+      ],
+      "scena3d/text": [
+        "./src/text.ts"
+      ],
+      "scena3d/props": [
+        "./src/props.ts"
+      ],
+      "scena3d/environment": [
+        "./src/environment.ts"
+      ],
+      "scena3d/scene": [
+        "./src/scene.ts"
       ]
     }
   },
