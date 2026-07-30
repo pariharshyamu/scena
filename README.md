@@ -1,5 +1,8 @@
 # SCENA — SCenes & ENvironment Assets
 
+[![CI](https://github.com/pariharshyamu/scena/actions/workflows/ci.yml/badge.svg)](https://github.com/pariharshyamu/scena/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/scena3d.svg)](https://www.npmjs.com/package/scena3d)
+
 **SCENA** is a 3D world-building library on top of [three.js](https://threejs.org): seeded procedural props, terrain, sky, lighting and scattering — with **gameplay metadata** (steering obstacles, exact height queries) that game libraries like [GAMA](https://github.com/pariharshyamu/gama) understand.
 
 three.js renders. GAMA makes it a game. **SCENA gives it a world.**
@@ -127,12 +130,23 @@ Scatter placement uses density noise for natural clumping and clearings, a spati
 
 ```bash
 npm install
-npm test          # 62 vitest unit tests (determinism, metadata, scatter rules, snapshots)
+npm test          # 1591 vitest unit tests (determinism, metadata, scatter rules, snapshots)
 npm run typecheck
 npm run build     # tsup → dist (ESM + CJS + d.ts)
 npm run dev       # the SCENA × GAMA living-forest demo
 npm run dev:manifest  # the same kind of world, built from one JSON manifest
 ```
+
+And the part a unit test cannot do — a prop that must LOOK right is not
+verified by asserting its vertex count:
+
+```bash
+npm run verify:playgrounds   # every example, headless, measured by pixels
+```
+
+Both run in CI on every push
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Release notes live in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

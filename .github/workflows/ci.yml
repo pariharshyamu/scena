@@ -1,0 +1,77 @@
+# The gates, on every push.
+#
+# SCENA is a library of things that must LOOK right, so a pipeline that ran
+# `npm test` and stopped would be close to worthless here. A unit test can
+# assert that `createBanner` returns a mesh with 240 vertices; it cannot notice
+# that the shader failed to compile, that the flag is a black rectangle, or
+# that the surface noise swims. Only running it in a browser and measuring the
+# screenshot answers that, which is why the second job exists and why it is
+# allowed to take twenty minutes.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  check:
+    name: typecheck, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  browser:
+    name: every example renders
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Chromium only — nothing here touches Firefox or WebKit, and
+      # --with-deps supplies the system libraries a bare runner lacks.
+      - run: npx playwright install --with-deps chromium
+      # Builds the docs site, which is what the playground examples are.
+      - run: npm run site:build
+      # A canvas existing and `gl.getError()` returning zero are both true of a
+      # completely blank frame. This measures pixels.
+      - run: node site/verify-playgrounds.mjs
+
+      # `include-hidden-files` is not optional: the shot directory is
+      # `.playground-shots`, and upload-artifact excludes dotfiles by default —
+      # it uploads nothing while reporting success. Measured on GAMA's first CI
+      # run, which is the only way anybody finds this out.
+      - name: upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: .playground-shots/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

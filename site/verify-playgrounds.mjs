@@ -100,9 +100,13 @@ function measure(png) {
 }
 
 /**
- * Playwright is not a dependency of this package — it is a big download and
- * only this script wants it. Take it from wherever it is: a local install, a
- * global one, or a path in the environment.
+ * Playwright from wherever it is.
+ *
+ * Normally the devDependency, which is what makes this script runnable on a
+ * fresh clone and in CI. The rest of the chain is for environments that ship a
+ * global one instead — and every path tried is named in the error, because a
+ * diagnosis built on the last failure in a fallback chain is a diagnosis of
+ * the backstop.
  */
 const pw = await (async () => {
   const tries = [process.env.PLAYWRIGHT, 'playwright', 'playwright-core',
