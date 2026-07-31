@@ -1072,3 +1072,33 @@ export {
   type StationPlatform,
   type StationPlatformOptions,
 } from './props/platform';
+
+// Ammunition — the whole supply chain, from one measured spec per kind.
+export {
+  AMMO,
+  AMMO_KINDS,
+  ballisticsOf,
+  createAmmoBox,
+  createBelt,
+  createCasing,
+  createMagazine,
+  createQuiver,
+  createRack,
+  createReady,
+  createRound,
+  describeAmmo,
+  roundTriangles,
+  type AmmoBoxOptions,
+  type AmmoKind,
+  type AmmoSpec,
+  type Ballistics,
+  type BeltOptions,
+  type CaseKind,
+  type CasingOptions,
+  type ContainerOptions,
+  type Countable,
+  type HeadKind,
+  type RackOptions,
+  type Round,
+  type RoundOptions,
+} from './props/ammunition';

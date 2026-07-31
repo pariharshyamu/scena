@@ -3734,8 +3734,8 @@ window.gauntletDebug = () => {
 import { applyFog, createBreakable, createEffects, createLightingRig,
          createPickup, createScoreboard, createSky, createStumps,
          createSurface, createTargetDummy, PALETTES } from 'scena3d';
-import { Mesh, PerspectiveCamera, PlaneGeometry, Scene, Vector3,
-         WebGLRenderer } from 'three';
+import { Box3, BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         Vector3, WebGLRenderer } from 'three';
 
 const palette = PALETTES.meadow;
 const scene = new Scene();
@@ -3868,8 +3868,8 @@ import { applyFog, createBungalow, createDayCycle, createLightBudget,
          createPhotocell, createRevolvingBeacon, createSky,
          createStreetLight, createStringLights, createSurface,
          PALETTES } from 'scena3d';
-import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
-         WebGLRenderer } from 'three';
+import { Box3, BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         Vector3, WebGLRenderer } from 'three';
 
 const palette = PALETTES.urban;
 const scene = new Scene();
@@ -4418,8 +4418,8 @@ window.airfieldDebug = () => {
 import { applyFog, createHelicopter, createHelipad, createHangar,
          createLightBudget, createLightingRig, createSky,
          createStreetLight, createSurface, PALETTES } from 'scena3d';
-import { Mesh, PerspectiveCamera, PlaneGeometry, Scene, Vector3,
-         WebGLRenderer } from 'three';
+import { Box3, BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         Vector3, WebGLRenderer } from 'three';
 
 const palette = PALETTES.dusk;
 const scene = new Scene();
@@ -4641,6 +4641,153 @@ window.jetsDebug = () => {
     drawCalls: renderer.info.render.calls,
   };
 };`,
+  },
+  {
+    id: 'ammunition',
+    title: 'Ammunition: one table, four states',
+    group: 'Living world',
+    code: `// THE SUPPLY CHAIN, NOT A SHELF OF MODELS.
+//
+// A round is never just a round. The same cartridge is a thing in a crate, a
+// thing in a belt, a thing in a hand and a case on the floor — and every one
+// of those is DERIVED from a single measured spec per kind. The magazine is
+// as long as its rounds are; the belt's link pitch is the case head; the
+// crate's stack falls out of its inside dimensions divided by the round.
+//
+// Front row: one round of each of the nineteen kinds, to scale with each
+// other. Real calibres, so the 5.56 next to the 155 mm is the actual ratio.
+// Behind: the ready state each kind really ships in — magazine, belt,
+// quiver, rack or open box, chosen by createReady() rather than by the
+// caller. The 100-round belt on the left is THREE draw calls.
+//
+// Watch the belts and magazines empty and refill. setCount() rewrites
+// instance matrices, so an empty container costs exactly what a full one
+// does — which is what lets a game put one on every gunner in a firefight.
+import { AMMO, AMMO_KINDS, applyFog, ballisticsOf, createCasing,
+         createLightingRig, createReady, createRound, createSky,
+         createSurface, describeAmmo, PALETTES } from 'scena3d';
+import { Box3, BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
+         Vector3, WebGLRenderer } from 'three';
+
+const palette = PALETTES.urban ?? PALETTES.meadow;
+const scene = new Scene();
+const camera = new PerspectiveCamera(48, innerWidth / innerHeight, 0.05, 400);
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(createSky({ palette }).mesh, createLightingRig('day').group);
+applyFog(scene, 'haze', palette);
+
+const floor = new Mesh(new PlaneGeometry(120, 120),
+  createSurface('concrete', { seed: 4 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+
+// ── One station per kind, in a grid ──────────────────────────────────
+// Small arms are millimetres and a torpedo is six metres, so each station
+// normalises its round to a common APPARENT size and the true figures are
+// what \`describeAmmo\` prints. The shape is what the row is for — a spitzer
+// bullet, a crimped hull, a sub-calibre dart, a fletched shaft — and the
+// shape is the part that is not being scaled away.
+const ready = [];
+const COLS = 5;
+const PITCH = 2.6;
+for (let i = 0; i < AMMO_KINDS.length; i++) {
+  const kind = AMMO_KINDS[i];
+  const spec = AMMO[kind];
+  const col = i % COLS;
+  const row = Math.floor(i / COLS);
+  const px = (col - (COLS - 1) / 2) * PITCH;
+  const pz = (row - 1.5) * PITCH;
+
+  // A plinth, so nothing floats and the grid reads as a display.
+  const plinth = new Mesh(new BoxGeometry(2.1, 0.34, 2.1),
+    createSurface('concrete', { seed: 9 }));
+  plinth.position.set(px, 0.17, pz);
+  scene.add(plinth);
+
+  // The round, stood on end, all of them the same height on screen.
+  const round = createRound(kind, { scale: 0.62 / spec.length });
+  round.object.position.set(px - 0.62, 0.34, pz + 0.55);
+  round.object.rotation.x = -Math.PI / 2;
+  scene.add(round.object);
+
+  // The ready state this kind actually ships in — magazine, belt, quiver,
+  // rack or open box — chosen by createReady, not by this loop.
+  //
+  // Fitted by its own MEASURED bounds rather than by the round's length. A
+  // 100-link belt and a 4-cell torpedo cradle are both "made of long rounds"
+  // and are nothing like each other in size, so scaling either by its round
+  // put one through the floor and the other off the plinth.
+  const box = createReady(kind);
+  const bounds = new Box3().setFromObject(box.object);
+  const size = bounds.getSize(new Vector3());
+  box.object.scale.setScalar(1.15 / Math.max(0.001, Math.max(size.x, size.y, size.z)));
+  box.object.position.set(px + 0.35, 0.34, pz - 0.1);
+  scene.add(box.object);
+  ready.push(box);
+
+  // And the brass it leaves behind, for the kinds that leave any. A mortar
+  // bomb and an arrow leave none, and the scene shows that by showing none.
+  const brass = createCasing(kind, { seed: 3, count: 16, spread: 0.3, scale: 3.2 });
+  brass.object.position.set(px - 0.55, 0.34, pz - 0.62);
+  scene.add(brass.object);
+}
+
+// ── Firing ────────────────────────────────────────────────────────────
+// Every container drains at a rate taken from its own ballistics, so the
+// belt-fed kinds empty fast and the racked ones do not — the same numbers
+// that decide how the rounds FLY decide how quickly they run out.
+const rate = ready.map((c) => {
+  const b = ballisticsOf(c.kind);
+  return Math.max(0.6, c.capacity / (b.speed > 800 ? 4 : b.speed > 300 ? 9 : 16));
+});
+const level = ready.map((c) => c.capacity);
+
+let t = 0;
+let last = performance.now() / 1000;
+function frame() {
+  const now = performance.now() / 1000;
+  const dt = Math.min(0.05, now - last);
+  last = now;
+  t += dt;
+
+  for (let i = 0; i < ready.length; i++) {
+    level[i] -= rate[i] * dt;
+    if (level[i] <= 0) level[i] = ready[i].capacity;   // reload
+    ready[i].setCount(level[i]);
+  }
+
+  // A slow orbit over the grid.
+  const a = t * 0.11;
+  camera.position.set(Math.sin(a) * 4.2, 7.6, 12.6 + Math.cos(a) * 1.4);
+  camera.lookAt(0, 0.5, 0.1);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+window.ammoDebug = () => ({
+  kinds: AMMO_KINDS.length,
+  // The claim the scene is making, in numbers: every container is instanced,
+  // so the whole wall of ammunition is a couple of draws per kind.
+  draws: renderer.info.render.calls,
+  triangles: renderer.info.render.triangles,
+  loaded: ready.map((c) => c.count),
+  capacities: ready.map((c) => c.capacity),
+  // Muzzle velocity straight from the same table that shaped the models.
+  fastest: describeAmmo(
+    AMMO_KINDS.reduce((a, b) => (AMMO[a].muzzle > AMMO[b].muzzle ? a : b))
+  ),
+});
+`,
   },
 ];
 

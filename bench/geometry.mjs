@@ -201,6 +201,20 @@ const BUDGETS = {
   locomotive: { draws: 25, geometries: 25, triangles: 780 }, // measured 21, 21, 620
   carriage: { draws: 27, geometries: 27, triangles: 800 }, // measured 23, 23, 644
   wagon: { draws: 21, geometries: 21, triangles: 720 }, // measured 17, 17, 572
+  // Ammunition. These are the real test of the instancing in the set, and the
+  // reason for the two hundred-round fixtures below: a belt built as meshes is
+  // two draws per round, so `beltHeavy` would be 301 instead of 4. The whole
+  // module is written the way it is to keep these numbers flat, and nothing
+  // except this gate would notice if it stopped.
+  // Guessed first, and five of the six draw counts were wrong — all of them
+  // too HIGH, which is the failure mode that never announces itself. Measured
+  // and given headroom, exactly as the rail budgets above were.
+  beltHeavy: { draws: 5, geometries: 5, triangles: 6600 }, // measured 3, 3, 6000
+  magRifle: { draws: 5, geometries: 5, triangles: 1600 }, // measured 3, 3, 1452
+  rackArtillery: { draws: 6, geometries: 6, triangles: 1100 }, // measured 4, 4, 972
+  quiverArrows: { draws: 6, geometries: 6, triangles: 1300 }, // measured 4, 4, 1176
+  ammoBox: { draws: 6, geometries: 6, triangles: 3200 }, // measured 4, 4, 2904
+  casings: { draws: 3, geometries: 3, triangles: 3600 }, // measured 1, 1, 3200
 };
 
 const BUILD = {
@@ -232,6 +246,14 @@ const BUILD = {
   locomotive: () => S.createLocomotive({ seed: 1 }),
   carriage: () => S.createCarriage({ seed: 1 }),
   wagon: () => S.createWagon({ seed: 1, kind: 'van' }),
+  // A hundred linked rounds and a hundred spent cases: the sizes a real
+  // firefight actually puts on screen.
+  beltHeavy: () => S.createBelt('heavy-mg'),
+  magRifle: () => S.createMagazine('rifle'),
+  rackArtillery: () => S.createRack('artillery'),
+  quiverArrows: () => S.createQuiver('arrow'),
+  ammoBox: () => S.createAmmoBox('rifle', { open: true }),
+  casings: () => S.createCasing('rifle', { count: 100 }),
 };
 
 /** 700 m with a bend in it — long enough that bad instancing cannot hide. */
