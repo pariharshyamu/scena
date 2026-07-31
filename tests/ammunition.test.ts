@@ -4,6 +4,12 @@ import {
   AMMO,
   AMMO_KINDS,
   ballisticsOf,
+  chargeVelocity,
+  createAmmoDump,
+  createBandolier,
+  createCharge,
+  createLoader,
+  createPowderKeg,
   createAmmoBox,
   createBelt,
   createCasing,
@@ -30,6 +36,10 @@ const draws = (c: { object: { traverse(fn: (o: unknown) => void): void } }): num
 /**
  * How many rounds are actually VISIBLE — instances that are not zero-scaled.
  *
+ * Only the meshes named `counted`. A bandolier's strap and a belt's links are
+ * instanced too, and taking the max across everything counted 24 strap
+ * segments as 24 rounds on a twelve-loop bandolier.
+ *
  * Read straight off the matrix elements rather than via `Matrix4.decompose`.
  * Decompose on a SINGULAR matrix divides by a zero scale, and what it leaves
  * in the output is not something to build an assertion on; the basis vectors
@@ -40,7 +50,7 @@ const visible = (c: Countable): number => {
   const m = new Matrix4();
   c.object.traverse((o) => {
     const im = o as InstancedMesh;
-    if (!im.isInstancedMesh) return;
+    if (!im.isInstancedMesh || im.name !== 'counted') return;
     let on = 0;
     for (let i = 0; i < im.count; i++) {
       im.getMatrixAt(i, m);
@@ -141,7 +151,10 @@ describe('a round', () => {
 
   it('is cheap enough to have a hundred of', () => {
     for (const kind of AMMO_KINDS) {
-      expect(roundTriangles(kind), kind).toBeLessThan(260);
+      // A stand of grape is the heaviest at 312 — three balls, a spindle and
+      // a base plate — and a hundred of those is 31k triangles, which is a
+      // machine-gun position's worth of litter and nothing to worry about.
+      expect(roundTriangles(kind), kind).toBeLessThan(340);
     }
   });
 
@@ -295,5 +308,186 @@ describe('a sealed crate', () => {
     expect(draws(sealed)).toBeLessThan(draws(open));
     // It still knows what is in it.
     expect(sealed.capacity).toBe(AMMO.rifle.perContainer * 2);
+  });
+});
+
+
+describe('loaders — the state between the crate and the weapon', () => {
+  it('builds all three styles, counting', () => {
+    for (const style of ['stripper', 'speedloader', 'en-bloc'] as const) {
+      const l = createLoader('rifle', { style });
+      expect(l.style, style).toBe(style);
+      expect(l.count, style).toBe(l.capacity);
+      expect(visible(l), style).toBe(l.capacity);
+      l.setCount(2);
+      expect(visible(l), style).toBe(2);
+    }
+  });
+
+  it('holds what a clip holds, not what the magazine under it takes', () => {
+    // A stripper clip is 5 rounds whether it is feeding a 5-round Mauser or a
+    // 30-round magazine, so the capacity cannot come from the kind.
+    expect(createLoader('rifle', { style: 'stripper' }).capacity).toBe(5);
+    expect(AMMO.rifle.perContainer).toBe(30);
+    expect(createLoader('pistol', { style: 'speedloader' }).capacity).toBe(6);
+    expect(createLoader('rifle', { style: 'en-bloc' }).capacity).toBe(8);
+  });
+
+  it('sizes the speedloader ring from the rounds', () => {
+    // A .38 loader and a 12-gauge one are different objects, and neither was
+    // drawn: the ring's circumference is the rounds laid round it.
+    const small = createLoader('pistol', { style: 'speedloader' });
+    const big = createLoader('shotgun', { style: 'speedloader' });
+    expect(big.obstacleRadius).toBeGreaterThan(small.obstacleRadius);
+  });
+
+  it('costs the same empty as full, like every other container', () => {
+    const l = createLoader('rifle', { style: 'stripper' });
+    const full = draws(l);
+    l.setCount(0);
+    expect(draws(l)).toBe(full);
+  });
+});
+
+describe('a bandolier', () => {
+  it('is worn, and says where', () => {
+    const b = createBandolier('shotgun', { loops: 12 });
+    expect(b.socket).toBe('chest');
+    expect(b.capacity).toBe(12);
+    expect(visible(b)).toBe(12);
+  });
+
+  it('empties like anything else', () => {
+    const b = createBandolier('rifle', { loops: 10 });
+    for (let i = 0; i < 10; i++) expect(b.consume()).toBe(true);
+    expect(b.consume()).toBe(false);
+    expect(visible(b)).toBe(0);
+  });
+
+  it('drapes rather than running straight', () => {
+    // A straight strap is the tell that this was drawn instead of laid out.
+    const sagged = createBandolier('rifle', { loops: 9, sag: 0.2 });
+    const flat = createBandolier('rifle', { loops: 9, sag: 0 });
+    const lowest = (c: ReturnType<typeof createBandolier>): number => {
+      let y = Infinity;
+      const m = new Matrix4();
+      c.object.traverse((o) => {
+        const im = o as InstancedMesh;
+        if (!im.isInstancedMesh) return;
+        for (let i = 0; i < im.count; i++) {
+          im.getMatrixAt(i, m);
+          if (im.name === 'counted' && Math.abs(m.elements[0]) > 1e-6) {
+          y = Math.min(y, m.elements[13]);
+        }
+        }
+      });
+      return y;
+    };
+    expect(lowest(sagged)).toBeLessThan(lowest(flat) - 0.1);
+  });
+});
+
+describe('propellant', () => {
+  it('exists only for bag-loaded kinds', () => {
+    // Asking for a charge for a rifle round is asking for something that does
+    // not exist. Inventing one would be the same lie as inventing brass for a
+    // caseless round.
+    expect(createCharge('artillery').capacity).toBeGreaterThan(0);
+    expect(createCharge('rifle').capacity).toBe(0);
+    expect(createCharge('rifle').consume()).toBe(false);
+  });
+
+  it('shows the increments it is loaded with', () => {
+    const c = createCharge('artillery', { capacity: 7, increments: 4 });
+    expect(c.count).toBe(4);
+    expect(visible(c)).toBe(4);
+  });
+
+  it('is a SQUARE ROOT, not a slider', () => {
+    // Muzzle energy goes with the propellant burnt and velocity with its
+    // square root, so a half charge is 71% of full velocity and not 50%.
+    // Linear here is the difference between artillery and a volume knob.
+    const full = chargeVelocity('artillery', 7);
+    const half = chargeVelocity('artillery', 3.5);
+    expect(full).toBe(AMMO.artillery.muzzle);
+    expect(half / full).toBeCloseTo(Math.SQRT1_2, 3);
+    expect(chargeVelocity('artillery', 0)).toBe(0);
+  });
+
+  it('reaches ballisticsOf, so the two cannot drift', () => {
+    expect(ballisticsOf('artillery', { increments: 3.5 }).speed).toBeCloseTo(
+      chargeVelocity('artillery', 3.5),
+      6
+    );
+    // A cartridge kind ignores it — its propellant is not a gunner's decision.
+    expect(ballisticsOf('rifle', { increments: 1 }).speed).toBe(AMMO.rifle.muzzle);
+  });
+
+  it('builds a keg, hooped', () => {
+    expect(draws(createPowderKeg())).toBeGreaterThan(1);
+    expect(draws(createPowderKeg({ open: true }))).toBeGreaterThan(draws(createPowderKeg()));
+  });
+});
+
+describe('an ammunition dump', () => {
+  it('is pallet scale and still single figures', () => {
+    // Thirty-six wooden crates is thirty-six draws if a level loops them, and
+    // that is the trap this function exists to close.
+    for (const kind of ['rifle', 'artillery', 'cannonball'] as AmmoKind[]) {
+      const dump = createAmmoDump(kind, { seed: 2 });
+      expect(dump.crates, kind).toBe(36);
+      expect(dump.rounds, kind).toBeGreaterThan(0);
+      expect(draws(dump), kind).toBeLessThan(10);
+    }
+  });
+
+  it('scales with what it is asked for', () => {
+    const small = createAmmoDump('rifle', { pallets: 2, perPallet: 3 });
+    const big = createAmmoDump('rifle', { pallets: 8, perPallet: 8 });
+    expect(small.crates).toBe(6);
+    expect(big.crates).toBe(64);
+    // ...and NOT in draw calls, which is the whole point.
+    expect(draws(big)).toBeLessThanOrEqual(draws(small) + 1);
+  });
+
+  it('is deterministic for a seed', () => {
+    const a = createAmmoDump('rifle', { seed: 9 });
+    const b = createAmmoDump('rifle', { seed: 9 });
+    expect(a.crates).toBe(b.crates);
+    expect(a.obstacleRadius).toBeCloseTo(b.obstacleRadius, 9);
+  });
+
+  it('stands the propellant beside the kinds that load separately', () => {
+    // A dump of 155 mm shells with no charge bags is showing half of what it
+    // takes to fire one.
+    expect(draws(createAmmoDump('artillery', { seed: 3 }))).toBeGreaterThan(
+      draws(createAmmoDump('tank', { seed: 3 }))
+    );
+  });
+});
+
+describe('the smoothbore loads', () => {
+  it('share a bore with round shot and are nothing like it', () => {
+    expect(AMMO.canister.calibre).toBe(AMMO.cannonball.calibre);
+    expect(AMMO.grapeshot.calibre).toBe(AMMO.cannonball.calibre);
+    // Lighter loads, and slower for it — a tin of balls is a poor gas seal.
+    expect(AMMO.canister.mass).toBeLessThan(AMMO.cannonball.mass);
+    expect(AMMO.canister.muzzle).toBeLessThan(AMMO.cannonball.muzzle);
+  });
+
+  it('build, and look like themselves', () => {
+    for (const kind of ['canister', 'grapeshot', 'rifle-grenade'] as AmmoKind[]) {
+      expect(draws(createRound(kind)), kind).toBeGreaterThan(1);
+      expect(createCasing(kind).object.children.length, kind).toBe(0);
+    }
+  });
+});
+
+describe('spent links', () => {
+  it('come with the brass on belt-fed kinds and nowhere else', () => {
+    // A machine-gun position without links is one where somebody swept up
+    // half the floor.
+    expect(draws(createCasing('heavy-mg', { count: 20 }))).toBe(2);
+    expect(draws(createCasing('rifle', { count: 20 }))).toBe(1);
   });
 });

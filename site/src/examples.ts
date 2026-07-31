@@ -4663,9 +4663,11 @@ window.jetsDebug = () => {
 // Watch the belts and magazines empty and refill. setCount() rewrites
 // instance matrices, so an empty container costs exactly what a full one
 // does — which is what lets a game put one on every gunner in a firefight.
-import { AMMO, AMMO_KINDS, applyFog, ballisticsOf, createCasing,
-         createLightingRig, createReady, createRound, createSky,
-         createSurface, describeAmmo, PALETTES } from 'scena3d';
+import { AMMO, AMMO_KINDS, applyFog, ballisticsOf, chargeVelocity,
+         createAmmoDump, createBandolier, createCasing, createCharge,
+         createLightingRig, createLoader, createPowderKeg, createReady,
+         createRound, createSky, createSurface, describeAmmo,
+         PALETTES } from 'scena3d';
 import { Box3, BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Scene,
          Vector3, WebGLRenderer } from 'three';
 
@@ -4691,7 +4693,7 @@ scene.add(floor);
 // bullet, a crimped hull, a sub-calibre dart, a fletched shaft — and the
 // shape is the part that is not being scaled away.
 const ready = [];
-const COLS = 5;
+const COLS = 6;
 const PITCH = 2.6;
 for (let i = 0; i < AMMO_KINDS.length; i++) {
   const kind = AMMO_KINDS[i];
@@ -4699,7 +4701,7 @@ for (let i = 0; i < AMMO_KINDS.length; i++) {
   const col = i % COLS;
   const row = Math.floor(i / COLS);
   const px = (col - (COLS - 1) / 2) * PITCH;
-  const pz = (row - 1.5) * PITCH;
+  const pz = (row - 1.0) * PITCH;
 
   // A plinth, so nothing floats and the grid reads as a display.
   const plinth = new Mesh(new BoxGeometry(2.1, 0.34, 2.1),
@@ -4735,6 +4737,38 @@ for (let i = 0; i < AMMO_KINDS.length; i++) {
   scene.add(brass.object);
 }
 
+// ── The states either side of "ready" ─────────────────────────────────
+// A supply point at the back, and the loading state in front of it: the
+// devices that get loose rounds into a weapon, the strap they are worn on,
+// and the propellant that is the other half of a separate-loading round.
+const dump = createAmmoDump('rifle', { seed: 2, pallets: 6, perPallet: 6 });
+dump.object.position.set(-4.5, 0, -7.5);
+scene.add(dump.object);
+const dump2 = createAmmoDump('artillery', { seed: 5, pallets: 4, perPallet: 4 });
+dump2.object.position.set(4.8, 0, -7.8);
+dump2.object.scale.setScalar(0.55);
+scene.add(dump2.object);
+
+const shelf = new Mesh(new BoxGeometry(9.5, 0.3, 1.5), createSurface('steel', { seed: 6 }));
+shelf.position.set(0, 0.15, -4.6);
+scene.add(shelf);
+
+const fitAt = (prop, x, z, target) => {
+  const size = new Box3().setFromObject(prop.object).getSize(new Vector3());
+  prop.object.scale.setScalar(target / Math.max(0.001, Math.max(size.x, size.y, size.z)));
+  prop.object.position.set(x, 0.3, z);
+  scene.add(prop.object);
+  return prop;
+};
+const loaders = [
+  fitAt(createLoader('rifle', { style: 'stripper' }), -3.8, -4.6, 0.95),
+  fitAt(createLoader('pistol', { style: 'speedloader' }), -2.3, -4.6, 0.8),
+  fitAt(createLoader('rifle', { style: 'en-bloc' }), -0.8, -4.6, 0.95),
+  fitAt(createBandolier('shotgun', { loops: 18 }), 1.0, -4.6, 1.5),
+  fitAt(createCharge('artillery', { capacity: 7 }), 3.2, -4.6, 0.9),
+];
+fitAt(createPowderKeg({ open: true }), 4.4, -4.6, 0.8);
+
 // ── Firing ────────────────────────────────────────────────────────────
 // Every container drains at a rate taken from its own ballistics, so the
 // belt-fed kinds empty fast and the racked ones do not — the same numbers
@@ -4758,11 +4792,17 @@ function frame() {
     if (level[i] <= 0) level[i] = ready[i].capacity;   // reload
     ready[i].setCount(level[i]);
   }
+  // The loaders empty on their own slower cycle — a clip is stripped in one
+  // motion, so it goes full to empty and back rather than draining.
+  for (let i = 0; i < loaders.length; i++) {
+    const phase = (t * 0.35 + i * 0.17) % 1;
+    loaders[i].setCount(Math.ceil((1 - phase) * loaders[i].capacity));
+  }
 
   // A slow orbit over the grid.
   const a = t * 0.11;
-  camera.position.set(Math.sin(a) * 4.2, 7.6, 12.6 + Math.cos(a) * 1.4);
-  camera.lookAt(0, 0.5, 0.1);
+  camera.position.set(Math.sin(a) * 4.0, 8.0, 12.4 + Math.cos(a) * 1.4);
+  camera.lookAt(0, 0.4, -2.6);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
@@ -4786,6 +4826,13 @@ window.ammoDebug = () => ({
   fastest: describeAmmo(
     AMMO_KINDS.reduce((a, b) => (AMMO[a].muzzle > AMMO[b].muzzle ? a : b))
   ),
+  // A supply point is 36 crates and it is not 36 draws.
+  dumpCrates: dump.crates + dump2.crates,
+  loaders: loaders.map((l) => l.count),
+  // Half a charge is 71% of the velocity, not 50%. The square root is the
+  // difference between artillery and a volume knob.
+  halfCharge: Number(chargeVelocity('artillery', 3.5).toFixed(0)),
+  fullCharge: AMMO.artillery.muzzle,
 });
 `,
   },

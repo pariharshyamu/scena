@@ -215,6 +215,15 @@ const BUDGETS = {
   quiverArrows: { draws: 6, geometries: 6, triangles: 1300 }, // measured 4, 4, 1176
   ammoBox: { draws: 6, geometries: 6, triangles: 3200 }, // measured 4, 4, 2904
   casings: { draws: 3, geometries: 3, triangles: 3600 }, // measured 1, 1, 3200
+  // A 36-crate ammunition dump. The trap this closes is a level looping the
+  // crates: thirty-six wooden boxes is thirty-six draws before anything is in
+  // them, and every sealed one is the same box.
+  ammoDump: { draws: 6, geometries: 6, triangles: 3100 }, // measured 4, 4, 2808
+  // A 20-loop shotgun bandolier: the strap is 24 instanced segments following
+  // its own catenary, which is most of the triangles and one draw.
+  bandolier: { draws: 5, geometries: 5, triangles: 1750 }, // measured 3, 3, 1568
+  stripperClip: { draws: 5, geometries: 5, triangles: 300 }, // measured 3, 3, 252
+  chargeBags: { draws: 3, geometries: 3, triangles: 340 }, // measured 1, 1, 280
 };
 
 const BUILD = {
@@ -254,6 +263,10 @@ const BUILD = {
   quiverArrows: () => S.createQuiver('arrow'),
   ammoBox: () => S.createAmmoBox('rifle', { open: true }),
   casings: () => S.createCasing('rifle', { count: 100 }),
+  ammoDump: () => S.createAmmoDump('rifle', { seed: 2 }),
+  bandolier: () => S.createBandolier('shotgun', { loops: 20 }),
+  stripperClip: () => S.createLoader('rifle', { style: 'stripper' }),
+  chargeBags: () => S.createCharge('artillery'),
 };
 
 /** 700 m with a bend in it — long enough that bad instancing cannot hide. */

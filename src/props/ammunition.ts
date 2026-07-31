@@ -82,8 +82,14 @@ export type AmmoKind =
   | 'bomb'
   | 'torpedo'
   | 'depth-charge'
-  // Thrown.
+  // Thrown, and launched off a muzzle.
   | 'grenade'
+  | 'rifle-grenade'
+  // Smoothbore anti-personnel loads. Same bore as round shot, different load
+  // entirely — which is the point of them being separate kinds rather than a
+  // flag on the cannonball.
+  | 'canister'
+  | 'grapeshot'
   // Pre-modern. The same four states, a thousand years earlier.
   | 'arrow'
   | 'bolt'
@@ -95,7 +101,8 @@ export const AMMO_KINDS: AmmoKind[] = [
   'pistol', 'rifle', 'shotgun', 'heavy-mg',
   'autocannon', 'tank', 'artillery', 'mortar',
   'rocket', 'missile', 'bomb', 'torpedo', 'depth-charge',
-  'grenade',
+  'grenade', 'rifle-grenade',
+  'canister', 'grapeshot',
   'arrow', 'bolt', 'sling', 'cannonball', 'ballista',
 ];
 
@@ -116,7 +123,9 @@ export type HeadKind =
   | 'shell'     // ogive artillery/tank shell
   | 'finned'    // mortar bomb, aircraft bomb, torpedo
   | 'sphere'    // cannonball, sling stone, grenade body
-  | 'shaft';    // arrow, bolt, ballista bolt
+  | 'shaft'     // arrow, bolt, ballista bolt
+  | 'tin'       // canister: a thin can of musket balls, bore-diameter
+  | 'stand';    // grapeshot: balls tiered around a spindle on a base plate
 
 /** Everything about one kind, measured once. */
 export interface AmmoSpec {
@@ -227,6 +236,25 @@ export const AMMO: Record<AmmoKind, AmmoSpec> = {
     case: 'none', head: 'sphere', perContainer: 6, container: 'box',
     color: 0x4a5340, label: 'fragmentation grenade',
   },
+  'rifle-grenade': {
+    calibre: 0.040, length: 0.430, mass: 0.60, muzzle: 75,
+    case: 'none', head: 'finned', perContainer: 4, container: 'box',
+    color: 0x4d5545, label: 'rifle grenade',
+  },
+  // Canister and grape are the same bore as round shot and nothing like it in
+  // effect: a tin of musket balls and a tiered stand of them, both of which
+  // come apart at the muzzle. Muzzle velocity is lower than solid shot
+  // because the load is lighter but far less efficient in the bore.
+  canister: {
+    calibre: 0.110, length: 0.180, mass: 3.2, muzzle: 300,
+    case: 'none', head: 'tin', perContainer: 12, container: 'rack',
+    color: 0x9a8f6f, label: 'canister shot',
+  },
+  grapeshot: {
+    calibre: 0.110, length: 0.230, mass: 4.5, muzzle: 320,
+    case: 'none', head: 'stand', perContainer: 10, container: 'rack',
+    color: 0x3a3d42, label: 'stand of grape',
+  },
   arrow: {
     calibre: 0.008, length: 0.750, mass: 0.030, muzzle: 55,
     case: 'none', head: 'shaft', perContainer: 24, container: 'quiver',
@@ -286,11 +314,28 @@ export interface Ballistics {
  * fall like a stone; a missile with its own guidance gets zero, since whatever
  * flies it owns its path.
  */
-export function ballisticsOf(kind: AmmoKind): Ballistics {
+export function ballisticsOf(
+  kind: AmmoKind,
+  options: {
+    /**
+     * Charge increments loaded, for separate-loading kinds. Omit for a full
+     * charge. Ignored by anything that is not bag-loaded, because a rifle
+     * round's propellant is not a decision anybody makes at the gun.
+     */
+    increments?: number;
+    /** Increments in a full charge. Default 7. */
+    chargeCapacity?: number;
+  } = {}
+): Ballistics {
   const spec = AMMO[kind];
   const powered = kind === 'rocket' || kind === 'missile' || kind === 'torpedo';
+  const cap = options.chargeCapacity ?? 7;
+  const speed =
+    spec.case === 'bagged' && options.increments !== undefined
+      ? chargeVelocity(kind, options.increments, cap)
+      : spec.muzzle;
   return {
-    speed: spec.muzzle,
+    speed,
     gravity: kind === 'missile' || kind === 'torpedo' ? 0 : powered ? 3.2 : 9.81,
     // Real calibres are millimetres and a true-to-life 5.56 mm tracer is one
     // pixel at any useful range, so a floor is needed. It has to be a floor
@@ -545,6 +590,59 @@ function roundParts(kind: AmmoKind): RoundParts[] {
       }
       break;
     }
+    case 'tin': {
+      // A thin sheet-metal can, bore diameter, with a lid seam. It flies for
+      // about a metre and then is not a projectile any more.
+      parts.push({
+        geometry: geo(`tin:${kind}`, () => new CylinderGeometry(r, r, L, seg)),
+        material: bodyMaterial(kind),
+        z: L / 2,
+        tilt: LIE,
+      });
+      parts.push({
+        geometry: geo(`tinlid:${kind}`, () => new CylinderGeometry(r * 1.04, r * 1.04, L * 0.09, seg)),
+        material: steelMaterial(),
+        z: L * 0.955,
+        tilt: LIE,
+      });
+      // A sabot disc at the base — what the powder actually pushes on.
+      parts.push({
+        geometry: geo(`tinbase:${kind}`, () => new CylinderGeometry(r, r, L * 0.12, seg)),
+        material: fletchMaterial(),
+        z: L * 0.06,
+        tilt: LIE,
+      });
+      break;
+    }
+    case 'stand': {
+      // Base plate, spindle, and three tiers of balls around it. Three tiers
+      // rather than the nine individual balls of the real thing: each ball is
+      // its own PART, and a part is an InstancedMesh in every container that
+      // holds one, so nine of them would cost a rack nine draw calls to say
+      // something three already say.
+      const ballR = r * 0.3;
+      parts.push({
+        geometry: geo(`plate:${kind}`, () => new CylinderGeometry(r, r, L * 0.08, seg)),
+        material: fletchMaterial(),
+        z: L * 0.04,
+        tilt: LIE,
+      });
+      parts.push({
+        geometry: geo(`spindle:${kind}`, () => new CylinderGeometry(r * 0.14, r * 0.14, L * 0.92, 6)),
+        material: steelMaterial(),
+        z: L * 0.54,
+        tilt: LIE,
+      });
+      for (let t = 0; t < 3; t++) {
+        parts.push({
+          geometry: geo(`grape:${kind}:${t}`, () => new SphereGeometry(ballR, 8, 6)),
+          material: bodyMaterial(kind),
+          z: L * (0.24 + t * 0.28),
+          tilt: LIE,
+        });
+      }
+      break;
+    }
     case 'shaft': {
       const shaftLen = L * 0.86;
       parts.push({
@@ -666,6 +764,10 @@ function stack(
     const im = new InstancedMesh(part.geometry, part.material, Math.max(1, capacity));
     im.frustumCulled = false;
     im.castShadow = true;
+    // Named, so anything walking the graph can tell the COUNTED instances
+    // from the structure holding them. A bandolier's strap and a belt's links
+    // are instanced too and are not the thing the container counts.
+    im.name = 'counted';
     parent.add(im);
     meshes.push(im);
   }
@@ -834,6 +936,7 @@ export function createBelt(kind: AmmoKind, options: BeltOptions = {}): Countable
     new BoxGeometry(pitch * 0.92, s.calibre * 0.9, s.calibre * 0.55)
   );
   const links = new InstancedMesh(linkGeo, steelMaterial(), Math.max(1, capacity));
+  links.name = 'links';
   links.frustumCulled = false;
   group.add(links);
   const node = new Object3D();
@@ -1104,6 +1207,29 @@ export function createCasing(kind: AmmoKind, options: CasingOptions = {}): Prop 
     mesh.setMatrixAt(i, node.matrix);
   }
   group.add(mesh);
+
+  // Belt-fed weapons drop LINKS as well as cases, at exactly one per round,
+  // and the links outnumber nothing — they are simply the other half of the
+  // litter. A machine-gun position without them is a position where somebody
+  // swept up half the floor.
+  if (s.container === 'belt') {
+    const linkGeo = geo(`spentlink:${kind}`, () =>
+      new BoxGeometry(s.calibre * 1.2, s.calibre * 0.5, s.calibre * 0.85)
+    );
+    const links = new InstancedMesh(linkGeo, steelMaterial(), count);
+    links.frustumCulled = false;
+    for (let i = 0; i < count; i++) {
+      const a = rng.range(-1.1, 1.1);
+      const d = spread * Math.sqrt(rng.range(0.02, 1));
+      node.position.set(Math.sin(a) * d + spread * 0.2, s.calibre * 0.25, Math.cos(a) * d * 0.7);
+      node.rotation.set(rng.range(-0.3, 0.3), rng.range(0, Math.PI * 2), rng.range(-0.3, 0.3));
+      node.scale.setScalar(1);
+      node.updateMatrix();
+      links.setMatrixAt(i, node.matrix);
+    }
+    group.add(links);
+  }
+
   group.scale.setScalar(scale);
   return { object: group, obstacleRadius: 0 };
 }
@@ -1129,4 +1255,467 @@ export function createReady(kind: AmmoKind, options: ContainerOptions = {}): Cou
     case 'box':
       return createAmmoBox(kind, { ...options, open: true });
   }
+}
+
+// ── the loading state ────────────────────────────────────────────────────
+// Between the crate and the weapon there is a fifth thing, and leaving it out
+// was the gap in the first pass: the device that gets a handful of loose
+// rounds into a magazine or a cylinder in one motion. It is not a container a
+// game stores ammunition in — it is a container ammunition passes THROUGH.
+
+export type LoaderStyle =
+  /** A spine with rounds in a row, thumbed down into a magazine. */
+  | 'stripper'
+  /** A ring of rounds with a knob, dropped into a revolver cylinder. */
+  | 'speedloader'
+  /** A cage that goes INTO the rifle with the rounds and ejects after. */
+  | 'en-bloc';
+
+export interface LoaderOptions extends ContainerOptions {
+  style?: LoaderStyle;
+}
+
+/**
+ * A stripper clip, a speedloader or an en-bloc clip.
+ *
+ * The three differ in one thing that matters and it is not their shape: a
+ * stripper clip stays in the hand, a speedloader stays in the hand, and an
+ * en-bloc clip **goes into the rifle** and is ejected when the last round
+ * fires. That is why `en-bloc` is a kind of loader and not a kind of magazine,
+ * and why a game reloading a Garand ejects something and one reloading a
+ * Mauser does not.
+ *
+ * Capacity defaults are the real ones — 5 for a stripper, 6 for a speedloader,
+ * 8 for an en-bloc — rather than the kind's magazine capacity, because a clip
+ * holds what a clip holds regardless of what the magazine under it takes.
+ */
+export function createLoader(
+  kind: AmmoKind,
+  options: LoaderOptions = {}
+): Countable & { style: LoaderStyle } {
+  const s = AMMO[kind];
+  const style = options.style ?? 'stripper';
+  const capacity =
+    options.capacity ?? (style === 'stripper' ? 5 : style === 'speedloader' ? 6 : 8);
+  const scale = options.scale ?? 1;
+  const group = new Group();
+  group.name = `loader-${style}-${kind}`;
+
+  const pitch = s.calibre * 1.18;
+  let write: (n: number) => void;
+  let radius: number;
+
+  if (style === 'speedloader') {
+    // Rounds on a circle whose diameter is the cylinder's, with the release
+    // knob in the middle. The circle is set by the ROUNDS, so a .38 loader
+    // and a .44 one are visibly different objects.
+    const ring = (pitch * capacity) / (2 * Math.PI);
+    const knob = new Mesh(
+      geo(`knob:${kind}:${capacity}`, () => new CylinderGeometry(ring * 0.42, ring * 0.5, s.calibre * 1.1, 10)),
+      caseMaterial('plastic')
+    );
+    knob.position.z = -s.length * 0.18;
+    knob.quaternion.copy(LIE);
+    group.add(knob);
+    write = stack(group, kind, capacity, (i, out) => {
+      const a = (i / capacity) * Math.PI * 2;
+      out.position.set(Math.cos(a) * ring, Math.sin(a) * ring, 0);
+    });
+    radius = ring + s.calibre;
+  } else {
+    // Stripper and en-bloc are both a row of rounds on a spine. The en-bloc's
+    // spine wraps them — it is a cage, because it has to survive being fired
+    // over — so it gets a second rail on the far side.
+    const span = pitch * capacity;
+    const spine = new Mesh(
+      geo(`spine:${kind}:${capacity}:${style}`, () =>
+        new BoxGeometry(span, s.calibre * 0.55, s.calibre * 0.5)
+      ),
+      steelMaterial()
+    );
+    spine.position.set(0, -s.calibre * 0.75, s.length * 0.14);
+    group.add(spine);
+    if (style === 'en-bloc') {
+      const far = spine.clone();
+      far.position.y = s.calibre * 0.75;
+      group.add(far);
+    }
+    write = stack(group, kind, capacity, (i, out) => {
+      out.position.set((i - (capacity - 1) / 2) * pitch, 0, -s.length / 2);
+    });
+    radius = span / 2;
+  }
+
+  group.scale.setScalar(scale);
+  const c = countable(group, kind, capacity, write, radius * scale, options.count ?? capacity);
+  return Object.assign(c, { style });
+}
+
+export interface BandolierOptions extends ContainerOptions {
+  /** Loops along the strap. Default 20. */
+  loops?: number;
+  /** How far the strap sags across the chest, metres. Default 0.16. */
+  sag?: number;
+}
+
+/**
+ * A bandolier — rounds in loops on a strap, worn across the body.
+ *
+ * The only container in the set that is WORN rather than held or set down, and
+ * the difference shows in the handshake: it publishes `socket`, the name ANIMA
+ * uses for the attachment point, and the caller parents it there. SCENA does
+ * not know what a shoulder is; it knows what a strap that has to hang across
+ * one looks like.
+ *
+ * The strap is a catenary, like the belt, for the same reason: a straight one
+ * is the tell that this was drawn rather than laid out. It is authored in the
+ * plane a torso presents, so parenting it to a chest socket needs no rotation.
+ */
+export function createBandolier(
+  kind: AmmoKind,
+  options: BandolierOptions = {}
+): Countable & { socket: string } {
+  const s = AMMO[kind];
+  const loops = options.loops ?? 20;
+  const capacity = options.capacity ?? loops;
+  const scale = options.scale ?? 1;
+  const sag = options.sag ?? 0.16;
+  const group = new Group();
+  group.name = `bandolier-${kind}`;
+
+  // A shoulder-to-hip run is about half a torso height; the strap is authored
+  // at that and the caller scales it to the body it goes on.
+  const span = 0.62;
+  const at = (u: number): { x: number; y: number; slope: number } => {
+    const t = u * 2 - 1; // -1..1
+    return { x: (t * span) / 2, y: -sag * (1 - t * t), slope: (2 * sag * t) / (span / 2) };
+  };
+
+  // The strap itself: short segments following the curve, instanced.
+  const SEGS = 24;
+  const strapGeo = geo(`strap:${kind}`, () =>
+    new BoxGeometry((span / SEGS) * 1.25, s.calibre * 1.5, s.calibre * 0.35)
+  );
+  const strap = new InstancedMesh(strapGeo, createSurface('leather', { seed: options.seed ?? 6 }), SEGS);
+  strap.name = 'strap';
+  strap.frustumCulled = false;
+  strap.castShadow = true;
+  const node = new Object3D();
+  for (let i = 0; i < SEGS; i++) {
+    const p = at((i + 0.5) / SEGS);
+    node.position.set(p.x, p.y, 0);
+    node.rotation.set(0, 0, Math.atan(p.slope));
+    node.scale.setScalar(1);
+    node.updateMatrix();
+    strap.setMatrixAt(i, node.matrix);
+  }
+  group.add(strap);
+
+  // Rounds sit nose-down in the loops, tilted with the strap.
+  const write = stack(group, kind, capacity, (i, out) => {
+    const p = at((i + 0.5) / capacity);
+    out.position.set(p.x, p.y - s.calibre * 0.4, 0);
+    out.rotation.set(-Math.PI / 2, 0, Math.atan(p.slope));
+  });
+
+  group.scale.setScalar(scale);
+  const c = countable(group, kind, capacity, write, (span / 2) * scale, options.count ?? capacity);
+  // ANIMA's socket names. A bandolier is a chest item; a game that wants it
+  // over the other shoulder mirrors the group's X scale.
+  return Object.assign(c, { socket: 'chest' });
+}
+
+// ── propellant ───────────────────────────────────────────────────────────
+
+export interface ChargeOptions extends ContainerOptions {
+  /**
+   * Increments loaded, 1..`capacity`. This is the gunner's actual decision on
+   * a separate-loading piece: more bags, more velocity, more range, more wear.
+   */
+  increments?: number;
+}
+
+/**
+ * Bagged propellant — the other half of a separate-loading round.
+ *
+ * A 155 mm shell is not a cartridge. The shell goes in, then a number of cloth
+ * charge bags behind it, and how many is a decision made per shot. Modelling
+ * the shell without the charge is modelling half the round, and it is the half
+ * a gun crew spends its time on.
+ *
+ * `count` is the number of bags SHOWN; `chargeVelocity` says what that many
+ * are worth. Only kinds whose case is `bagged` have these — asking for a
+ * charge for a rifle round is asking for something that does not exist, and
+ * this returns an empty prop rather than inventing one.
+ */
+export function createCharge(kind: AmmoKind, options: ChargeOptions = {}): Countable {
+  const s = AMMO[kind];
+  const capacity = options.capacity ?? 7;
+  const scale = options.scale ?? 1;
+  const group = new Group();
+  group.name = `charge-${kind}`;
+  const r = s.calibre * 0.46;
+  const bagH = s.length * 0.16;
+
+  if (s.case !== 'bagged') {
+    return {
+      object: group,
+      kind,
+      capacity: 0,
+      count: 0,
+      setCount: () => 0,
+      consume: () => false,
+      obstacleRadius: 0,
+    };
+  }
+
+  const bagGeo = geo(`bag:${kind}`, () => new CylinderGeometry(r, r * 0.94, bagH, 10));
+  const bags = new InstancedMesh(bagGeo, caseMaterial('bagged'), Math.max(1, capacity));
+  bags.name = 'counted';
+  bags.frustumCulled = false;
+  bags.castShadow = true;
+  group.add(bags);
+  const node = new Object3D();
+  const hidden = new Matrix4().makeScale(0, 0, 0);
+  const write = (n: number): void => {
+    for (let i = 0; i < capacity; i++) {
+      if (i >= n) {
+        bags.setMatrixAt(i, hidden);
+        continue;
+      }
+      node.position.set(0, bagH / 2 + i * bagH * 0.98, 0);
+      node.rotation.set(0, (i * 1.7) % Math.PI, 0);
+      node.scale.setScalar(1);
+      node.updateMatrix();
+      bags.setMatrixAt(i, node.matrix);
+    }
+    bags.instanceMatrix.needsUpdate = true;
+  };
+
+  group.scale.setScalar(scale);
+  return countable(group, kind, capacity, write, r * scale, options.increments ?? options.count ?? capacity);
+}
+
+/**
+ * What `increments` bags of propellant are worth, in m/s.
+ *
+ * Muzzle energy is proportional to the propellant burnt and velocity goes as
+ * its square root, so a half charge is **71%** of full velocity rather than
+ * 50%. Getting that linear is the difference between a gunnery mechanic that
+ * behaves like artillery and one that behaves like a slider.
+ *
+ * The full charge is the kind's own `muzzle`, so this and `ballisticsOf` can
+ * never drift apart.
+ */
+export function chargeVelocity(kind: AmmoKind, increments: number, capacity = 7): number {
+  const full = AMMO[kind].muzzle;
+  const n = Math.max(0, Math.min(capacity, increments));
+  return full * Math.sqrt(n / capacity);
+}
+
+export interface KegOptions {
+  seed?: number;
+  scale?: number;
+  /** Lid off, powder visible. Default false. */
+  open?: boolean;
+}
+
+/**
+ * A powder keg — the bulk propellant that everything before the cartridge ran
+ * on, and the most explosive thing on any pre-modern map.
+ *
+ * Not a `Countable`: a keg holds a mass, not a number of rounds, and giving it
+ * a `count` would be inventing a unit nobody uses.
+ */
+export function createPowderKeg(options: KegOptions = {}): Prop {
+  const scale = options.scale ?? 1;
+  const seed = options.seed ?? 13;
+  const group = new Group();
+  group.name = 'powder-keg';
+  const r = 0.19;
+  const h = 0.44;
+
+  const body = new Mesh(
+    geo('kegbody', () => new CylinderGeometry(r, r * 0.88, h, 14)),
+    createSurface('wood', { seed })
+  );
+  body.position.y = h / 2;
+  body.castShadow = true;
+  group.add(body);
+
+  // Two iron hoops. A barrel without them reads as a bucket.
+  const hoopGeo = geo('keghoop', () => new CylinderGeometry(r * 1.03, r * 1.03, h * 0.07, 14));
+  const hoops = new InstancedMesh(hoopGeo, steelMaterial(), 2);
+  hoops.frustumCulled = false;
+  const node = new Object3D();
+  for (let i = 0; i < 2; i++) {
+    node.position.set(0, h * (0.22 + i * 0.56), 0);
+    node.rotation.set(0, 0, 0);
+    node.scale.setScalar(1);
+    node.updateMatrix();
+    hoops.setMatrixAt(i, node.matrix);
+  }
+  group.add(hoops);
+
+  if (options.open) {
+    const powder = new Mesh(
+      geo('kegpowder', () => new CylinderGeometry(r * 0.9, r * 0.9, h * 0.06, 14)),
+      shared('powder', () => new MeshStandardMaterial({ color: 0x24242a, roughness: 1, metalness: 0 }))
+    );
+    powder.position.y = h * 0.94;
+    group.add(powder);
+  }
+
+  group.scale.setScalar(scale);
+  return { object: group, obstacleRadius: r * scale };
+}
+
+// ── the dump ─────────────────────────────────────────────────────────────
+
+export interface DumpOptions {
+  seed?: number;
+  /** Pallets of crates. Default 6. */
+  pallets?: number;
+  /** Crates per pallet. Default 6. */
+  perPallet?: number;
+  /** Fraction of pallets with the top crate open. Default 0.3. */
+  open?: number;
+  scale?: number;
+}
+
+export interface AmmoDump extends Prop {
+  kind: AmmoKind;
+  /** Crates in the dump, of whatever this kind's crate holds. */
+  crates: number;
+  /** Rounds the whole dump represents. */
+  rounds: number;
+}
+
+/**
+ * An ammunition dump — pallet scale.
+ *
+ * The state above `stored`: not a crate, a supply point. Crates stacked on
+ * pallets in a loose grid, a few of them open, the rest sealed, with kegs or
+ * charge bags alongside for the kinds that need them.
+ *
+ * The reason this is worth its own function rather than a loop in a level is
+ * that a naive loop is a performance trap: thirty-six wooden crates is
+ * thirty-six draws before anything is in them, and a sealed crate is exactly
+ * the same box every time. The crates here are ONE instanced mesh, the pallets
+ * another, and only the open ones pay for contents.
+ */
+export function createAmmoDump(kind: AmmoKind, options: DumpOptions = {}): AmmoDump {
+  const s = AMMO[kind];
+  const pallets = Math.max(1, options.pallets ?? 6);
+  const perPallet = Math.max(1, options.perPallet ?? 6);
+  const openFrac = options.open ?? 0.3;
+  const scale = options.scale ?? 1;
+  const rng = new Rng(options.seed ?? 17);
+  const group = new Group();
+  group.name = `ammodump-${kind}`;
+
+  // One crate size for the whole dump, from the round, as everything else is.
+  const box = {
+    x: Math.max(0.36, s.length * 1.25),
+    y: Math.max(0.22, s.calibre * 6),
+    z: Math.max(0.3, s.length * 0.75),
+  };
+  const palletSize = { x: box.x * 1.25, y: 0.11, z: box.z * 1.6 };
+  const cols = Math.ceil(Math.sqrt(pallets));
+  const spot = (i: number): { x: number; z: number; a: number } => {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    return {
+      x: (c - (cols - 1) / 2) * palletSize.x * 1.5 + rng.range(-0.08, 0.08),
+      z: (r - (Math.ceil(pallets / cols) - 1) / 2) * palletSize.z * 1.7 + rng.range(-0.08, 0.08),
+      a: rng.range(-0.12, 0.12),
+    };
+  };
+  const spots = Array.from({ length: pallets }, (_, i) => spot(i));
+
+  const node = new Object3D();
+  const put = (mesh: InstancedMesh, i: number, x: number, y: number, z: number, a: number): void => {
+    node.position.set(x, y, z);
+    node.rotation.set(0, a, 0);
+    node.scale.setScalar(1);
+    node.updateMatrix();
+    mesh.setMatrixAt(i, node.matrix);
+  };
+
+  const palletMesh = new InstancedMesh(
+    geo(`pallet:${kind}`, () => new BoxGeometry(palletSize.x, palletSize.y, palletSize.z)),
+    createSurface('wood', { seed: (options.seed ?? 17) + 1 }),
+    pallets
+  );
+  palletMesh.frustumCulled = false;
+  palletMesh.receiveShadow = true;
+  group.add(palletMesh);
+
+  const crateMesh = new InstancedMesh(
+    geo(`dumpcrate:${kind}`, () => new BoxGeometry(box.x, box.y, box.z)),
+    createSurface('wood', { seed: options.seed ?? 17 }),
+    pallets * perPallet
+  );
+  crateMesh.frustumCulled = false;
+  crateMesh.castShadow = true;
+  group.add(crateMesh);
+
+  let crate = 0;
+  const openTops: Array<{ x: number; y: number; z: number; a: number }> = [];
+  for (let p = 0; p < pallets; p++) {
+    const at = spots[p];
+    put(palletMesh, p, at.x, palletSize.y / 2, at.z, at.a);
+    // Crates stack two wide and up; the top one of some pallets is open.
+    for (let c = 0; c < perPallet; c++) {
+      const tier = Math.floor(c / 2);
+      const side = c % 2 === 0 ? -1 : 1;
+      const y = palletSize.y + box.y / 2 + tier * box.y;
+      const x = at.x + side * box.x * 0.02;
+      put(crateMesh, crate++, x, y, at.z + side * box.z * 0.06, at.a + rng.range(-0.05, 0.05));
+      const top = c >= perPallet - 2;
+      if (top && rng.range(0, 1) < openFrac) openTops.push({ x, y: y + box.y / 2, z: at.z, a: at.a });
+    }
+  }
+
+  // Only the open ones pay for rounds — and they pay for them ONCE, as a
+  // single stack shared across every open crate in the dump.
+  if (openTops.length) {
+    const perCrate = Math.max(4, Math.min(24, s.perContainer));
+    const total = openTops.length * perCrate;
+    const write = stack(group, kind, total, (i, out) => {
+      const which = openTops[Math.floor(i / perCrate)];
+      const j = i % perCrate;
+      const row = Math.floor(j / 4);
+      const col = j % 4;
+      out.position.set(
+        which.x + (col - 1.5) * s.calibre * 1.35,
+        which.y - s.calibre * 0.6 + row * s.calibre * 1.2,
+        which.z - s.length / 2
+      );
+      out.rotation.set(0, which.a, 0);
+    });
+    write(total);
+  }
+
+  // Kinds that are loaded separately need their propellant standing beside
+  // them, or the dump is showing half of what it takes to fire.
+  if (s.case === 'bagged') {
+    const charge = createCharge(kind, { capacity: 6, seed: options.seed });
+    charge.object.position.set(spots[0].x - palletSize.x * 1.1, palletSize.y, spots[0].z);
+    group.add(charge.object);
+  } else if (s.muzzle > 0 && s.case === 'none' && AMMO[kind].head === 'sphere') {
+    const keg = createPowderKeg({ seed: options.seed });
+    keg.object.position.set(spots[0].x - palletSize.x * 1.1, 0, spots[0].z);
+    group.add(keg.object);
+  }
+
+  group.scale.setScalar(scale);
+  const spread = cols * palletSize.x * 1.5;
+  return {
+    object: group,
+    kind,
+    crates: crate,
+    rounds: crate * s.perContainer * 2,
+    obstacleRadius: (spread / 2) * scale,
+  };
 }

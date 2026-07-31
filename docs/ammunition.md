@@ -9,12 +9,16 @@ wants ammunition wants all four or none of them. So this is organised by
 
 | state | what builds it |
 |---|---|
+| supplied | `createAmmoDump` — pallets of crates, a supply point |
 | stored | `createAmmoBox` — sealed, or open with the rounds visible |
-| ready | `createMagazine` `createBelt` `createQuiver` `createRack` |
+| loading | `createLoader` — stripper clip, speedloader, en-bloc clip |
+| ready | `createMagazine` `createBelt` `createQuiver` `createRack` `createBandolier` |
 | carried | `createRound` — one, `Holdable`, in a hand |
-| spent | `createCasing` — brass on the ground |
+| spent | `createCasing` — brass, and links for belt-fed kinds |
 
 and every one of them is **derived** from a single measured spec per kind.
+Plus the other half of a separate-loading round: `createCharge` (bagged
+propellant) and `createPowderKeg` (bulk).
 
 ```ts
 import { createReady, createRound, ballisticsOf } from 'scena3d';
@@ -24,13 +28,19 @@ scene.add(belt.object);
 belt.consume();                                 // it visibly shortens
 ```
 
-## Nineteen kinds, one table
+## Twenty-two kinds, one table
 
 ```ts
 AMMO_KINDS  // pistol rifle shotgun heavy-mg  autocannon tank artillery mortar
-            // rocket missile bomb torpedo depth-charge  grenade
-            // arrow bolt sling cannonball ballista
+            // rocket missile bomb torpedo depth-charge  grenade rifle-grenade
+            // canister grapeshot  arrow bolt sling cannonball ballista
 ```
+
+`canister` and `grapeshot` share a bore with `cannonball` and are nothing like
+it: a tin of musket balls and a tiered stand of them, both of which come apart
+at the muzzle. They are separate kinds rather than a flag on the cannonball
+because a smoothbore taking three completely different loads is the fact worth
+modelling.
 
 Real calibres and real masses, because the whole value of deriving the
 containers is lost if the source numbers are invented. A 12.7 mm belt is
@@ -110,6 +120,10 @@ Measured:
 | 24-arrow quiver | **4** | 1176 |
 | open rifle crate | **4** | 2904 |
 | 100 spent cases | **1** | 3200 |
+| 36-crate ammunition dump | **4** | 2808 |
+| 20-loop bandolier | **3** | 1568 |
+| 5-round stripper clip | **3** | 252 |
+| 7-bag artillery charge | **1** | 280 |
 
 A magazine that empties therefore costs the same as a full one, which is what
 lets a game put a belt on every gunner in a firefight. That is a unit test
@@ -117,7 +131,7 @@ lets a game put a belt on every gunner in a firefight. That is a unit test
 individual meshes — a completely plausible way to write it — takes `beltHeavy`
 from 3 draws to **103**, and the gate says so.
 
-Six budgets were guessed before they were measured and five of the six draw
+Ten budgets were guessed before they were measured and nine of the ten draw
 counts were wrong, all of them too high. That is the failure mode that never
 announces itself, and it is the argument for the gate in one line.
 
@@ -136,12 +150,78 @@ announces itself, and it is the argument for the gate in one line.
 - **A driving band.** Three millimetres of copper near the base of a shell,
   and the difference between "a shell" and "a grey cylinder".
 
+## The loading state
+
+Between the crate and the weapon there is a fifth thing, and leaving it out was
+the gap in the first pass: the device that gets a handful of loose rounds into
+a magazine or a cylinder in one motion.
+
+```ts
+createLoader('rifle', { style: 'stripper' })     // 5, thumbed into a magazine
+createLoader('pistol', { style: 'speedloader' }) // 6, dropped into a cylinder
+createLoader('rifle', { style: 'en-bloc' })      // 8, goes IN and ejects
+```
+
+The three differ in one thing that matters, and it is not their shape: a
+stripper clip and a speedloader stay in the hand, and an **en-bloc clip goes
+into the rifle** and is ejected when the last round fires. That is why it is a
+kind of loader and not a kind of magazine, and why a game reloading a Garand
+ejects something and one reloading a Mauser does not.
+
+Capacities are the real ones — 5, 6, 8 — and deliberately *not* the kind's
+magazine capacity: a stripper clip holds 5 whether it is feeding a 5-round
+Mauser or a 30-round magazine.
+
+## Worn, not held
+
+`createBandolier` is the only container in the set that is worn, and the
+difference shows in the handshake: it publishes `socket`, the name ANIMA uses
+for its attachment points, and the caller parents it there. SCENA does not know
+what a shoulder is; it knows what a strap that has to hang across one looks
+like. The strap is a catenary of instanced segments, for the same reason the
+belt is — a straight one is the tell that it was drawn rather than laid out.
+
+## Propellant is half the round
+
+A 155 mm shell is not a cartridge. The shell goes in, then a number of cloth
+charge bags behind it, and **how many is a decision made per shot**. Modelling
+the shell without the charge is modelling half the round, and it is the half a
+gun crew spends its time on.
+
+```ts
+const charge = createCharge('artillery', { capacity: 7, increments: 4 });
+ballisticsOf('artillery', { increments: 4 }).speed;   // 625 m/s, not 827
+```
+
+Muzzle energy goes with the propellant burnt and velocity with its square root,
+so **a half charge is 71% of full velocity, not 50%**. Linear here is the
+difference between a gunnery mechanic that behaves like artillery and one that
+behaves like a volume knob. The full charge is the kind's own `muzzle`, so
+`chargeVelocity` and `ballisticsOf` can never drift apart.
+
+Only bag-loaded kinds have charges. Asking for one for a rifle round returns an
+empty prop — the same refusal as asking for brass from a caseless round.
+`createPowderKeg` is the bulk version, and not a `Countable`: a keg holds a
+mass, not a number of rounds, and giving it a `count` would invent a unit
+nobody uses.
+
+## The dump
+
+`createAmmoDump` is the state above *stored*: not a crate, a supply point.
+Pallets of crates in a loose grid, a few open, the rest sealed, with charge
+bags or a powder keg alongside for the kinds that load separately.
+
+It is worth its own function because the obvious loop is a performance trap.
+Thirty-six wooden crates is thirty-six draw calls before anything is in them,
+and every sealed one is exactly the same box. Measured: **36 crates in 4
+draws**, and asking for 64 instead of 6 does not add one.
+
 ## What is not here yet
 
-Stripper clips and speedloaders, a bandolier that drapes on a body, rifle
-grenades, canister and grapeshot, powder kegs and separate propellant charges,
-and an ammunition *dump* — a pallet-scale arrangement rather than a single
-container.
+Drum and pan magazines, a shell hoist, blank and drill rounds (visually
+distinct on purpose — a blue drill round is blue so nobody loads it), tracer
+mixes in a belt at one-in-five, and clip-fed *stripping* as an animation
+rather than a prop.
 
 The [`ammunition` playground](?example=ammunition) puts one station per kind in
 a grid: the round, the ready state it actually ships in, and the brass it
