@@ -26,6 +26,41 @@ stated rather than papered over:
 
 ## Releases
 
+## [0.108.0] — 2026-08-01
+
+### Added
+
+- **`boardStrength()` — what a board takes to break, derived from four
+  published numbers and nothing else.** Modulus of rupture and Young's modulus
+  from the Wood Handbook, the visual-grade strength ratio from ASTM D245, and
+  the standard three-point bending relation. Five timbers.
+- **It has been checked against the world.** Feld, McNair and Wilk measured a
+  30 × 15 × 2.5 cm pine board at about **3.1 kN** in *Scientific American* in
+  1979. Handed that board's dimensions and nothing else, this says **3.62 kN** —
+  a 17% error with no fitting. Without the ASTM strength ratio it says 10.4 kN
+  and looks entirely plausible while being three times wrong.
+- **`stackStrength()`** — and two results the algebra gives that intuition does
+  not. **Energy is LINEAR in thickness**, not cubic: the `d³` is in the
+  stiffness and a stiffer beam fails sooner, so `U ∝ σ²bdL/E` and six glued
+  boards take exactly the same energy as six spaced ones. The spacers are a
+  **force** argument — 4.10 kN six times against 147.7 kN at once.
+- **`createBoard()`** — boards on two blocks whose spacing *is* the span the
+  strength was computed from. `strike()` takes **newtons**, because force is
+  what breaks a beam.
+- Added to `npm run geometry`.
+
+### The cross-library result
+
+ANIMA derives a strike's kinetic energy from Dempster's segment masses and a
+measured surface velocity, has never heard of this file, and puts a hammerfist
+at **113 J** against a pine board's **1.9 J**.
+
+**Energy is not what limits board breaking — it is out by a factor of sixty.**
+Every strike ANIMA can measure carries 10× to 400× what a pine board needs. What
+a person runs out of is force, in the first millimetre. Two libraries that do not
+import each other, each deriving its own half in its own units, is what made that
+checkable.
+
 ### 2026-07-30
 
 - **0.105.0** — **Rail**, the one vehicle class that does not steer: a train's

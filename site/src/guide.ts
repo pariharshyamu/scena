@@ -45,6 +45,7 @@ const PAGES: Array<{ id: string; title: string; playground?: string }> = [
   { id: 'scatter', title: 'Scattering & LOD', playground: 'forest' },
   { id: 'settlement', title: 'Villages, buildings & kits', playground: 'village' },
   { id: 'manifests', title: 'Manifests & markers', playground: 'manifest' },
+  { id: 'boards', title: 'Breaking boards: a number checked against the world' },
   { id: 'handshake', title: 'The GAMA handshake', playground: 'path' },
 ];
 

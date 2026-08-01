@@ -851,3 +851,17 @@ export {
   type Round,
   type RoundOptions,
 } from './props/ammunition';
+export {
+  createBoard,
+  boardStrength,
+  stackStrength,
+  TIMBERS,
+  TIMBER_NAMES,
+  type BoardOptions,
+  type BoardShape,
+  type BoardStack,
+  type BoardState,
+  type BoardStrength,
+  type Timber,
+  type TimberSpec,
+} from './props/boards';

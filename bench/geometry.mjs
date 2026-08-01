@@ -166,6 +166,7 @@ function measure(object) {
  */
 const BUDGETS = {
   crate: { draws: 16, geometries: 16, triangles: 200 },
+  boards: { draws: 11, geometries: 11, triangles: 140 },
   rock: { draws: 2, geometries: 2, triangles: 30 },
   tree: { draws: 7, geometries: 7, triangles: 140 },
   fence: { draws: 9, geometries: 9, triangles: 160 },
@@ -228,6 +229,7 @@ const BUDGETS = {
 
 const BUILD = {
   crate: () => S.createCrate({ seed: 1 }),
+  boards: () => S.createBoard({ seed: 1, count: 3 }),
   rock: () => S.createRock({ seed: 1 }),
   tree: () => S.createTree({ seed: 1 }),
   fence: () => S.createFence({ seed: 1 }),

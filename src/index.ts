@@ -1115,3 +1115,19 @@ export {
   type Round,
   type RoundOptions,
 } from './props/ammunition';
+
+// Breaking boards — what a board takes, in joules, from published timber.
+export {
+  createBoard,
+  boardStrength,
+  stackStrength,
+  TIMBERS,
+  TIMBER_NAMES,
+  type BoardOptions,
+  type BoardShape,
+  type BoardStack,
+  type BoardState,
+  type BoardStrength,
+  type Timber,
+  type TimberSpec,
+} from './props/boards';
