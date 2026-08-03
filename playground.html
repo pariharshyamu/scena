@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Playground · SCENA</title>
+    <script type="module" crossorigin src="./assets/playground-eAXFUEF8.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+    <link rel="modulepreload" crossorigin href="./assets/examples-D_OgjN6R.js">
+    <link rel="stylesheet" crossorigin href="./assets/site-C1FSdWBW.css">
+  </head>
+  <body>
+    <div class="pg">
+      <nav class="nav">
+        <a class="logo" href="./index.html">SCE<span>NA</span></a>
+        <a class="navlink" href="./guide.html">Guide</a>
+        <a class="navlink active" href="./playground.html">Playground</a>
+        <span class="spacer"></span>
+        <a class="navlink" href="https://github.com/pariharshyamu/scena">GitHub</a>
+      </nav>
+      <div class="pg-toolbar">
+        <select id="example-select" aria-label="Example"></select>
+        <button class="run" id="run">Run ▸</button>
+        <button id="reset">Reset</button>
+        <span class="hint">Ctrl/⌘+Enter runs · edit freely — it's your copy · try changing a seed</span>
+      </div>
+      <div class="pg-main">
+        <div class="pg-editor">
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        </div>
+        <div class="pg-preview">
+          <iframe id="preview" title="preview" allow="pointer-lock"></iframe>
+          <div class="pg-error" id="error"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
