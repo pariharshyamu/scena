@@ -26,6 +26,58 @@ stated rather than papered over:
 
 ## Releases
 
+## [0.109.0] — 2026-08-03
+
+### Added
+
+- **`plateStrength`, `mailStrength` and `createArmour`** — what it costs to
+  push a hard point through a sheet of metal, from the metal's yield strength
+  and a ruler. SCENA has never heard of an arrow.
+
+### The obvious model is the wrong mechanism
+
+Shearing a plug out — perimeter × thickness × shear strength — is what every
+press-tool handbook uses for punching holes. Handed a 9 mm bodkin and 2 mm of
+wrought iron it says **19.6 J**, and the measured figure is nearly ten times
+that.
+
+A sharp point does not shear a plug. It OPENS A HOLE, pushing metal aside
+radially, and what that costs is the metal's INDENTATION pressure — which Tabor
+measured in 1951 at about three times the yield stress, and which is also what
+a hardness test measures.
+
+    p = 3·σ_y            F = p·πd²/4            E = F·t
+
+Both numbers are reported side by side. A model that is only ever right is a
+model nobody has checked against the alternative.
+
+### What it is wrong against
+
+Alan Williams (*The Knight and the Blast Furnace*, 2003) put 2 mm plate at about
+**175 J** and mail over padding at around **120 J**. This file's 2 mm comes out
+at **76 J** in wrought iron and **153 J** in medium-carbon steel — under, which
+it must be, because Williams's are system figures including dishing the plate
+and the arrow bending. The gap is the energy that goes into BENDING the plate
+rather than piercing it, which is the whole argument about arrows and armour.
+
+### Mail is not what stops the arrow
+
+One riveted ring takes **679 N** and **3.05 J**, against an arrow's hundred and
+twenty. That is why mail was never worn alone: the padding under it does the
+work, the padding is textile, and SCENA has no business knowing the fracture
+toughness of linen. That number lives in ANIMA, and neither package imports the
+other.
+
+The areal density comes out at **10.8 kg/m²** from wire diameter and ring pitch
+alone. Surviving riveted mail is 8-12.
+
+### And a unit that deliberately does not match
+
+`createBoard().strike()` takes NEWTONS; `createArmour().strike()` takes JOULES.
+A board fails when its outer fibre reaches rupture stress, so what runs out is
+force. A plate fails when a hole is open all the way through, so what runs out
+is work. Making them match would be tidier and wrong.
+
 ## [0.108.0] — 2026-08-01
 
 ### Added

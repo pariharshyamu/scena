@@ -865,3 +865,19 @@ export {
   type Timber,
   type TimberSpec,
 } from './props/boards';
+export {
+  ALLOYS,
+  ALLOY_NAMES,
+  TABOR,
+  createArmour,
+  mailStrength,
+  plateStrength,
+  type Alloy,
+  type AlloySpec,
+  type ArmourOptions,
+  type ArmourProp,
+  type MailShape,
+  type MailStrength,
+  type PlateShape,
+  type PlateStrength,
+} from './props/armour';
